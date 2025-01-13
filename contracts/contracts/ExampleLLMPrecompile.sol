@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 import "./interfaces/ILLM.sol";
 
 // ExampleLLM shows how the HelloWorld precompile can be used in a smart contract.
-contract ExampleLLM {
+contract ExampleLLMPrecompile {
   address constant LLM_ADDRESS = 0x0300000000000000000000000000000000000000;
   ILLM llm = ILLM(LLM_ADDRESS);
 
@@ -29,6 +29,7 @@ contract ExampleLLM {
   }
 
   function healthCheck() external view returns (bool healthy) {
+    // healthy = true;
     healthy = llm.healthCheck();
   }
 }
