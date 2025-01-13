@@ -18,7 +18,7 @@ var _ contract.Configurator = &configurator{}
 
 // ConfigKey is the key used in json config files to specify this precompile config.
 // must be unique across all precompiles.
-const ConfigKey = "lLMPrecompileConfig"
+const ConfigKey = "llmprecompileConfig"
 
 // ContractAddress is the defined address of the precompile contract.
 // This should be unique across all precompile contracts.
