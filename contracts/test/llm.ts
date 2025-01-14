@@ -4,7 +4,7 @@
 import { expect } from "chai";
 import { Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
-import { test } from "./utils";
+// import { test } from "./utils";
 
 // make sure this is always an admin for hello world precompile
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
@@ -23,43 +23,82 @@ describe("ILLM", function () {
     ownerAddress = await owner.getAddress();
     llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
-    const code = await ethers.provider.getCode(LLM_ADDRESS);
-    console.log("Contract code at address:", code);
+    let code = await ethers.provider.getCode(LLM_ADDRESS);
+    expect(code).to.not.equal("0x");
 
-    const WARP_ADDRESS = "0x0200000000000000000000000000000000000005";
-
-    const warpCode = await ethers.provider.getCode(WARP_ADDRESS);
-    console.log("Contract code at address:", warpCode);
-
-    const ExampleLLM = await ethers.getContractFactory("ExampleLLM", {
+    const ExampleLLM = await ethers.getContractFactory("ExampleLLMPrecompile", {
       owner,
     });
     testContract = await ExampleLLM.deploy();
     await testContract.waitForDeployment();
-
-    // const testContractAddress = await testContract.getAddress(); // Use the contract directly
-    // const tx = await llmContract.setEnabled(testContractAddress);
-
-    // // Wait for the transaction to be mined
-    // await tx.wait();
-
-    // const isHealthy = await testContract.healthCheck();
-    // console.log("isHealthy: ", isHealthy);
-
-    // const adminEnabled = await llmContract.readAllowList(ADMIN_ADDRESS);
-    // console.log("isEnabled: ", adminEnabled);
-
-    // const isEnabled = await llmContract.readAllowList(testContractAddress);
-    // console.log("isEnabled: ", isEnabled);
   });
 
   it("should test evaluatePrompt", async function () {
-    const tx = await testContract.evaluatePrompt("Hello World");
+    const inputPrompt = "Hello World";
+    // let health = await llmContract.healthCheck();
+    // console.log("health: ", health);
+    // health = await testContract.healthCheck();
+    // console.log("health: ", health);
+
+    // let expectedPromptId = 1n;
+    const expectedAddress = ethers.ZeroAddress;
+    const expectedBytes = ethers.toUtf8Bytes(inputPrompt);
+    const expectedHex = ethers.hexlify(expectedBytes);
+
+    const tx = await testContract.evaluatePrompt(inputPrompt);
     await tx.wait();
-    await expect(tx).to.emit(testContract, "EvaluatePromptEvent");
-    // .withArgs(
-    //   1,
-    // );
+    await expect(tx).to.emit(testContract, "HealthCheck").withArgs(true);
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePromptEvent")
+      .withArgs(
+        (promptId) => true,
+        (contractMethodParams) => {
+          const firstContractMethodParams = contractMethodParams[0];
+          return (
+            firstContractMethodParams.contractAddress == expectedAddress &&
+            firstContractMethodParams.methodData == expectedHex
+          );
+        },
+      );
+  });
+
+  it("should test continueEvaluation", async function () {
+    const expectedAddress = ethers.ZeroAddress;
+    const firstResultBytes = ethers.toUtf8Bytes("Hello World");
+    const firstResultHex = ethers.hexlify(firstResultBytes);
+    const secondResultBytes = ethers.toUtf8Bytes("Hello Mars");
+    const secondResultHex = ethers.hexlify(secondResultBytes);
+    const promptId = 1;
+    const contractMethodResults = [firstResultHex, secondResultHex];
+
+    const tx = await testContract.continueEvaluation(
+      promptId,
+      contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          // Ensure the array length matches the input
+          if (contractMethodParams.length !== contractMethodResults.length) {
+            return false;
+          }
+
+          // Compare each parameter in contractMethodParams
+          for (let i = 0; i < contractMethodParams.length; i++) {
+            const param = contractMethodParams[i];
+            if (
+              param.contractAddress !== expectedAddress || // Ensure address matches
+              param.methodData !== contractMethodResults[i] // Ensure methodData matches
+            ) {
+              return false;
+            }
+          }
+          return true;
+        },
+      );
   });
 });
 
