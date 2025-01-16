@@ -7,7 +7,9 @@ package llmprecompile
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
+	"strings"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -131,7 +133,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     }
 
     // Unpack input into the arguments to the ContinueEvaluationInput
-    inputStruct, err := UnpackContinueEvaluationInput(input)
+    // inputStruct, err := UnpackContinueEvaluationInput(input)
     if err != nil {
         return nil, remainingGas, err
     }
@@ -139,15 +141,17 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     // stateDB := accessibleState.GetStateDB()
     // Create the output with EvaluationDone as false and populate ContractMethodParams
     var output ContinueEvaluationOutput
-    output.EvaluationDone = false
-    output.ContractMethodParams = make([]ILLMContractMethodParams, len(inputStruct.ContractMethodResults))
+    output.EvaluationDone = true
+    output.ContractMethodParams = make([]ILLMContractMethodParams, 0)
 
-    for i, result := range inputStruct.ContractMethodResults {
-        output.ContractMethodParams[i] = ILLMContractMethodParams{
-            ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x0
-            MethodData:      result,                                                        // Copy result bytes
-        }
-    }
+    // output.ContractMethodParams = make([]ILLMContractMethodParams, len(inputStruct.ContractMethodResults))
+
+    // for i, result := range inputStruct.ContractMethodResults {
+    //     output.ContractMethodParams[i] = ILLMContractMethodParams{
+    //         ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x0
+    //         MethodData:      result,                                                        // Copy result bytes
+    //     }
+    // }
 
     // Pack the output to conform to the ABI
     packedOutput, err := PackContinueEvaluationOutput(output)
@@ -244,15 +248,73 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     // Get and increment the counter for the new PromptId
     currentPromptId := IncrementPromptCounter(stateDB) // Retrieve and update the counter
 
-    // Create the desired output
+	log.Printf("Input string: %s", inputString)
+
+	parts := strings.Split(inputString, ",")
+    if len(parts) != 3 {
+        return nil, remainingGas, fmt.Errorf("invalid input format")
+    }
+
+	contractAddress := common.HexToAddress(parts[0])
+    to := common.HexToAddress(parts[1])
+    amount, ok := new(big.Int).SetString(parts[2], 10)
+    if !ok {
+        return nil, remainingGas, fmt.Errorf("invalid amount")
+    }
+	log.Printf("Parsed contractAddress: %s, to: %s, amount: %s", contractAddress.Hex(), to.Hex(), amount.String())
+
+
+
+     // Define the ERC20 transfer function ABI
+	 erc20ABI := `[{
+        "inputs": [
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+        ],
+        "name": "transfer",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }]`
+
+    // Parse the ABI
+    parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
+    if err != nil {
+        return nil, remainingGas, fmt.Errorf("failed to parse ABI: %v", err)
+    }
+
+    // Get the "transfer" method
+    transferMethod, exists := parsedABI.Methods["transfer"]
+    if !exists {
+        return nil, remainingGas, fmt.Errorf("transfer method not found in ABI")
+    }
+
+    // Encode the transfer method data
+    methodData, err := transferMethod.Inputs.Pack(to, amount)
+    if err != nil {
+        return nil, remainingGas, fmt.Errorf("failed to pack transfer method inputs: %v", err)
+    }
+    log.Printf("Encoded method data: %x", append(transferMethod.ID, methodData...))
+    // Create the output
     var output EvaluatePromptOutput
     output.PromptId = currentPromptId
     output.ContractMethodParams = []ILLMContractMethodParams{
         {
-            ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x00000000
-            MethodData:      []byte(inputString),                                             // Convert input string to bytes
+            ContractAddress: contractAddress,
+            MethodData:      append(transferMethod.ID, methodData...), // Prepend method selector
         },
     }
+
+
+    // Create the desired output
+    // var output EvaluatePromptOutput
+    // output.PromptId = currentPromptId
+    // output.ContractMethodParams = []ILLMContractMethodParams{
+    //     {
+    //         ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x00000000
+    //         MethodData:      []byte(inputString),                                             // Convert input string to bytes
+    //     },
+    // }
 
     // Pack the output to conform to the ABI
     packedOutput, err := PackEvaluatePromptOutput(output)
