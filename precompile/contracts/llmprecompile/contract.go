@@ -5,6 +5,7 @@
 package llmprecompile
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -40,6 +41,197 @@ var (
 	_ = common.Big0
 )
 
+
+type Arg struct {
+	Value  string `json:"value"`
+	Lookup bool   `json:"lookup"`
+}
+
+type Step struct {
+	Method    string   `json:"method,omitempty"`
+	Contract  string   `json:"contract,omitempty"`
+	ABI       string   `json:"abi,omitempty"`
+	Args      []Arg    `json:"args,omitempty"`
+	PcStep    bool     `json:"pcStep,omitempty"`
+	Condition int      `json:"condition,omitempty"`
+	SkipTo    int      `json:"skipTo,omitempty"`
+}
+
+const erc20Address = "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922";
+var	steps = []Step{
+		{
+			Method:   "balanceOf",
+			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			ABI: `[{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "balanceOf",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}]`,
+			Args: []Arg{
+				{Value: "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC", Lookup: false},
+			},
+		},
+		{
+			Method:   "divide",
+			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			ABI: `[{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "a",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "b",
+						"type": "uint256"
+					}
+				],
+				"name": "divide",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "pure",
+				"type": "function"
+			}]`,
+			Args: []Arg{
+				{Value: "0.1", Lookup: true},
+				{Value: "2", Lookup: false},
+			},
+		},
+		{
+			Method:   "isLessThanOrEqual",
+			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			ABI: `[{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "a",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "b",
+						"type": "uint256"
+					}
+				],
+				"name": "isLessThanOrEqual",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "pure",
+				"type": "function"
+			}]`,
+			Args: []Arg{
+				{Value: "1.1", Lookup: true},
+				{Value: "10", Lookup: false},
+			},
+		},
+		{
+			PcStep:    true,
+			Method:    "jumpIf",
+			Condition: 2,
+			SkipTo:    5,
+		},
+		{
+			Method:   "transfer",
+			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			ABI: `[{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "transfer",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}]`,
+			Args: []Arg{
+				{Value: "0xad660da80c8D32E1a4Fb8DF6925A428060b58616", Lookup: false},
+				{Value: "1.1", Lookup: true},
+			},
+		},
+	}
+
+
+	// ProcessArguments converts arguments based on the expected types from the ABI.
+func ProcessArguments(inputs abi.Arguments, args []Arg) ([]interface{}, error) {
+    if len(inputs) != len(args) {
+        return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
+    }
+
+    packedArgs := make([]interface{}, len(args))
+    for i, input := range inputs {
+        expectedType := input.Type.String()
+        argValue := args[i].Value
+
+        switch expectedType {
+        case "address":
+            packedArgs[i] = common.HexToAddress(argValue) // Convert to Ethereum address
+        case "uint256":
+            bigIntValue := new(big.Int)
+            if _, success := bigIntValue.SetString(argValue, 10); !success {
+                return nil, fmt.Errorf("invalid uint256 value: %s", argValue)
+            }
+            packedArgs[i] = bigIntValue
+        case "bool":
+            if argValue == "true" {
+                packedArgs[i] = true
+            } else if argValue == "false" {
+                packedArgs[i] = false
+            } else {
+                return nil, fmt.Errorf("invalid boolean value: %s", argValue)
+            }
+        case "string":
+            packedArgs[i] = argValue // Use string as-is
+        default:
+            return nil, fmt.Errorf("unsupported type: %s", expectedType)
+        }
+
+        // Log the conversion
+        log.Printf("Arg %d: Value=%v, ConvertedValue=%v, ExpectedType=%s", i, argValue, packedArgs[i], expectedType)
+    }
+
+    return packedArgs, nil
+}
+
+
 // Singleton StatefulPrecompiledContract and signatures.
 var (
 
@@ -51,6 +243,8 @@ var (
 
 	// Prompt Counter for identification of evaluations
 	promptCounterKey = common.BytesToHash([]byte("promptCounter"))
+	stepsKey = common.BytesToHash([]byte("steps"))
+    pcKey    = common.BytesToHash([]byte("pc"))
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 )
@@ -119,8 +313,8 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 // 3. Constructs an output with:
 //    - EvaluationDone: Always set to false.
 //    - ContractMethodParams: An array where each entry includes:
-//       - ContractAddress: Fixed to 0x0000000000000000000000000000000000000000.
-//       - MethodData: Each corresponding entry from ContractMethodResults.
+//       - ContractAddress
+//       - MethodData
 //
 // Output:
 // The function returns a packed ABI-compliant byte array containing the constructed output.
@@ -217,7 +411,16 @@ func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
 	// Store the new value in the StateDB
 	stateDB.SetState(ContractAddress, promptCounterKey, common.BigToHash(nextCounter))
 
-	return currentCounter // Return the current value before incrementing
+	return nextCounter // Return the current value before incrementing
+}
+
+// Utility function to encode steps into bytes
+func encodeSteps(steps []Step) ([]byte, error) {
+    encoded, err := json.Marshal(steps)
+    if err != nil {
+        return nil, fmt.Errorf("failed to encode steps to JSON: %w", err)
+    }
+    return encoded, nil
 }
 
 
@@ -226,8 +429,8 @@ func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
 // The output includes:
 // - PromptId: A unique identifier for the prompt.
 // - ContractMethodParams: An array containing:
-//   - ContractAddress: Fixed at 0x0000000000000000000000000000000000000000.
-//   - MethodData: The input string converted to bytes.
+//   - ContractAddress
+//   - MethodData
 // This function ensures ABI compliance and consistent outputs for each invocation.
 func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
     if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePromptGasCost); err != nil {
@@ -243,78 +446,83 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
         return nil, remainingGas, err
     }
 
+	log.Printf("Input string: %s", inputString)
+
+
     stateDB := accessibleState.GetStateDB()
 
     // Get and increment the counter for the new PromptId
     currentPromptId := IncrementPromptCounter(stateDB) // Retrieve and update the counter
 
-	log.Printf("Input string: %s", inputString)
+	log.Printf("currentPromptId: %v", currentPromptId)
 
-	parts := strings.Split(inputString, ",")
-    if len(parts) != 3 {
-        return nil, remainingGas, fmt.Errorf("invalid input format")
-    }
-
-	contractAddress := common.HexToAddress(parts[0])
-    to := common.HexToAddress(parts[1])
-    amount, ok := new(big.Int).SetString(parts[2], 10)
-    if !ok {
-        return nil, remainingGas, fmt.Errorf("invalid amount")
-    }
-	log.Printf("Parsed contractAddress: %s, to: %s, amount: %s", contractAddress.Hex(), to.Hex(), amount.String())
-
-
-
-     // Define the ERC20 transfer function ABI
-	 erc20ABI := `[{
-        "inputs": [
-            {"internalType": "address", "name": "to", "type": "address"},
-            {"internalType": "uint256", "name": "amount", "type": "uint256"}
-        ],
-        "name": "transfer",
-        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    }]`
-
-    // Parse the ABI
-    parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
+	// Always overwrite the steps in the state database with the current steps
+    encodedSteps, err := encodeSteps(steps)
     if err != nil {
-        return nil, remainingGas, fmt.Errorf("failed to parse ABI: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to encode steps: %w", err)
     }
+    stateDB.SetState(addr, stepsKey, common.BytesToHash(encodedSteps))
 
-    // Get the "transfer" method
-    transferMethod, exists := parsedABI.Methods["transfer"]
-    if !exists {
-        return nil, remainingGas, fmt.Errorf("transfer method not found in ABI")
+
+
+	// Initialize the program counter to zero
+    currentPC := big.NewInt(0)
+	stateDB.SetState(addr, pcKey, common.BigToHash(currentPC))
+
+	log.Printf("currentPC: %v", currentPC)
+
+
+	// Fetch the first step
+    if len(steps) == 0 {
+        return nil, remainingGas, errors.New("no steps available")
     }
+    currentStep := steps[0]
 
-    // Encode the transfer method data
-    methodData, err := transferMethod.Inputs.Pack(to, amount)
+	log.Printf("currentStep: %+v", currentStep)
+
+	// Parse the ABI to create a contract object
+	parsedABI, err := abi.JSON(strings.NewReader(currentStep.ABI))
+	if err != nil {
+		return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
+	}
+
+	// Retrieve the method from the parsed contract ABI
+	method, exists := parsedABI.Methods[currentStep.Method]
+	if !exists {
+		return nil, remainingGas, fmt.Errorf("method %s not found in ABI", currentStep.Method)
+	}
+
+	log.Printf("method: %s", method)
+
+    // Process the arguments for the method
+    packedArgs, err := ProcessArguments(method.Inputs, currentStep.Args)
     if err != nil {
-        return nil, remainingGas, fmt.Errorf("failed to pack transfer method inputs: %v", err)
+		log.Printf("Error: Failed to process arguments: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to process arguments: %w", err)
     }
-    log.Printf("Encoded method data: %x", append(transferMethod.ID, methodData...))
-    // Create the output
-    var output EvaluatePromptOutput
-    output.PromptId = currentPromptId
-    output.ContractMethodParams = []ILLMContractMethodParams{
+    log.Printf("Packed arguments: %+v", packedArgs)
+
+    // Pack the method data
+    methodData, err := method.Inputs.Pack(packedArgs...)
+    if err != nil {
+		log.Printf("Error: Failed to pack method data: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to pack method data: %w", err)
+    }
+    log.Printf("Method data (hex): %x", methodData)
+
+    // Create contract method params
+    contractMethodParams := []ILLMContractMethodParams{
         {
-            ContractAddress: contractAddress,
-            MethodData:      append(transferMethod.ID, methodData...), // Prepend method selector
+            ContractAddress: common.HexToAddress(currentStep.Contract),
+            MethodData:      append(method.ID, methodData...), // Prepend method selector
         },
     }
-
-
-    // Create the desired output
-    // var output EvaluatePromptOutput
-    // output.PromptId = currentPromptId
-    // output.ContractMethodParams = []ILLMContractMethodParams{
-    //     {
-    //         ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x00000000
-    //         MethodData:      []byte(inputString),                                             // Convert input string to bytes
-    //     },
-    // }
+    log.Printf("Contract Method Params: %+v", contractMethodParams)
+	// Prepare the output
+	output := EvaluatePromptOutput{
+		PromptId:             currentPromptId, // PromptId is irrelevant in this context
+		ContractMethodParams: contractMethodParams,
+	}
 
     // Pack the output to conform to the ABI
     packedOutput, err := PackEvaluatePromptOutput(output)
