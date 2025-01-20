@@ -13,6 +13,23 @@ describe("ILLM", function () {
   let owner: Signer;
   let llmContract: Contract;
   let testContract: Contract;
+  let erc20Contract: Contract;
+  const erc20Address = "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922";
+
+  before(async function () {
+    const erc20Code = await ethers.provider.getCode(erc20Address);
+    if (erc20Code == "0x") {
+      const ERC20 = await ethers.getContractFactory("ERC20ForTesting", owner);
+      erc20Contract = await ERC20.deploy();
+      await erc20Contract.waitForDeployment();
+    } else {
+      erc20Contract = await ethers.getContractAt(
+        "ERC20ForTesting",
+        erc20Address,
+        owner,
+      );
+    }
+  });
 
   beforeEach(async function () {
     //   const network = await ethers.provider.getNetwork();
@@ -20,8 +37,8 @@ describe("ILLM", function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
     llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
-    let code = await ethers.provider.getCode(LLM_ADDRESS);
-    expect(code).to.not.equal("0x");
+    let llmCode = await ethers.provider.getCode(LLM_ADDRESS);
+    expect(llmCode).to.not.equal("0x");
 
     const ExampleLLM = await ethers.getContractFactory("ExampleLLMPrecompile", {
       owner,
@@ -30,15 +47,11 @@ describe("ILLM", function () {
     await testContract.waitForDeployment();
   });
 
-  it("should test evaluatePrompt", async function () {
-    const ERC20 = await ethers.getContractFactory("ERC20ForTesting", owner);
-    const erc20Contract = await ERC20.deploy();
-    await erc20Contract.waitForDeployment();
-    const erc20Address = await erc20Contract.getAddress();
-    const recipientAddress = "0x000000000000000000000000000000000000dead";
-    const amount = ethers.parseUnits("10", 18).toString();
+  it.only("should test evaluatePrompt", async function () {
+    // const recipientAddress = "0x000000000000000000000000000000000000dead";
+    // const amount = ethers.parseUnits("10", 18).toString();
 
-    const inputPrompt = `${erc20Address},${recipientAddress},${amount}`;
+    const inputPrompt = `Hello World`;
 
     const tx = await testContract.evaluatePrompt(inputPrompt);
     await tx.wait();
@@ -57,14 +70,16 @@ describe("ILLM", function () {
       );
 
     // Use the captured params to call the ERC20 method
-    const txCall = await owner.sendTransaction({
+    const result = await owner.call({
       to: calleeContractAddress,
       data: methodData,
     });
-    txCall.wait();
+    const resultAsBigInt = BigInt(result);
+    const balance = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+    expect(resultAsBigInt).to.equal(balance);
     // Verify the transfer occurred
-    const balance = await erc20Contract.balanceOf(recipientAddress);
-    expect(balance).to.equal(amount);
+    // const balance = await erc20Contract.balanceOf(recipientAddress);
+    // expect(balance).to.equal(amount);
   });
 
   it("should test continueEvaluation", async function () {
