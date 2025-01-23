@@ -44,7 +44,8 @@ var (
 
 type Arg struct {
 	Value  string `json:"value"`
-	Lookup bool   `json:"lookup"`
+	Lookup int    `json:"lookup"` // Step number to retrieve value from (0 or negative means use Value)
+    Key    string `json:"key"` 
 }
 
 type Step struct {
@@ -57,137 +58,64 @@ type Step struct {
 	SkipTo    int      `json:"skipTo,omitempty"`
 }
 
-const erc20Address = "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922";
 var	steps = []Step{
-		{
-			Method:   "balanceOf",
-			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
-			ABI: `[{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "account",
-						"type": "address"
-					}
-				],
-				"name": "balanceOf",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			}]`,
-			Args: []Arg{
-				{Value: "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC", Lookup: false},
+	{
+		Method:   "increase",
+		Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+		ABI: `[{
+			"inputs": [
+				{
+					"internalType": "uint256",
+					"name": "number",
+					"type": "uint256"
+				}
+			],
+			"name": "increase",
+			"outputs": [
+				{
+					"internalType": "uint256",
+					"name": "",
+					"type": "uint256"
+				}
+			],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}]`,
+		Args: []Arg{
+			{
+				Value: "10",
 			},
 		},
-		{
-			Method:   "divide",
-			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
-			ABI: `[{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "a",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "b",
-						"type": "uint256"
-					}
-				],
-				"name": "divide",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "pure",
-				"type": "function"
-			}]`,
-			Args: []Arg{
-				{Value: "0.1", Lookup: true},
-				{Value: "2", Lookup: false},
+	},
+	{
+		Method:   "increase",
+		Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+		ABI: `{
+			"inputs": [
+				{
+					"internalType": "uint256",
+					"name": "number",
+					"type": "uint256"
+				}
+			],
+			"name": "increase",
+			"outputs": [
+				{
+					"internalType": "uint256",
+					"name": "",
+					"type": "uint256"
+				}
+			],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}`,
+		Args: []Arg{
+			{
+				Value: "20",
 			},
 		},
-		{
-			Method:   "isLessThanOrEqual",
-			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
-			ABI: `[{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "a",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "b",
-						"type": "uint256"
-					}
-				],
-				"name": "isLessThanOrEqual",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "pure",
-				"type": "function"
-			}]`,
-			Args: []Arg{
-				{Value: "1.1", Lookup: true},
-				{Value: "10", Lookup: false},
-			},
-		},
-		{
-			PcStep:    true,
-			Method:    "jumpIf",
-			Condition: 2,
-			SkipTo:    5,
-		},
-		{
-			Method:   "transfer",
-			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
-			ABI: `[{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "to",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					}
-				],
-				"name": "transfer",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}]`,
-			Args: []Arg{
-				{Value: "0xad660da80c8D32E1a4Fb8DF6925A428060b58616", Lookup: false},
-				{Value: "1.1", Lookup: true},
-			},
-		},
-	}
+	},
+}
 
 
 	// ProcessArguments converts arguments based on the expected types from the ABI.
@@ -302,6 +230,148 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 	return outputStruct, err
 }
 
+// Utility function to retrieve and decode steps from state storage
+func getStepsFromState(stateDB contract.StateDB, addr common.Address) ([]Step, error) {
+    // Retrieve encoded steps from state
+    encodedSteps := stateDB.GetState(addr, stepsKey).Bytes()
+    if len(encodedSteps) == 0 {
+        log.Printf("Error: No steps found in state for address: %s", addr.Hex())
+        return nil, errors.New("no steps found in state")
+    }
+
+    // Log the raw encoded steps retrieved from the state
+    log.Printf("Encoded steps retrieved from state: %s", string(encodedSteps))
+
+    // Unmarshal the encoded steps into the steps struct
+    var steps []Step
+    if err := json.Unmarshal(encodedSteps, &steps); err != nil {
+        log.Printf("Error: Failed to decode steps for address: %s. Raw data: %s. Error: %v", addr.Hex(), string(encodedSteps), err)
+        return nil, fmt.Errorf("failed to decode steps: %w", err)
+    }
+
+    // Log the successfully decoded steps
+    log.Printf("Successfully decoded steps: %+v", steps)
+    return steps, nil
+}
+
+
+// Utility function to retrieve the program counter
+func getPCFromState(stateDB contract.StateDB, addr common.Address) (*big.Int, error) {
+    currentPCBytes := stateDB.GetState(addr, pcKey)
+    if currentPCBytes == (common.Hash{}) {
+        return nil, errors.New("program counter not initialized")
+    }
+    currentPC := new(big.Int).SetBytes(currentPCBytes.Bytes())
+    return currentPC, nil
+}
+
+// Utility function to save the program counter to state
+func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
+    stateDB.SetState(addr, pcKey, common.BigToHash(pc))
+}
+
+// Utility function to decode results
+// Utility function to decode results
+func decodeResults(method abi.Method, result []byte) (map[string]interface{}, error) {
+    decodedResults := make(map[string]interface{})
+    log.Printf("Decoding results for method: %s", method.Name)
+
+    // Attempt to unpack the results
+    if err := method.Outputs.UnpackIntoMap(decodedResults, result); err != nil {
+        log.Printf("Error: Failed to decode results: %v", err)
+        return nil, fmt.Errorf("failed to decode results: %w", err)
+    }
+
+    // Log the decoded outputs
+    if len(decodedResults) == 0 {
+        log.Printf("No outputs were decoded for method: %s", method.Name)
+    } else {
+        for key, value := range decodedResults {
+            if key == "" {
+                log.Printf("Unnamed output decoded: Value=%v", value)
+            } else {
+                log.Printf("Output decoded: Key=%s, Value=%v", key, value)
+            }
+        }
+    }
+
+    return decodedResults, nil
+}
+
+
+
+// Utility function to prepare the next step's contract call
+func prepareNextStep(step Step) ([]ILLMContractMethodParams, error) {
+    log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
+
+    // Parse the ABI
+    parsedABI, err := abi.JSON(strings.NewReader(step.ABI))
+    if err != nil {
+        log.Printf("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        return nil, fmt.Errorf("failed to parse ABI: %w", err)
+    }
+    log.Printf("Successfully parsed ABI for Method=%s, Contract=%s", step.Method, step.Contract)
+
+    // Retrieve the method
+    method, exists := parsedABI.Methods[step.Method]
+    if !exists {
+        log.Printf("Error: Method=%s not found in ABI for Contract=%s", step.Method, step.Contract)
+        return nil, fmt.Errorf("method %s not found in ABI", step.Method)
+    }
+    log.Printf("Successfully retrieved method %s from ABI for Contract=%s", step.Method, step.Contract)
+
+    // Process arguments
+    packedArgs, err := ProcessArguments(method.Inputs, step.Args)
+    if err != nil {
+        log.Printf("Error: Failed to process arguments for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        return nil, fmt.Errorf("failed to process arguments: %w", err)
+    }
+    log.Printf("Successfully processed arguments for Method=%s. Packed Arguments: %+v", step.Method, packedArgs)
+
+    // Pack method data
+    methodData, err := method.Inputs.Pack(packedArgs...)
+    if err != nil {
+        log.Printf("Error: Failed to pack method data for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        return nil, fmt.Errorf("failed to pack method data: %w", err)
+    }
+    log.Printf("Successfully packed method data for Method=%s. Method Data (hex): %x", step.Method, methodData)
+
+    // Return the prepared contract method parameters
+    contractParams := []ILLMContractMethodParams{
+        {
+            ContractAddress: common.HexToAddress(step.Contract),
+            MethodData:      append(method.ID, methodData...),
+        },
+    }
+    log.Printf("Prepared contract method parameters for Method=%s, Contract=%s: %+v", step.Method, step.Contract, contractParams)
+
+    return contractParams, nil
+}
+
+
+// Utility function to update memory in state storage
+func updateMemoryInState(stateDB contract.StateDB, addr common.Address, pc *big.Int, decodedResults map[string]interface{}) error {
+    memoryKey := fmt.Sprintf("step_result_%d", pc.Int64())
+    memory := make(map[string][]byte)
+
+    for key, value := range decodedResults {
+        encodedValue, err := json.Marshal(value)
+        if err != nil {
+            return fmt.Errorf("failed to encode result for key %s: %w", key, err)
+        }
+        memory[key] = encodedValue
+    }
+
+    encodedMemory, err := json.Marshal(memory)
+    if err != nil {
+        return fmt.Errorf("failed to encode memory map: %w", err)
+    }
+
+    stateDB.SetState(addr, common.BytesToHash([]byte(memoryKey)), common.BytesToHash(encodedMemory))
+    return nil
+}
+
+
 // continueEvaluation processes a given prompt ID and an array of contract method results,
 // returning a structured response indicating the evaluation status and associated method parameters.
 //
@@ -319,43 +389,126 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 // Output:
 // The function returns a packed ABI-compliant byte array containing the constructed output.
 func continueEvaluation(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+    log.Printf("Starting continueEvaluation function. Caller: %s, Contract Address: %s", caller.Hex(), addr.Hex())
+
+    // Deduct gas
     if remainingGas, err = contract.DeductGas(suppliedGas, ContinueEvaluationGasCost); err != nil {
+        log.Printf("Error: Insufficient gas supplied. Error: %v", err)
         return nil, 0, err
     }
+
     if readOnly {
+        log.Printf("Error: Write protection violation. Function is not allowed in read-only mode.")
         return nil, remainingGas, vmerrs.ErrWriteProtection
     }
 
-    // Unpack input into the arguments to the ContinueEvaluationInput
-    // inputStruct, err := UnpackContinueEvaluationInput(input)
+    stateDB := accessibleState.GetStateDB()
+
+    // Retrieve steps from state using getLargeState
+    encodedSteps, err := getLargeState(stateDB, addr, stepsKey)
     if err != nil {
+        log.Printf("Error: Failed to retrieve steps from state. Error: %v", err)
         return nil, remainingGas, err
     }
+    log.Printf("Encoded steps retrieved from state: %s", string(encodedSteps))
 
-    // stateDB := accessibleState.GetStateDB()
-    // Create the output with EvaluationDone as false and populate ContractMethodParams
-    var output ContinueEvaluationOutput
-    output.EvaluationDone = true
-    output.ContractMethodParams = make([]ILLMContractMethodParams, 0)
+    // Decode the steps
+    var steps []Step
+    if err := json.Unmarshal(encodedSteps, &steps); err != nil {
+        log.Printf("Error: Failed to decode steps from state. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to decode steps: %w", err)
+    }
+    log.Printf("Successfully decoded %d steps from state.", len(steps))
 
-    // output.ContractMethodParams = make([]ILLMContractMethodParams, len(inputStruct.ContractMethodResults))
+    // Retrieve the program counter
+    currentPC, err := getPCFromState(stateDB, addr)
+    if err != nil {
+        log.Printf("Error: Failed to retrieve the program counter. Error: %v", err)
+        return nil, remainingGas, err
+    }
+    log.Printf("Current program counter: %d", currentPC.Int64())
 
-    // for i, result := range inputStruct.ContractMethodResults {
-    //     output.ContractMethodParams[i] = ILLMContractMethodParams{
-    //         ContractAddress: common.HexToAddress("0x0000000000000000000000000000000000000000"), // Address 0x0
-    //         MethodData:      result,                                                        // Copy result bytes
-    //     }
-    // }
+    // Parse input
+    inputStruct := ContinueEvaluationInput{}
+    if err := json.Unmarshal(input, &inputStruct); err != nil {
+        log.Printf("Error: Failed to decode input. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to decode input: %w", err)
+    }
+    log.Printf("Decoded input. Prompt ID: %d, ContractMethodResults count: %d", inputStruct.PromptId, len(inputStruct.ContractMethodResults))
 
-    // Pack the output to conform to the ABI
+    // Process the current step
+    currentStep := steps[currentPC.Int64()]
+    log.Printf("Processing step %d: Method=%s, Contract=%s", currentPC.Int64(), currentStep.Method, currentStep.Contract)
+
+    parsedABI, err := abi.JSON(strings.NewReader(currentStep.ABI))
+    if err != nil {
+        log.Printf("Error: Failed to parse ABI for step %d. Error: %v", currentPC.Int64(), err)
+        return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
+    }
+    log.Printf("Successfully parsed ABI for step %d.", currentPC.Int64())
+
+    decodedResults, err := decodeResults(parsedABI.Methods[currentStep.Method], inputStruct.ContractMethodResults[0])
+    if err != nil {
+        log.Printf("Error: Failed to decode results for step %d. Error: %v", currentPC.Int64(), err)
+        return nil, remainingGas, fmt.Errorf("failed to decode results: %w", err)
+    }
+    log.Printf("Decoded results for step %d: %+v", currentPC.Int64(), decodedResults)
+
+    // Update memory in state
+    if err := updateMemoryInState(stateDB, addr, currentPC, decodedResults); err != nil {
+        log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
+        return nil, remainingGas, err
+    }
+    log.Printf("Successfully updated memory in state for step %d.", currentPC.Int64())
+
+    // Increment the program counter
+    nextPC := currentPC.Add(currentPC, big.NewInt(1))
+    savePCToState(stateDB, addr, nextPC)
+    log.Printf("Updated program counter to %d.", nextPC.Int64())
+
+    // Check if evaluation is done
+    if nextPC.Int64() >= int64(len(steps)) {
+        log.Printf("Evaluation completed. No more steps to process.")
+        output := ContinueEvaluationOutput{EvaluationDone: true}
+        packedOutput, err := PackContinueEvaluationOutput(output)
+        if err != nil {
+            log.Printf("Error: Failed to pack final output. Error: %v", err)
+            return nil, remainingGas, err
+        }
+        log.Printf("Successfully packed final output. Returning.")
+        return packedOutput, remainingGas, nil
+    }
+
+    // Prepare the next step
+    nextStep := steps[nextPC.Int64()]
+    log.Printf("Preparing next step %d: Method=%s, Contract=%s", nextPC.Int64(), nextStep.Method, nextStep.Contract)
+
+    contractMethodParams, err := prepareNextStep(nextStep)
+    if err != nil {
+        log.Printf("Error: Failed to prepare next step %d. Error: %v", nextPC.Int64(), err)
+        return nil, remainingGas, err
+    }
+    log.Printf("Successfully prepared contract method params for next step %d.", nextPC.Int64())
+
+    // Pack the output for the next step
+    output := ContinueEvaluationOutput{
+        EvaluationDone:       false,
+        ContractMethodParams: contractMethodParams,
+    }
+
     packedOutput, err := PackContinueEvaluationOutput(output)
     if err != nil {
+        log.Printf("Error: Failed to pack output for next step %d. Error: %v", nextPC.Int64(), err)
         return nil, remainingGas, err
     }
 
-    // Return the packed output and remaining gas
+    log.Printf("Successfully packed output for next step %d. Returning.", nextPC.Int64())
     return packedOutput, remainingGas, nil
 }
+
+
+
+
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
@@ -423,6 +576,40 @@ func encodeSteps(steps []Step) ([]byte, error) {
     return encoded, nil
 }
 
+func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash, data []byte) {
+    chunks := len(data) / common.HashLength
+    if len(data)%common.HashLength != 0 {
+        chunks++
+    }
+
+    for i := 0; i < chunks; i++ {
+        start := i * common.HashLength
+        end := (i + 1) * common.HashLength
+        if end > len(data) {
+            end = len(data)
+        }
+        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+        stateDB.SetState(addr, chunkKey, common.BytesToHash(data[start:end]))
+    }
+}
+
+func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash) ([]byte, error) {
+    var data []byte
+    for i := 0; ; i++ {
+        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+        chunk := stateDB.GetState(addr, chunkKey).Bytes()
+        if len(chunk) == 0 {
+            break
+        }
+        data = append(data, chunk...)
+    }
+    if len(data) == 0 {
+        return nil, errors.New("no data found in state")
+    }
+    return data, nil
+}
+
+
 
 // evaluatePrompt generates a unique PromptId (starting from 1 and incrementing with each call)
 // and processes the input string, returning it as MethodData in the output.
@@ -431,8 +618,8 @@ func encodeSteps(steps []Step) ([]byte, error) {
 // - ContractMethodParams: An array containing:
 //   - ContractAddress
 //   - MethodData
-// This function ensures ABI compliance and consistent outputs for each invocation.
 func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+    // Deduct gas
     if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePromptGasCost); err != nil {
         return nil, 0, err
     }
@@ -440,99 +627,67 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
         return nil, remainingGas, vmerrs.ErrWriteProtection
     }
 
-    // Unpack input into the arguments for EvaluatePromptInput
+    // Unpack the input to retrieve the string argument
     inputString, err := UnpackEvaluatePromptInput(input)
     if err != nil {
+        log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, remainingGas, err
     }
-
-	log.Printf("Input string: %s", inputString)
-
+    log.Printf("Input string: %s", inputString)
 
     stateDB := accessibleState.GetStateDB()
 
-    // Get and increment the counter for the new PromptId
-    currentPromptId := IncrementPromptCounter(stateDB) // Retrieve and update the counter
+    // Increment and log the prompt counter
+    currentPromptId := IncrementPromptCounter(stateDB)
+    log.Printf("Current Prompt ID: %v", currentPromptId)
 
-	log.Printf("currentPromptId: %v", currentPromptId)
-
-	// Always overwrite the steps in the state database with the current steps
+    // Encode the steps for storage
     encodedSteps, err := encodeSteps(steps)
     if err != nil {
+        log.Printf("Error: Failed to encode steps: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to encode steps: %w", err)
     }
-    stateDB.SetState(addr, stepsKey, common.BytesToHash(encodedSteps))
+    log.Printf("Encoded steps before storing: %s", string(encodedSteps))
 
+    // Store the encoded steps using setLargeState
+    setLargeState(stateDB, addr, stepsKey, encodedSteps)
+    log.Printf("Steps stored successfully in state.")
 
-
-	// Initialize the program counter to zero
+    // Initialize the program counter to 0
     currentPC := big.NewInt(0)
-	stateDB.SetState(addr, pcKey, common.BigToHash(currentPC))
+    savePCToState(stateDB, addr, currentPC)
+    log.Printf("Initialized program counter to: %v", currentPC)
 
-	log.Printf("currentPC: %v", currentPC)
+    // Prepare the first step
+    nextStep := steps[0]
+    log.Printf("Current step: %+v", nextStep)
 
-
-	// Fetch the first step
-    if len(steps) == 0 {
-        return nil, remainingGas, errors.New("no steps available")
-    }
-    currentStep := steps[0]
-
-	log.Printf("currentStep: %+v", currentStep)
-
-	// Parse the ABI to create a contract object
-	parsedABI, err := abi.JSON(strings.NewReader(currentStep.ABI))
-	if err != nil {
-		return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
-	}
-
-	// Retrieve the method from the parsed contract ABI
-	method, exists := parsedABI.Methods[currentStep.Method]
-	if !exists {
-		return nil, remainingGas, fmt.Errorf("method %s not found in ABI", currentStep.Method)
-	}
-
-	log.Printf("method: %s", method)
-
-    // Process the arguments for the method
-    packedArgs, err := ProcessArguments(method.Inputs, currentStep.Args)
+    contractMethodParams, err := prepareNextStep(nextStep)
     if err != nil {
-		log.Printf("Error: Failed to process arguments: %v", err)
-        return nil, remainingGas, fmt.Errorf("failed to process arguments: %w", err)
-    }
-    log.Printf("Packed arguments: %+v", packedArgs)
-
-    // Pack the method data
-    methodData, err := method.Inputs.Pack(packedArgs...)
-    if err != nil {
-		log.Printf("Error: Failed to pack method data: %v", err)
-        return nil, remainingGas, fmt.Errorf("failed to pack method data: %w", err)
-    }
-    log.Printf("Method data (hex): %x", methodData)
-
-    // Create contract method params
-    contractMethodParams := []ILLMContractMethodParams{
-        {
-            ContractAddress: common.HexToAddress(currentStep.Contract),
-            MethodData:      append(method.ID, methodData...), // Prepend method selector
-        },
+        log.Printf("Error: Failed to prepare next step. Error: %v", err)
+        return nil, remainingGas, err
     }
     log.Printf("Contract Method Params: %+v", contractMethodParams)
-	// Prepare the output
-	output := EvaluatePromptOutput{
-		PromptId:             currentPromptId, // PromptId is irrelevant in this context
-		ContractMethodParams: contractMethodParams,
-	}
 
-    // Pack the output to conform to the ABI
+    // Construct the output
+    output := EvaluatePromptOutput{
+        PromptId:             currentPromptId,
+        ContractMethodParams: contractMethodParams,
+    }
+
+    // Pack the output for the next step
     packedOutput, err := PackEvaluatePromptOutput(output)
     if err != nil {
+        log.Printf("Error: Failed to pack output. Error: %v", err)
         return nil, remainingGas, err
     }
 
-    // Return the packed output and remaining gas
+    log.Printf("evaluatePrompt completed successfully.")
     return packedOutput, remainingGas, nil
 }
+
+
+
 
 
 // PackHealthCheck packs the include selector (first 4 func signature bytes).
