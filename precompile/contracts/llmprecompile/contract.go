@@ -5,6 +5,7 @@
 package llmprecompile
 
 import (
+    "bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -90,7 +91,7 @@ var	steps = []Step{
 	{
 		Method:   "increase",
 		Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-		ABI: `{
+		ABI: `[{
 			"inputs": [
 				{
 					"internalType": "uint256",
@@ -108,7 +109,7 @@ var	steps = []Step{
 			],
 			"stateMutability": "nonpayable",
 			"type": "function"
-		}`,
+		}]`,
 		Args: []Arg{
 			{
 				Value: "20",
@@ -261,13 +262,27 @@ func getPCFromState(stateDB contract.StateDB, addr common.Address) (*big.Int, er
     if currentPCBytes == (common.Hash{}) {
         return nil, errors.New("program counter not initialized")
     }
+
+    // Converting value from 1 to 0
+    // savePCToState stores 1 when pc value is 0
+    if currentPCBytes == (common.Hash{1}) {
+        return big.NewInt(0), nil
+    }
+
     currentPC := new(big.Int).SetBytes(currentPCBytes.Bytes())
     return currentPC, nil
 }
 
 // Utility function to save the program counter to state
 func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
-    stateDB.SetState(addr, pcKey, common.BigToHash(pc))
+    // Convert the big.Int value to a padded byte array
+    valueToSave := common.BytesToHash(pc.Bytes())
+    // using 1 if counter value is 0, getPCFromState throws "program counter not initialized"
+    // error when value is 0
+    if pc.Sign() == 0 { // Check if pc == 0
+        valueToSave = common.Hash{1} // Use a unique marker for 0
+    }
+    stateDB.SetState(addr, pcKey, valueToSave)
 }
 
 // Utility function to decode results
@@ -414,7 +429,9 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
     // Decode the steps
     var steps []Step
-    if err := json.Unmarshal(encodedSteps, &steps); err != nil {
+    // Remove null bytes from the encoded steps
+    sanitizedEncodedSteps := bytes.ReplaceAll(encodedSteps, []byte("\x00"), []byte{})
+    if err := json.Unmarshal(sanitizedEncodedSteps, &steps); err != nil {
         log.Printf("Error: Failed to decode steps from state. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to decode steps: %w", err)
     }
@@ -428,11 +445,17 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     }
     log.Printf("Current program counter: %d", currentPC.Int64())
 
-    // Parse input
-    inputStruct := ContinueEvaluationInput{}
-    if err := json.Unmarshal(input, &inputStruct); err != nil {
-        log.Printf("Error: Failed to decode input. Error: %v", err)
-        return nil, remainingGas, fmt.Errorf("failed to decode input: %w", err)
+    // unpacking input values
+    inputStruct, err := UnpackContinueEvaluationInput(input)
+
+    // if err := json.Unmarshal(inputString, &inputStruct); err != nil {
+    //     log.Printf("Error: Failed to decode input. Error: %v", err)
+    //     return nil, remainingGas, fmt.Errorf("failed to decode input: %w", err)
+    // }
+
+    if err != nil {
+        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to unpack input: %w", err)
     }
     log.Printf("Decoded input. Prompt ID: %d, ContractMethodResults count: %d", inputStruct.PromptId, len(inputStruct.ContractMethodResults))
 
@@ -598,9 +621,21 @@ func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Has
     for i := 0; ; i++ {
         chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
         chunk := stateDB.GetState(addr, chunkKey).Bytes()
-        if len(chunk) == 0 {
-            break
-        }
+
+        // checks for empty chunk
+        isEmptyChunk := true
+		for _, b := range chunk {
+			if b != 0 {
+				isEmptyChunk = false
+				break
+			}
+		}
+
+		// Break the loop if no valid data is found
+		if isEmptyChunk {
+			break
+		}
+
         data = append(data, chunk...)
     }
     if len(data) == 0 {

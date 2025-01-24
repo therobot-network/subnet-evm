@@ -9,7 +9,7 @@ import { ethers } from "hardhat";
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
 
-describe("ILLM", function () {
+describe("ILLM", function () {  
   let owner: Signer;
   let llmContract: Contract;
   let testContract: Contract;
@@ -20,7 +20,7 @@ describe("ILLM", function () {
 
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
-    llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
+    // llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
     let llmCode = await ethers.provider.getCode(LLM_ADDRESS);
     expect(llmCode).to.not.equal("0x");
@@ -96,7 +96,7 @@ describe("ILLM", function () {
 
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      [],
+      ["0x000000000000000000000000000000000000000000000000000000000000000a"],
       // contractMethodResults,
     );
     await tx.wait();
@@ -107,13 +107,14 @@ describe("ILLM", function () {
         (contractMethodParams) => {
           calleeContractAddress = contractMethodParams[0].contractAddress;
           methodData = contractMethodParams[0].methodData;
+          return true;
         },
       );
 
     // Update Counter B
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      [],
+      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
       // contractMethodResults,
     );
     await tx.wait();
