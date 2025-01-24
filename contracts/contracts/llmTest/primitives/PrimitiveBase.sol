@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {ILLM} from "../../interfaces/ILLM.sol";
+import {ILLM} from "./ILLM.sol";
 
 abstract contract PrimitiveBase is Ownable, Initializable {
   // llm precompile contract address for publishing new primitive
