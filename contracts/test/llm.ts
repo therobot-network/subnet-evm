@@ -98,7 +98,31 @@ describe("ILLM", function () {
 
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      ["0x000000000000000000000000000000000000000000000000000000000000000a"],
+      ["0x000000000000000000000000000000000000000000000000000000000000000b"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read counter A
+    // result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
       // contractMethodResults,
     );
     await tx.wait();
@@ -137,6 +161,6 @@ describe("ILLM", function () {
     const countBEnd = await counterBContract.getCounter();
 
     expect(countAEnd).to.equal(countAStart + 10n);
-    expect(countBEnd).to.equal(countBStart + 20n);
+    expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 });
