@@ -9,7 +9,7 @@ import { ethers } from "hardhat";
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
 
-describe("ILLM", function () {  
+describe("ILLM", function () {
   let owner: Signer;
   let llmContract: Contract;
   let testContract: Contract;
@@ -65,6 +65,9 @@ describe("ILLM", function () {
     // const recipientAddress = "0x000000000000000000000000000000000000dead";
     // const amount = ethers.parseUnits("10", 18).toString();
 
+    const countAStart = await counterAContract.getCounter();
+    const countBStart = await counterBContract.getCounter();
+
     const inputPrompt = `Hello World`;
     let promptIdRead: string;
 
@@ -87,7 +90,6 @@ describe("ILLM", function () {
       );
 
     // Update Counter A
-
     let result = await owner.sendTransaction({
       // let result = await owner.call({
       to: calleeContractAddress,
@@ -112,6 +114,12 @@ describe("ILLM", function () {
       );
 
     // Update Counter B
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
     tx = await testContract.continueEvaluation(
       promptIdRead,
       ["0x000000000000000000000000000000000000000000000000000000000000001e"],
@@ -124,5 +132,11 @@ describe("ILLM", function () {
         (evaluationDone) => evaluationDone == true,
         (contractMethodParams) => true,
       );
+
+    const countAEnd = await counterAContract.getCounter();
+    const countBEnd = await counterBContract.getCounter();
+
+    expect(countAEnd).to.equal(countAStart + 10n);
+    expect(countBEnd).to.equal(countBStart + 20n);
   });
 });
