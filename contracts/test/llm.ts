@@ -20,7 +20,7 @@ describe("ILLM", function () {
 
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
-    llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
+    // llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
     let llmCode = await ethers.provider.getCode(LLM_ADDRESS);
     expect(llmCode).to.not.equal("0x");
@@ -65,6 +65,9 @@ describe("ILLM", function () {
     // const recipientAddress = "0x000000000000000000000000000000000000dead";
     // const amount = ethers.parseUnits("10", 18).toString();
 
+    const countAStart = await counterAContract.getCounter();
+    const countBStart = await counterBContract.getCounter();
+
     const inputPrompt = `Hello World`;
     let promptIdRead: string;
 
@@ -87,7 +90,6 @@ describe("ILLM", function () {
       );
 
     // Update Counter A
-
     let result = await owner.sendTransaction({
       // let result = await owner.call({
       to: calleeContractAddress,
@@ -96,7 +98,7 @@ describe("ILLM", function () {
 
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      [],
+      ["0x000000000000000000000000000000000000000000000000000000000000000a"],
       // contractMethodResults,
     );
     await tx.wait();
@@ -107,13 +109,20 @@ describe("ILLM", function () {
         (contractMethodParams) => {
           calleeContractAddress = contractMethodParams[0].contractAddress;
           methodData = contractMethodParams[0].methodData;
+          return true;
         },
       );
 
     // Update Counter B
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      [],
+      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
       // contractMethodResults,
     );
     await tx.wait();
@@ -123,5 +132,11 @@ describe("ILLM", function () {
         (evaluationDone) => evaluationDone == true,
         (contractMethodParams) => true,
       );
+
+    const countAEnd = await counterAContract.getCounter();
+    const countBEnd = await counterBContract.getCounter();
+
+    expect(countAEnd).to.equal(countAStart + 10n);
+    expect(countBEnd).to.equal(countBStart + 20n);
   });
 });
