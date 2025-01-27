@@ -28,9 +28,11 @@ const (
 	// You should set a gas cost for each function in your contract.
 	// Generally, you should not set gas costs very low as this may cause your network to be vulnerable to DoS attacks.
 	// There are some predefined gas costs in contract/utils.go that you can use.
-	ContinueEvaluationGasCost uint64 = 1 /* SET A GAS COST HERE */
-	EvaluatePromptGasCost     uint64 = 1 /* SET A GAS COST HERE */
-	HealthCheckGasCost        uint64 = 1 /* SET A GAS COST HERE */
+	ContinueEvaluationGasCost     uint64 = 1 /* SET A GAS COST HERE */
+	EvaluatePlanGasCost           uint64 = 1 /* SET A GAS COST HERE */
+	EvaluatePromptGasCost         uint64 = 1 /* SET A GAS COST HERE */
+	PublishCustomPrimitiveGasCost uint64 = 1 /* SET A GAS COST HERE */
+	PublishPrimitiveGasCost       uint64 = 1 /* SET A GAS COST HERE */
 )
 
 // CUSTOM CODE STARTS HERE
@@ -203,9 +205,24 @@ type ContinueEvaluationOutput struct {
 	ContractMethodParams []ILLMContractMethodParams
 }
 
+type EvaluatePlanOutput struct {
+	PromptId             *big.Int
+	ContractMethodParams []ILLMContractMethodParams
+}
+
 type EvaluatePromptOutput struct {
 	PromptId             *big.Int
 	ContractMethodParams []ILLMContractMethodParams
+}
+
+type PublishCustomPrimitiveInput struct {
+	ContractAddress  common.Address
+	PrimitiveAddress common.Address
+}
+
+type PublishPrimitiveInput struct {
+	ContractAddress common.Address
+	Metadata        string
 }
 
 // UnpackContinueEvaluationInput attempts to unpack [input] as ContinueEvaluationInput
@@ -239,8 +256,6 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 
 	return outputStruct, err
 }
-
-
 
 // Utility function to retrieve the program counter
 func getPCFromState(stateDB contract.StateDB, addr common.Address) (*big.Int, error) {
@@ -293,12 +308,6 @@ func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
 
     return decodedResults, nil
 }
-
-
-
-
-
-
 
 // Utility function to prepare the next step's contract call
 func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
@@ -370,8 +379,6 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, pc *big.
 	stateDB.SetState(addr, common.BytesToHash([]byte(memoryKey)), common.BytesToHash(encodedMemory))
 	return nil
 }
-
-
 
 // continueEvaluation processes a given prompt ID and an array of contract method results,
 // returning a structured response indicating the evaluation status and associated method parameters.
@@ -515,9 +522,68 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     return packedOutput, remainingGas, nil
 }
 
+// UnpackEvaluatePlanInput attempts to unpack [input] into the string type argument
+// assumes that [input] does not include selector (omits first 4 func signature bytes)
+func UnpackEvaluatePlanInput(input []byte) (string, error) {
+	res, err := LLMPrecompileABI.UnpackInput("evaluatePlan", input, false)
+	if err != nil {
+		return "", err
+	}
+	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
+	return unpacked, nil
+}
 
+// PackEvaluatePlan packs [plan] of type string into the appropriate arguments for evaluatePlan.
+// the packed bytes include selector (first 4 func signature bytes).
+// This function is mostly used for tests.
+func PackEvaluatePlan(plan string) ([]byte, error) {
+	return LLMPrecompileABI.Pack("evaluatePlan", plan)
+}
 
+// PackEvaluatePlanOutput attempts to pack given [outputStruct] of type EvaluatePlanOutput
+// to conform the ABI outputs.
+func PackEvaluatePlanOutput(outputStruct EvaluatePlanOutput) ([]byte, error) {
+	return LLMPrecompileABI.PackOutput("evaluatePlan",
+		outputStruct.PromptId,
+		outputStruct.ContractMethodParams,
+	)
+}
 
+// UnpackEvaluatePlanOutput attempts to unpack [output] as EvaluatePlanOutput
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func UnpackEvaluatePlanOutput(output []byte) (EvaluatePlanOutput, error) {
+	outputStruct := EvaluatePlanOutput{}
+	err := LLMPrecompileABI.UnpackIntoInterface(&outputStruct, "evaluatePlan", output)
+
+	return outputStruct, err
+}
+
+func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePlanGasCost); err != nil {
+		return nil, 0, err
+	}
+	if readOnly {
+		return nil, remainingGas, vmerrs.ErrWriteProtection
+	}
+	// attempts to unpack [input] into the arguments to the EvaluatePlanInput.
+	// Assumes that [input] does not include selector
+	// You can use unpacked [inputStruct] variable in your code
+	inputStruct, err := UnpackEvaluatePlanInput(input)
+	if err != nil {
+		return nil, remainingGas, err
+	}
+
+	// CUSTOM CODE STARTS HERE
+	_ = inputStruct               // CUSTOM CODE OPERATES ON INPUT
+	var output EvaluatePlanOutput // CUSTOM CODE FOR AN OUTPUT
+	packedOutput, err := PackEvaluatePlanOutput(output)
+	if err != nil {
+		return nil, remainingGas, err
+	}
+
+	// Return the packed output and the remaining gas
+	return packedOutput, remainingGas, nil
+}
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
@@ -630,8 +696,6 @@ func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Has
     return data, nil
 }
 
-
-
 // evaluatePrompt generates a unique PromptId (starting from 1 and incrementing with each call)
 // and processes the input string, returning it as MethodData in the output.
 // The output includes:
@@ -708,45 +772,77 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 }
 
 
+// UnpackPublishCustomPrimitiveInput attempts to unpack [input] as PublishCustomPrimitiveInput
+// assumes that [input] does not include selector (omits first 4 func signature bytes)
+func UnpackPublishCustomPrimitiveInput(input []byte) (PublishCustomPrimitiveInput, error) {
+	inputStruct := PublishCustomPrimitiveInput{}
+	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishCustomPrimitive", input, false)
 
-
-
-// PackHealthCheck packs the include selector (first 4 func signature bytes).
-// This function is mostly used for tests.
-func PackHealthCheck() ([]byte, error) {
-	return LLMPrecompileABI.Pack("healthCheck")
+	return inputStruct, err
 }
 
-// PackHealthCheckOutput attempts to pack given healthy of type bool
-// to conform the ABI outputs.
-func PackHealthCheckOutput(healthy bool) ([]byte, error) {
-	return LLMPrecompileABI.PackOutput("healthCheck", healthy)
+// PackPublishCustomPrimitive packs [inputStruct] of type PublishCustomPrimitiveInput into the appropriate arguments for publishCustomPrimitive.
+func PackPublishCustomPrimitive(inputStruct PublishCustomPrimitiveInput) ([]byte, error) {
+	return LLMPrecompileABI.Pack("publishCustomPrimitive", inputStruct.ContractAddress, inputStruct.PrimitiveAddress)
 }
 
-// UnpackHealthCheckOutput attempts to unpack given [output] into the bool type output
-// assumes that [output] does not include selector (omits first 4 func signature bytes)
-func UnpackHealthCheckOutput(output []byte) (bool, error) {
-	res, err := LLMPrecompileABI.Unpack("healthCheck", output)
-	if err != nil {
-		return false, err
-	}
-	unpacked := *abi.ConvertType(res[0], new(bool)).(*bool)
-	return unpacked, nil
-}
-
-func healthCheck(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, HealthCheckGasCost); err != nil {
+func publishCustomPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if remainingGas, err = contract.DeductGas(suppliedGas, PublishCustomPrimitiveGasCost); err != nil {
 		return nil, 0, err
 	}
-	// no input provided for this function
-
-	// CUSTOM CODE STARTS HERE
-
-	output := true
-	packedOutput, err := PackHealthCheckOutput(output)
+	if readOnly {
+		return nil, remainingGas, vmerrs.ErrWriteProtection
+	}
+	// attempts to unpack [input] into the arguments to the PublishCustomPrimitiveInput.
+	// Assumes that [input] does not include selector
+	// You can use unpacked [inputStruct] variable in your code
+	inputStruct, err := UnpackPublishCustomPrimitiveInput(input)
 	if err != nil {
 		return nil, remainingGas, err
 	}
+
+	// CUSTOM CODE STARTS HERE
+	_ = inputStruct // CUSTOM CODE OPERATES ON INPUT
+	// this function does not return an output, leave this one as is
+	packedOutput := []byte{}
+
+	// Return the packed output and the remaining gas
+	return packedOutput, remainingGas, nil
+}
+
+// UnpackPublishPrimitiveInput attempts to unpack [input] as PublishPrimitiveInput
+// assumes that [input] does not include selector (omits first 4 func signature bytes)
+func UnpackPublishPrimitiveInput(input []byte) (PublishPrimitiveInput, error) {
+	inputStruct := PublishPrimitiveInput{}
+	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishPrimitive", input, false)
+
+	return inputStruct, err
+}
+
+// PackPublishPrimitive packs [inputStruct] of type PublishPrimitiveInput into the appropriate arguments for publishPrimitive.
+func PackPublishPrimitive(inputStruct PublishPrimitiveInput) ([]byte, error) {
+	return LLMPrecompileABI.Pack("publishPrimitive", inputStruct.ContractAddress, inputStruct.Metadata)
+}
+
+func publishPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
+		return nil, 0, err
+	}
+	if readOnly {
+		return nil, remainingGas, vmerrs.ErrWriteProtection
+	}
+	// attempts to unpack [input] into the arguments to the PublishPrimitiveInput.
+	// Assumes that [input] does not include selector
+	// You can use unpacked [inputStruct] variable in your code
+	inputStruct, err := UnpackPublishPrimitiveInput(input)
+	if err != nil {
+		return nil, remainingGas, err
+	}
+
+	// CUSTOM CODE STARTS HERE
+	_ = inputStruct // CUSTOM CODE OPERATES ON INPUT
+	// this function does not return an output, leave this one as is
+	packedOutput := []byte{}
 
 	// Return the packed output and the remaining gas
 	return packedOutput, remainingGas, nil
@@ -758,9 +854,11 @@ func createLLMPrecompilePrecompile() contract.StatefulPrecompiledContract {
 	var functions []*contract.StatefulPrecompileFunction
 
 	abiFunctionMap := map[string]contract.RunStatefulPrecompileFunc{
-		"continueEvaluation": continueEvaluation,
-		"evaluatePrompt":     evaluatePrompt,
-		"healthCheck":        healthCheck,
+		"continueEvaluation":     continueEvaluation,
+		"evaluatePlan":           evaluatePlan,
+		"evaluatePrompt":         evaluatePrompt,
+		"publishCustomPrimitive": publishCustomPrimitive,
+		"publishPrimitive":       publishPrimitive,
 	}
 
 	for name, function := range abiFunctionMap {
