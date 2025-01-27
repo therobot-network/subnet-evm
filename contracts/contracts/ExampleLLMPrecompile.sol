@@ -8,14 +8,22 @@ contract ExampleLLMPrecompile {
   ILLM llm = ILLM(LLM_ADDRESS);
 
   event EvaluatePromptEvent(uint promptId, ILLM.ContractMethodParams[] contractMethodParams);
+  event EvaluatePlanEvent(uint promptId, ILLM.ContractMethodParams[] contractMethodParams);
   event ContinueEvaluationEvent(bool evaluationDone, ILLM.ContractMethodParams[] contractMethodParams);
-  event HealthCheck(bool healthy);
 
   function evaluatePrompt(
     string calldata prompt
   ) external returns (uint promptId, ILLM.ContractMethodParams[] memory contractMethodParams) {
     (promptId, contractMethodParams) = llm.evaluatePrompt(prompt);
     emit EvaluatePromptEvent(promptId, contractMethodParams);
+    return (promptId, contractMethodParams);
+  }
+
+  function evaluatePlan(
+    string calldata plan
+  ) external returns (uint promptId, ILLM.ContractMethodParams[] memory contractMethodParams) {
+    (promptId, contractMethodParams) = llm.evaluatePlan(plan);
+    emit EvaluatePlanEvent(promptId, contractMethodParams);
     return (promptId, contractMethodParams);
   }
 
@@ -26,10 +34,5 @@ contract ExampleLLMPrecompile {
     (evaluationDone, contractMethodParams) = llm.continueEvaluation(promptId, contractMethodResults);
     emit ContinueEvaluationEvent(evaluationDone, contractMethodParams);
     return (evaluationDone, contractMethodParams);
-  }
-
-  function healthCheck() external view returns (bool healthy) {
-    // healthy = true;
-    healthy = llm.healthCheck();
   }
 }
