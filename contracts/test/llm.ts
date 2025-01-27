@@ -13,15 +13,17 @@ describe("ILLM", function () {
   let owner: Signer;
   let llmContract: Contract;
   let testContract: Contract;
+  let counterAContract: Contract;
+  let counterBContract: Contract;
+  const counterAAddress = "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25";
+  const counterBAddress = "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e";
 
-  beforeEach(async function () {
-    //   const network = await ethers.provider.getNetwork();
-    //   console.log(`Connected to chain ID: ${network.chainId}`);
+  before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
-    llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
+    // llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
-    let code = await ethers.provider.getCode(LLM_ADDRESS);
-    expect(code).to.not.equal("0x");
+    let llmCode = await ethers.provider.getCode(LLM_ADDRESS);
+    expect(llmCode).to.not.equal("0x");
 
     const ExampleLLM = await ethers.getContractFactory("ExampleLLMPrecompile", {
       owner,
@@ -30,68 +32,135 @@ describe("ILLM", function () {
     await testContract.waitForDeployment();
   });
 
-  it("should test evaluatePrompt", async function () {
-    const ERC20 = await ethers.getContractFactory("ERC20ForTesting", owner);
-    const erc20Contract = await ERC20.deploy();
-    await erc20Contract.waitForDeployment();
-    const erc20Address = await erc20Contract.getAddress();
-    const recipientAddress = "0x000000000000000000000000000000000000dead";
-    const amount = ethers.parseUnits("10", 18).toString();
+  beforeEach(async function () {
+    const counterACode = await ethers.provider.getCode(counterAAddress);
+    if (counterACode == "0x") {
+      const Counter = await ethers.getContractFactory(
+        "CounterPrimitive",
+        owner,
+      );
+      counterAContract = await Counter.deploy();
+      await counterAContract.waitForDeployment();
+      counterBContract = await Counter.deploy();
+      await counterBContract.waitForDeployment();
+      const counterAAddressChain = await counterAContract.getAddress();
+      const counterBAddressChain = await counterBContract.getAddress();
+      console.log("counterAAddress: ", counterAAddressChain);
+      console.log("counterBAddress: ", counterBAddressChain);
+    } else {
+      counterAContract = await ethers.getContractAt(
+        "CounterPrimitive",
+        counterAAddress,
+        owner,
+      );
+      counterBContract = await ethers.getContractAt(
+        "CounterPrimitive",
+        counterBAddress,
+        owner,
+      );
+    }
+  });
 
-    const inputPrompt = `${erc20Address},${recipientAddress},${amount}`;
+  it("should test evaluatePrompt and continueEvaluation", async function () {
+    // const recipientAddress = "0x000000000000000000000000000000000000dead";
+    // const amount = ethers.parseUnits("10", 18).toString();
 
-    const tx = await testContract.evaluatePrompt(inputPrompt);
+    const countAStart = await counterAContract.getCounter();
+    const countBStart = await counterBContract.getCounter();
+
+    const inputPrompt = `Hello World`;
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePrompt(inputPrompt);
     await tx.wait();
     let methodData: string;
     let calleeContractAddress: string;
     await expect(tx)
       .to.emit(testContract, "EvaluatePromptEvent")
       .withArgs(
-        (promptId) => true,
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
         (contractMethodParams) => {
-          contractMethodParams[0].contractAddress == erc20Address;
           calleeContractAddress = contractMethodParams[0].contractAddress;
           methodData = contractMethodParams[0].methodData;
           return true;
         },
       );
 
-    // Use the captured params to call the ERC20 method
-    const txCall = await owner.sendTransaction({
+    // Update Counter A
+    let result = await owner.sendTransaction({
+      // let result = await owner.call({
       to: calleeContractAddress,
       data: methodData,
     });
-    txCall.wait();
-    // Verify the transfer occurred
-    const balance = await erc20Contract.balanceOf(recipientAddress);
-    expect(balance).to.equal(amount);
-  });
 
-  it("should test continueEvaluation", async function () {
-    const expectedAddress = ethers.ZeroAddress;
-    const firstResultBytes = ethers.toUtf8Bytes("Hello World");
-    const firstResultHex = ethers.hexlify(firstResultBytes);
-    const secondResultBytes = ethers.toUtf8Bytes("Hello Mars");
-    const secondResultHex = ethers.hexlify(secondResultBytes);
-    const promptId = 1;
-    const contractMethodResults = [firstResultHex, secondResultHex];
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x000000000000000000000000000000000000000000000000000000000000000b"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
 
-    const tx = await testContract.continueEvaluation(
-      promptId,
-      contractMethodResults,
+    // Read counter A
+    // result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter B
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
+      // contractMethodResults,
     );
     await tx.wait();
     await expect(tx)
       .to.emit(testContract, "ContinueEvaluationEvent")
       .withArgs(
         (evaluationDone) => evaluationDone == true,
-        (contractMethodParams) => {
-          // Ensure the array length matches the input
-          if (contractMethodParams.length !== 0) {
-            return false;
-          }
-          return true;
-        },
+        (contractMethodParams) => true,
       );
+
+    const countAEnd = await counterAContract.getCounter();
+    const countBEnd = await counterBContract.getCounter();
+
+    expect(countAEnd).to.equal(countAStart + 10n);
+    expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 });
