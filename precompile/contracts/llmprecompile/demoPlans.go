@@ -63,7 +63,7 @@ var demoPlans = map[string][]Step{
 			},
 		},
 	},
-},
+  },
   "withLookup": {
     {
       Method:   "increase",
@@ -143,6 +143,8 @@ var demoPlans = map[string][]Step{
 				},
 			},
 		},
+	},
+  "withJumpIf": {
 	},
 	"erc20Plan": {
 		{
