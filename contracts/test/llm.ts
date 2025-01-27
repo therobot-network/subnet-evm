@@ -166,7 +166,7 @@ describe("ILLM", function () {
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 
-  it.only("should test evaluatePlan and continueEvaluation with lookup", async function () {
+  it("should test evaluatePlan and continueEvaluation with lookup", async function () {
     const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
 
     // Read the JSON file containing the plans
