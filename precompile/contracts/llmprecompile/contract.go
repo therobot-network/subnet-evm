@@ -567,6 +567,28 @@ func sanitizeSteps(input []byte) ([]byte, error) {
     return sanitized, nil
 }
 
+// deletePlanFromState removes all chunks of data stored under the given key in the state.
+func deletePlanFromState(stateDB contract.StateDB, addr common.Address, key common.Hash) {
+    log.Printf("Deleting plan from state with key: %s", key.Hex())
+
+    for i := 0; ; i++ {
+        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+        chunk := stateDB.GetState(addr, chunkKey)
+        if chunk == (common.Hash{}) {
+            // Stop if no more chunks are found
+            log.Printf("No more chunks found after index %d. Deletion complete.", i)
+            break
+        }
+
+        // Clear the chunk by setting it to an empty hash
+        stateDB.SetState(addr, chunkKey, common.Hash{})
+        log.Printf("Deleted chunk %d with key: %s", i, chunkKey.Hex())
+    }
+
+    log.Printf("All chunks under key %s have been deleted.", key.Hex())
+}
+
+
 
 func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePlanGasCost); err != nil {
@@ -615,6 +637,8 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
         return nil, remainingGas, err
     }
 
+    deletePlanFromState(stateDB, addr, stepsKey)
+
     // Store the encoded steps using setLargeState
     setLargeState(stateDB, addr, stepsKey, sanitizedSteps)
     log.Printf("Steps stored successfully in state.")
@@ -648,7 +672,7 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
         return nil, remainingGas, err
     }
 
-    log.Printf("evaluatePrompt completed successfully.")
+    log.Printf("evaluatePlan completed successfully.")
     return packedOutput, remainingGas, nil
 }
 
@@ -800,6 +824,8 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
         return nil, remainingGas, fmt.Errorf("failed to encode steps: %w", err)
     }
     log.Printf("Encoded steps before storing: %s", string(encodedSteps))
+
+    deletePlanFromState(stateDB, addr, stepsKey)
 
     // Store the encoded steps using setLargeState
     setLargeState(stateDB, addr, stepsKey, encodedSteps)
