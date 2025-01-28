@@ -519,15 +519,43 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     return packedOutput, remainingGas, nil
 }
 
+// Helper function to parse JSON and extract "prompt"/"plan" and "lookupTable"
+func parseEvalInputJSON(input string) (string, string, error) {
+	// Parse the string into a JSON map
+	var parsed map[string]string
+	err := json.Unmarshal([]byte(input), &parsed)
+	if err != nil {
+		return "", "", errors.New("failed to parse JSON: " + err.Error())
+	}
+
+	// Extract the required keys
+	evalData, ok1 := parsed["prompt"]
+	if !ok1 {
+		evalData, ok1 = parsed["plan"] // Fallback to "plan"
+	}
+	if !ok1 {
+		return "", "", errors.New("missing required key: 'prompt' or 'plan'")
+	}
+
+	lookupTable, ok2 := parsed["lookupTable"]
+	if !ok2 {
+		lookupTable = "" // Default to empty string if not present
+	}
+
+	return evalData, lookupTable, nil
+}
+
 // UnpackEvaluatePlanInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePlanInput(input []byte) (string, error) {
+func UnpackEvaluatePlanInput(input []byte) (string, string, error) {
+	// Unpack the input string
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePlan", input, false)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
+
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
-	return unpacked, nil
+    return parseEvalInputJSON(unpacked)
 }
 
 // PackEvaluatePlan packs [plan] of type string into the appropriate arguments for evaluatePlan.
@@ -664,16 +692,17 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
     }
 
     // Unpack the input to retrieve the string argument
-    inputString, err := UnpackEvaluatePlanInput(input)
+    plan, lookupTable, err := UnpackEvaluatePlanInput(input)
     if err != nil {
         log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
-    log.Printf("Input string: %s", inputString)
-
+    fmt.Println("Plan:", plan)
+    fmt.Println("LookupTable:", lookupTable)
+    
     // Parse input into steps
     var inputSteps []Step
-    if err := json.Unmarshal([]byte(inputString), &inputSteps); err != nil {
+    if err := json.Unmarshal([]byte(plan), &inputSteps); err != nil {
         log.Printf("Error: Failed to parse input string as steps. Error: %v", err)
         return nil, suppliedGas, fmt.Errorf("invalid input format: %w", err)
     }
@@ -693,12 +722,13 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     }
 
     // Unpack the input to retrieve the string argument
-    inputString, err := UnpackEvaluatePromptInput(input)
+    prompt, lookupTable, err := UnpackEvaluatePromptInput(input)
     if err != nil {
         log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
-    log.Printf("Input string: %s", inputString)
+    log.Printf("Input string: %s", prompt)
+    fmt.Println("LookupTable:", lookupTable)
 
     // Use pre-defined steps for evaluatePrompt
     if len(steps) == 0 {
@@ -711,13 +741,13 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePromptInput(input []byte) (string, error) {
+func UnpackEvaluatePromptInput(input []byte) (string, string, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePrompt", input, false)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
-	return unpacked, nil
+	return parseEvalInputJSON(unpacked)
 }
 
 // PackEvaluatePrompt packs [prompt] of type string into the appropriate arguments for evaluatePrompt.
