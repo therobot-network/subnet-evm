@@ -61,6 +61,10 @@ type Step struct {
 
 var	steps = demoPlans["withLookup"]
 
+// primitive ABIs (erc20, math)
+const erc20Primitive = primitiveABI["erc20"]
+const mathPrimitive = primitiveABI["math"]
+
 // isAllZeroBytes checks if a byte slice contains only zero bytes.
 func isAllZeroBytes(data []byte) bool {
 	for _, b := range data {
