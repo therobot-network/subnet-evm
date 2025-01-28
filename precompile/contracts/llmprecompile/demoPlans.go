@@ -68,28 +68,8 @@ var demoPlans = map[string][]Step{
     {
       Method:   "increase",
       Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-      ABI: `[
-        {
-          "inputs": [
-            {
-              "internalType": "uint256",
-              "name": "number",
-              "type": "uint256"
-            }
-          ],
-          "name": "increase",
-          "outputs": [
-            {
-              "internalType": "uint256",
-              "name": "",
-              "type": "uint256"
-            }
-          ],
-          "stateMutability": "nonpayable",
-          "type": "function"
-        }
-      ]`,
-      Args: []Arg{
+      ABI: primitiveABI["counter"],
+	  Args: []Arg{
         {
           Value: "10",
         },
@@ -98,47 +78,17 @@ var demoPlans = map[string][]Step{
 		{
 			Method:   "getCounter",
 			Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-			ABI: `[{
-				"inputs": [],
-				"name": "getCounter",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			}]`,
+			ABI: primitiveABI["counter"],
 			Args: []Arg{},
 		},
 		{
 			Method:   "increase",
 			Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-			ABI: `[{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "number",
-						"type": "uint256"
-					}
-				],
-				"name": "increase",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}]`,
+			ABI: primitiveABI["counter"],
 			Args: []Arg{
 				{
 					Lookup: true,
-					PcLookupKey:    1,
+					PcLookupKey: 1,
 					ReturnArgKey: 0,
 				},
 			},
