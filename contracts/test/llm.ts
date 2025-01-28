@@ -63,7 +63,7 @@ describe("ILLM", function () {
     }
   });
 
-  it("should test evaluatePrompt and continueEvaluation", async function () {
+  it("should test evaluatePrompt and continueEvaluation with lookup", async function () {
     // const recipientAddress = "0x000000000000000000000000000000000000dead";
     // const amount = ethers.parseUnits("10", 18).toString();
 
@@ -164,6 +164,86 @@ describe("ILLM", function () {
 
     expect(countAEnd).to.equal(countAStart + 10n);
     expect(countBEnd).to.equal(countBStart + countAEnd);
+  });
+
+  it("should test evaluatePlan and continueEvaluation basic", async function () {
+    const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
+
+    // Read the JSON file containing the plans
+    const fileContent = fs.readFileSync(planPath, "utf8");
+    const plans = JSON.parse(fileContent);
+    const withLookupPlan = JSON.stringify(plans["basic"]);
+
+    const countAStart = await counterAContract.getCounter();
+    const countBStart = await counterBContract.getCounter();
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withLookupPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter A
+    let result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x000000000000000000000000000000000000000000000000000000000000000b"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter B
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(promptIdRead, [
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+    ]);
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => true,
+      );
+
+    const countAEnd = await counterAContract.getCounter();
+    const countBEnd = await counterBContract.getCounter();
+
+    expect(countAEnd).to.equal(countAStart + 10n);
+    expect(countBEnd).to.equal(countBStart + 20n);
   });
 
   it("should test evaluatePlan and continueEvaluation with lookup", async function () {

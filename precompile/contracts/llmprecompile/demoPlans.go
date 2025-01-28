@@ -138,8 +138,8 @@ var demoPlans = map[string][]Step{
 			Args: []Arg{
 				{
 					Lookup: true,
-          PcLookupKey:    1,
-          ReturnArgKey: 0,
+					PcLookupKey:    1,
+					ReturnArgKey: 0,
 				},
 			},
 		},
