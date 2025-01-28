@@ -1,8 +1,41 @@
 package llmprecompile
 
 
-var primitiveABI = map[string][]Step{
-	"erc20": [
+var primitiveABI = map[string]string{
+  "counter":`[
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "number",
+              "type": "uint256"
+            }
+          ],
+          "name": "increase",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+				"inputs": [],
+				"name": "getCounter",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}]`,
+	"erc20": `[
     {
       "inputs": [],
       "name": "LLM_PRECOMPILE",
@@ -316,8 +349,8 @@ var primitiveABI = map[string][]Step{
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ],
-  "math": [
+  ]`,
+  "math": `[
     {
       "inputs": [
         {
@@ -814,5 +847,5 @@ var primitiveABI = map[string][]Step{
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ],
+  ]`,
 }
