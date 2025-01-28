@@ -80,6 +80,7 @@ var demoPlans = map[string][]Step{
 			Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
 			ABI: primitiveABI["counter"],
 			Args: []Arg{},
+			Output: "CountA",
 		},
 		{
 			Method:   "increase",
@@ -88,7 +89,7 @@ var demoPlans = map[string][]Step{
 			Args: []Arg{
 				{
 					Lookup: true,
-					PcLookupKey: 1,
+					LookupKey: "CountA",
 					ReturnArgKey: 0,
 				},
 			},

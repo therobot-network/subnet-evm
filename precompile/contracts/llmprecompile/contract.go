@@ -45,7 +45,7 @@ var (
 type Arg struct {
 	Value  string `json:"value"`
 	Lookup bool    `json:"lookup"`
-    PcLookupKey int `json:"pcLookupkey"`
+    LookupKey string `json:"lookupKey"`
     ReturnArgKey    int `json:"returnArgKey"` 
 }
 
@@ -54,6 +54,7 @@ type Step struct {
 	Contract  string   `json:"contract,omitempty"`
 	ABI       string   `json:"abi,omitempty"`
 	Args      []Arg    `json:"args,omitempty"`
+    Output    string   `json:"output,omitempty"`
 	PcStep    bool     `json:"pcStep,omitempty"`
 	Condition int      `json:"condition,omitempty"`
 	SkipTo    int      `json:"skipTo,omitempty"`
@@ -84,27 +85,18 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 		arg := args[i]
 		argValue := arg.Value
 
-
-        // Remove null bytes from the encoded steps
-        // sanitizedEncodedSteps := bytes.ReplaceAll(encodedSteps, []byte("\x00"), []byte{})
-        // if err := json.Unmarshal(sanitizedEncodedSteps, &steps); err != nil {
-        //     log.Printf("Error: Failed to decode steps from state. Error: %v", err)
-        //     return nil, remainingGas, fmt.Errorf("failed to decode steps: %w", err)
-        // }
-        // log.Printf("Successfully decoded %d steps from state.", len(steps))
-
 		if arg.Lookup {
             // Perform lookup in blockchain storage
-            stepKey := common.BytesToHash([]byte(fmt.Sprintf("step_result_%d", arg.PcLookupKey)))
-            stepData := stateDB.GetState(ContractAddress, stepKey).Bytes()
+            lookupKey := common.BytesToHash([]byte(arg.LookupKey))
+            lookupData := stateDB.GetState(ContractAddress, lookupKey).Bytes()
         
-            if len(stepData) == 0 || isAllZeroBytes(stepData) {
-                log.Printf("No valid data found for key=%s, returning error", stepKey.Hex())
-                return nil, fmt.Errorf("no valid data found for lookup step %d", arg.PcLookupKey)
+            if len(lookupData) == 0 || isAllZeroBytes(lookupData) {
+                log.Printf("No valid data found for key=%s, returning error", lookupKey.Hex())
+                return nil, fmt.Errorf("no valid data found for lookup key %s", arg.LookupKey)
             }
         
             // Sanitize stepData: Remove leading and trailing null bytes
-            sanitizedStepData := bytes.Trim(stepData, "\x00")
+            sanitizedStepData := bytes.Trim(lookupData, "\x00")
             log.Printf("Sanitized step data: %s", sanitizedStepData)
         
             // Decode the sanitized step data
@@ -118,7 +110,7 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
             // Check bounds for the ReturnArgKey
             if arg.ReturnArgKey >= len(stepResults) {
                 log.Printf("Index '%d' out of bounds for step results, length=%d", arg.ReturnArgKey, len(stepResults))
-                return nil, fmt.Errorf("key '%d' not found in storage at step %d", arg.ReturnArgKey, arg.PcLookupKey)
+                return nil, fmt.Errorf("key '%d' not found in storage at key %s", arg.ReturnArgKey, arg.LookupKey)
             }
         
             // Retrieve and process the value
@@ -354,27 +346,33 @@ func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodP
 }
 
 
-func updateMemoryInState(stateDB contract.StateDB, addr common.Address, pc *big.Int, decodedResults []interface{}) error {
-	memoryKey := fmt.Sprintf("step_result_%d", pc.Int64())
-	memory := make([][]byte, len(decodedResults))
+func updateMemoryInState(stateDB contract.StateDB, addr common.Address, outputKey string, decodedResults []interface{}) error {
+    if outputKey == "" {
+        return nil
+    }
 
-	for i, value := range decodedResults {
-		encodedValue, err := json.Marshal(value)
-		if err != nil {
-			return fmt.Errorf("failed to encode result at index %d: %w", i, err)
-		}
-		memory[i] = encodedValue
-	}
+    // Convert decodedResults to a memory representation
+    memory := make([][]byte, len(decodedResults))
+    for i, value := range decodedResults {
+        encodedValue, err := json.Marshal(value)
+        if err != nil {
+            return fmt.Errorf("failed to encode result at index %d: %w", i, err)
+        }
+        memory[i] = encodedValue
+    }
 
-	encodedMemory, err := json.Marshal(memory)
-	if err != nil {
-		return fmt.Errorf("failed to encode memory array: %w", err)
-	}
+    // Serialize the memory array
+    encodedMemory, err := json.Marshal(memory)
+    if err != nil {
+        return fmt.Errorf("failed to encode memory array: %w", err)
+    }
 
-	log.Printf("Writing to state: Key=%s, EncodedMemory=%x", memoryKey, encodedMemory)
-	stateDB.SetState(addr, common.BytesToHash([]byte(memoryKey)), common.BytesToHash(encodedMemory))
-	return nil
+    // Write to state using the outputKey
+    log.Printf("Writing to state: Key=%s, EncodedMemory=%x", outputKey, encodedMemory)
+    stateDB.SetState(addr, common.BytesToHash([]byte(outputKey)), common.BytesToHash(encodedMemory))
+    return nil
 }
+
 
 // continueEvaluation processes a given prompt ID and an array of contract method results,
 // returning a structured response indicating the evaluation status and associated method parameters.
@@ -438,11 +436,6 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     // unpacking input values
     inputStruct, err := UnpackContinueEvaluationInput(input)
 
-    // if err := json.Unmarshal(inputString, &inputStruct); err != nil {
-    //     log.Printf("Error: Failed to decode input. Error: %v", err)
-    //     return nil, remainingGas, fmt.Errorf("failed to decode input: %w", err)
-    // }
-
     if err != nil {
         log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to unpack input: %w", err)
@@ -467,12 +460,12 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     }
     log.Printf("Decoded results for step %d: %+v", currentPC.Int64(), decodedResults)
 
-    // Update memory in state
-    if err := updateMemoryInState(stateDB, addr, currentPC, decodedResults); err != nil {
+    // Update memory in state using the Output field as the key
+    if err := updateMemoryInState(stateDB, addr, currentStep.Output, decodedResults); err != nil {
         log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
         return nil, remainingGas, err
     }
-    log.Printf("Successfully updated memory in state for step %d.", currentPC.Int64())
+    log.Printf("Successfully updated memory in state for step %d under key: %s.", currentPC.Int64(), currentStep.Output)
 
     // Increment the program counter
     nextPC := currentPC.Add(currentPC, big.NewInt(1))
