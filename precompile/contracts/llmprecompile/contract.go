@@ -590,34 +590,14 @@ func deletePlanFromState(stateDB contract.StateDB, addr common.Address, key comm
 
 
 
-func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePlanGasCost); err != nil {
-		return nil, 0, err
-	}
-	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
-	}
-
-    // Unpack the input to retrieve the string argument
-    inputString, err := UnpackEvaluatePlanInput(input)
-    if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
-        return nil, remainingGas, err
-    }
-    log.Printf("Input string: %s", inputString)
-
-    var inputSteps []Step
-    if err := json.Unmarshal([]byte(inputString), &inputSteps); err != nil {
-        log.Printf("Error: Failed to parse input string as steps. Error: %v", err)
-        return nil, remainingGas, fmt.Errorf("invalid input format: %w", err)
-    }
-    log.Printf("Parsed %d steps from input string.", len(inputSteps))
-
-    if len(inputSteps) == 0 {
-        return nil, remainingGas, fmt.Errorf("evaluatePlan: input steps are empty")
-    }
-
+// evaluateSteps contains the shared logic for processing steps in evaluatePlan and evaluatePrompt.
+func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address, inputSteps []Step, suppliedGas uint64, gasCost uint64) (ret []byte, remainingGas uint64, err error) {
     stateDB := accessibleState.GetStateDB()
+
+    // Deduct gas
+    if remainingGas, err = contract.DeductGas(suppliedGas, gasCost); err != nil {
+        return nil, 0, err
+    }
 
     // Increment and log the prompt counter
     currentPromptId := IncrementPromptCounter(stateDB)
@@ -637,6 +617,7 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
         return nil, remainingGas, err
     }
 
+    // Delete any existing plan
     deletePlanFromState(stateDB, addr, stepsKey)
 
     // Store the encoded steps using setLargeState
@@ -672,9 +653,61 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
         return nil, remainingGas, err
     }
 
-    log.Printf("evaluatePlan completed successfully.")
+    log.Printf("evaluateSteps completed successfully.")
     return packedOutput, remainingGas, nil
 }
+
+// evaluatePlan uses evaluateSteps for its logic.
+func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+    if readOnly {
+        return nil, suppliedGas, vmerrs.ErrWriteProtection
+    }
+
+    // Unpack the input to retrieve the string argument
+    inputString, err := UnpackEvaluatePlanInput(input)
+    if err != nil {
+        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        return nil, suppliedGas, err
+    }
+    log.Printf("Input string: %s", inputString)
+
+    // Parse input into steps
+    var inputSteps []Step
+    if err := json.Unmarshal([]byte(inputString), &inputSteps); err != nil {
+        log.Printf("Error: Failed to parse input string as steps. Error: %v", err)
+        return nil, suppliedGas, fmt.Errorf("invalid input format: %w", err)
+    }
+    log.Printf("Parsed %d steps from input string.", len(inputSteps))
+
+    if len(inputSteps) == 0 {
+        return nil, suppliedGas, fmt.Errorf("evaluatePlan: input steps are empty")
+    }
+
+    return evaluateSteps(accessibleState, addr, inputSteps, suppliedGas, EvaluatePlanGasCost)
+}
+
+// evaluatePrompt uses evaluateSteps for its logic.
+func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+    if readOnly {
+        return nil, suppliedGas, vmerrs.ErrWriteProtection
+    }
+
+    // Unpack the input to retrieve the string argument
+    inputString, err := UnpackEvaluatePromptInput(input)
+    if err != nil {
+        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        return nil, suppliedGas, err
+    }
+    log.Printf("Input string: %s", inputString)
+
+    // Use pre-defined steps for evaluatePrompt
+    if len(steps) == 0 {
+        return nil, suppliedGas, fmt.Errorf("evaluatePrompt: no predefined steps available")
+    }
+
+    return evaluateSteps(accessibleState, addr, steps, suppliedGas, EvaluatePromptGasCost)
+}
+
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
@@ -786,84 +819,6 @@ func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Has
     }
     return data, nil
 }
-
-// evaluatePrompt generates a unique PromptId (starting from 1 and incrementing with each call)
-// and processes the input string, returning it as MethodData in the output.
-// The output includes:
-// - PromptId: A unique identifier for the prompt.
-// - ContractMethodParams: An array containing:
-//   - ContractAddress
-//   - MethodData
-func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-    // Deduct gas
-    if remainingGas, err = contract.DeductGas(suppliedGas, EvaluatePromptGasCost); err != nil {
-        return nil, 0, err
-    }
-    if readOnly {
-        return nil, remainingGas, vmerrs.ErrWriteProtection
-    }
-
-    // Unpack the input to retrieve the string argument
-    inputString, err := UnpackEvaluatePromptInput(input)
-    if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
-        return nil, remainingGas, err
-    }
-    log.Printf("Input string: %s", inputString)
-
-    stateDB := accessibleState.GetStateDB()
-
-    // Increment and log the prompt counter
-    currentPromptId := IncrementPromptCounter(stateDB)
-    log.Printf("Current Prompt ID: %v", currentPromptId)
-
-    // Encode the steps for storage
-    encodedSteps, err := encodeSteps(steps)
-    if err != nil {
-        log.Printf("Error: Failed to encode steps: %v", err)
-        return nil, remainingGas, fmt.Errorf("failed to encode steps: %w", err)
-    }
-    log.Printf("Encoded steps before storing: %s", string(encodedSteps))
-
-    deletePlanFromState(stateDB, addr, stepsKey)
-
-    // Store the encoded steps using setLargeState
-    setLargeState(stateDB, addr, stepsKey, encodedSteps)
-    log.Printf("Steps stored successfully in state.")
-
-    // Initialize the program counter to 0
-    currentPC := big.NewInt(0)
-    savePCToState(stateDB, addr, currentPC)
-    log.Printf("Initialized program counter to: %v", currentPC)
-
-    // Prepare the first step
-    nextStep := steps[0]
-    log.Printf("Current step: %+v", nextStep)
-
-    contractMethodParams, err := prepareNextStep(nextStep, stateDB)
-    if err != nil {
-        log.Printf("Error: Failed to prepare next step. Error: %v", err)
-        return nil, remainingGas, err
-    }
-    log.Printf("Contract Method Params: %+v", contractMethodParams)
-
-    // Construct the output
-    output := EvaluatePromptOutput{
-        PromptId:             currentPromptId,
-        ContractMethodParams: contractMethodParams,
-    }
-
-    // Pack the output for the next step
-    packedOutput, err := PackEvaluatePromptOutput(output)
-    if err != nil {
-        log.Printf("Error: Failed to pack output. Error: %v", err)
-        return nil, remainingGas, err
-    }
-
-    log.Printf("evaluatePrompt completed successfully.")
-    return packedOutput, remainingGas, nil
-}
-
 
 // UnpackPublishCustomPrimitiveInput attempts to unpack [input] as PublishCustomPrimitiveInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
