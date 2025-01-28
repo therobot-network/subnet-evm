@@ -43,21 +43,21 @@ var (
 
 
 type Arg struct {
-	Value  string `json:"value"`
-	Lookup bool    `json:"lookup"`
-    LookupKey string `json:"lookupKey"`
-    ReturnArgKey    int `json:"returnArgKey"` 
+	Value  string `json:"Value"`
+	Lookup bool    `json:"Lookup"`
+    LookupKey string `json:"LookupKey"`
+    ReturnArgKey    int `json:"ReturnArgKey"` 
 }
 
 type Step struct {
-	Method    string   `json:"method,omitempty"`
-	Contract  string   `json:"contract,omitempty"`
-	ABI       string   `json:"abi,omitempty"`
-	Args      []Arg    `json:"args,omitempty"`
-    Output    string   `json:"output,omitempty"`
-	PcStep    bool     `json:"pcStep,omitempty"`
-	Condition int      `json:"condition,omitempty"`
-	SkipTo    int      `json:"skipTo,omitempty"`
+	Method    string   `json:"Method,omitempty"`
+	Contract  string   `json:"Contract,omitempty"`
+	Primitive string   `json:"Primitive,omitempty"`
+	Args      []Arg    `json:"Args,omitempty"`
+    Output    string   `json:"Output,omitempty"`
+	PcStep    bool     `json:"PcStep,omitempty"` // GoStep
+	Condition string   `json:"Condition,omitempty"`
+	SkipTo    int      `json:"SkipTo,omitempty"`
 }
 
 var	steps = demoPlans["withLookup"]
@@ -73,7 +73,7 @@ func isAllZeroBytes(data []byte) bool {
 }
 
 
-// ProcessArguments converts arguments based on the expected types from the ABI.
+// ProcessArguments converts arguments based on the expected types from the Primitive.
 func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
 	if len(inputs) != len(args) {
 		return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
@@ -302,7 +302,7 @@ func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodP
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
     // Parse the ABI
-    parsedABI, err := abi.JSON(strings.NewReader(step.ABI))
+    parsedABI, err := abi.JSON(strings.NewReader(primitiveABI[step.Primitive]))
     if err != nil {
         log.Printf("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
         return nil, fmt.Errorf("failed to parse ABI: %w", err)
@@ -446,7 +446,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     currentStep := steps[currentPC.Int64()]
     log.Printf("Processing step %d: Method=%s, Contract=%s", currentPC.Int64(), currentStep.Method, currentStep.Contract)
 
-    parsedABI, err := abi.JSON(strings.NewReader(currentStep.ABI))
+    parsedABI, err := abi.JSON(strings.NewReader(primitiveABI[currentStep.Primitive]))
     if err != nil {
         log.Printf("Error: Failed to parse ABI for step %d. Error: %v", currentPC.Int64(), err)
         return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
