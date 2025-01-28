@@ -73,7 +73,9 @@ describe("ILLM", function () {
     const inputPrompt = `Hello World`;
     let promptIdRead: string;
 
-    let tx = await testContract.evaluatePrompt(inputPrompt);
+    let tx = await testContract.evaluatePrompt(JSON.stringify({
+      prompt: inputPrompt
+    }));
     await tx.wait();
     let methodData: string;
     let calleeContractAddress: string;
@@ -172,7 +174,9 @@ describe("ILLM", function () {
     // Read the JSON file containing the plans
     const fileContent = fs.readFileSync(planPath, "utf8");
     const plans = JSON.parse(fileContent);
-    const withLookupPlan = JSON.stringify(plans["basic"]);
+    const withLookupPlan = JSON.stringify({
+      plan: plans["basic"]
+    });
 
     const countAStart = await counterAContract.getCounter();
     const countBStart = await counterBContract.getCounter();
@@ -252,7 +256,7 @@ describe("ILLM", function () {
     // Read the JSON file containing the plans
     const fileContent = fs.readFileSync(planPath, "utf8");
     const plans = JSON.parse(fileContent);
-    const withLookupPlan = JSON.stringify(plans["withLookup"]);
+    const withLookupPlan = JSON.stringify({ plan: plans["withLookup"] });
 
     const countAStart = await counterAContract.getCounter();
     const countBStart = await counterBContract.getCounter();
