@@ -5,7 +5,7 @@ import "./tasks";
 // Since the blockchainID is not known in advance, there's no good default to use and we use the C-Chain here.
 var local_rpc_uri =
   process.env.RPC_URI ||
-  "http://127.0.0.1:9650/ext/bc/68JCdKgCacpJjBsP552dQu32noSYCPoowc5cUJ6o3v4DysZ1P/rpc";
+  "http://127.0.0.1:9650/ext/bc/Nr87kKgULn67r6NpeRpy1YXuHLApJMycC5H632YXHpUnGkYrT/rpc";
 // var local_rpc_uri = process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/C/rpc";
 var local_chain_id = parseInt(process.env.CHAIN_ID, 10) || 99999;
 // var local_chain_id = parseInt(process.env.CHAIN_ID, 10) || 43112;

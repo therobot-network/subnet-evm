@@ -73,8 +73,18 @@ describe("ILLM", function () {
     const inputPrompt = `Hello World`;
     let promptIdRead: string;
 
+    // should fail when prompt key is not passed
+    let isFailed = false;
+    await testContract.evaluatePrompt(JSON.stringify({ plan: inputPrompt })).catch(err => {
+      isFailed = true;
+    });
+    expect(isFailed).to.be.true;
+
     let tx = await testContract.evaluatePrompt(JSON.stringify({
-      prompt: inputPrompt
+      prompt: inputPrompt,
+      lookupTable: JSON.stringify({
+        recipient: '0x000000000000000000000000000000000000dead'
+      })
     }));
     await tx.wait();
     let methodData: string;
@@ -171,11 +181,21 @@ describe("ILLM", function () {
   it("should test evaluatePlan and continueEvaluation basic", async function () {
     const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
 
+    // should fail when plan is not passed
+    let isFailed = false;
+    await testContract.evaluatePlan(JSON.stringify({ prompt: '' })).catch(err => {
+      isFailed = true;
+    });
+    expect(isFailed).to.be.true;
+
     // Read the JSON file containing the plans
     const fileContent = fs.readFileSync(planPath, "utf8");
     const plans = JSON.parse(fileContent);
     const withLookupPlan = JSON.stringify({
-      plan: plans["basic"]
+      plan: JSON.stringify(plans["basic"]),
+      lookupTable: JSON.stringify({
+        recipient: '0x000000000000000000000000000000000000dead'
+      })
     });
 
     const countAStart = await counterAContract.getCounter();
@@ -256,7 +276,7 @@ describe("ILLM", function () {
     // Read the JSON file containing the plans
     const fileContent = fs.readFileSync(planPath, "utf8");
     const plans = JSON.parse(fileContent);
-    const withLookupPlan = JSON.stringify({ plan: plans["withLookup"] });
+    const withLookupPlan = JSON.stringify({ plan: JSON.stringify(plans["withLookup"]) });
 
     const countAStart = await counterAContract.getCounter();
     const countBStart = await counterBContract.getCounter();
