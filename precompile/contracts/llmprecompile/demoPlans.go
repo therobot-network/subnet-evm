@@ -6,27 +6,7 @@ var demoPlans = map[string][]Step{
 	{
 		Method:   "increase",
 		Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-		ABI: `[
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "number",
-						"type": "uint256"
-					}
-				],
-				"name": "increase",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}
-		]`,
+		Primitive: "counter",
 		Args: []Arg{
 			{
 				Value: "10",
@@ -36,27 +16,7 @@ var demoPlans = map[string][]Step{
 	{
 		Method:   "increase",
 		Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-		ABI: `[
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "number",
-						"type": "uint256"
-					}
-				],
-				"name": "increase",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}
-		]`,
+		Primitive: "counter",
 		Args: []Arg{
 			{
 				Value: "20",
@@ -68,7 +28,7 @@ var demoPlans = map[string][]Step{
     {
       Method:   "increase",
       Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-      ABI: primitiveABI["counter"],
+      Primitive: "counter",
 	  Args: []Arg{
         {
           Value: "10",
@@ -78,17 +38,18 @@ var demoPlans = map[string][]Step{
 		{
 			Method:   "getCounter",
 			Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-			ABI: primitiveABI["counter"],
+			Primitive: "counter",
 			Args: []Arg{},
+			Output: "CountA",
 		},
 		{
 			Method:   "increase",
 			Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-			ABI: primitiveABI["counter"],
+			Primitive: "counter",
 			Args: []Arg{
 				{
 					Lookup: true,
-					PcLookupKey: 1,
+					LookupKey: "CountA",
 					ReturnArgKey: 0,
 				},
 			},
@@ -100,7 +61,7 @@ var demoPlans = map[string][]Step{
 		{
 			Method:   "balanceOf",
 			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
-			ABI: `[
+			Primitive: `[
 				{
 					"inputs": [
 						{
@@ -130,7 +91,7 @@ var demoPlans = map[string][]Step{
 		{
 			Method:   "divide",
 			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
-			ABI: `[
+			Primitive: `[
 				{
 					"inputs": [
 						{
@@ -168,7 +129,7 @@ var demoPlans = map[string][]Step{
 		{
 			Method:   "isLessThanOrEqual",
 			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
-			ABI: `[
+			Primitive: `[
 				{
 					"inputs": [
 						{
@@ -204,15 +165,27 @@ var demoPlans = map[string][]Step{
 			},
 		},
 		{
-			PcStep:    true,
+			PcStep:    true, // GoStep
 			Method:    "jumpIf",
-			Condition: 2,
+			Condition: "StoredMemoryA", // Change to output
 			SkipTo:    5,
+		},
+		{
+			Method:   "jumpIf",
+			Primitive: "GoMethods",
+			Args: []Arg{
+				{
+					Value:  "true",
+				},
+				{
+					Lookup: true,
+				},
+			},
 		},
 		{
 			Method:   "transfer",
 			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
-			ABI: `[
+			Primitive: `[
 				{
 					"inputs": [
 						{

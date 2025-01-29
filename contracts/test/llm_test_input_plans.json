@@ -3,7 +3,7 @@
     {
       "Method": "increase",
       "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-      "ABI": "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"increase\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+      "Primitive": "counter",
       "Args": [
         {
           "Value": "10"
@@ -13,16 +13,17 @@
     {
       "Method": "getCounter",
       "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-      "ABI": "[{\"inputs\":[],\"name\":\"getCounter\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
-      "Args": []
+      "Primitive": "counter",
+      "Args": [],
+      "Output": "CountA"
     },
     {
       "Contract": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-      "ABI": "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"increase\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+      "Primitive": "counter",
       "Args": [
         {
           "Lookup": true,
-          "PcLookupKey": 1,
+          "LookupKey": "CountA",
           "ReturnArgKey": 0
         }
       ],
@@ -33,7 +34,7 @@
     {
       "Method": "increase",
       "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-      "ABI": "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"increase\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+      "Primitive": "counter",
       "Args": [
         {
           "Value": "10"
@@ -42,7 +43,7 @@
     },
     {
       "Contract": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
-      "ABI": "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"increase\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+      "Primitive": "counter",
       "Args": [
         {
           "Value": "20"
