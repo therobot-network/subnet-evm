@@ -513,7 +513,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 }
 
 // Helper function to parse JSON and extract "prompt"/"plan" and "lookupTable"
-func parseEvalInputJSON(input string) (string, string, error) {
+func parseEvalInputJSON(input string, expectedKey string) (string, string, error) {
 	// Parse the string into a JSON map
 	var parsed map[string]string
 	err := json.Unmarshal([]byte(input), &parsed)
@@ -521,17 +521,15 @@ func parseEvalInputJSON(input string) (string, string, error) {
 		return "", "", errors.New("failed to parse JSON: " + err.Error())
 	}
 
-	// Extract the required keys
-	evalData, ok1 := parsed["prompt"]
-	if !ok1 {
-		evalData, ok1 = parsed["plan"] // Fallback to "plan"
-	}
-	if !ok1 {
-		return "", "", errors.New("missing required key: 'prompt' or 'plan'")
+	// Extract the required key dynamically
+	evalData, ok := parsed[expectedKey]
+	if !ok {
+		return "", "", fmt.Errorf("missing required key: '%s'", expectedKey)
 	}
 
-	lookupTable, ok2 := parsed["lookupTable"]
-	if !ok2 {
+	// Extract lookupTable (optional)
+	lookupTable, ok := parsed["lookupTable"]
+	if !ok {
 		lookupTable = "" // Default to empty string if not present
 	}
 
@@ -548,7 +546,7 @@ func UnpackEvaluatePlanInput(input []byte) (string, string, error) {
 	}
 
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
-    return parseEvalInputJSON(unpacked)
+    return parseEvalInputJSON(unpacked, "plan")
 }
 
 // PackEvaluatePlan packs [plan] of type string into the appropriate arguments for evaluatePlan.
@@ -690,8 +688,9 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
         log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
-    fmt.Println("Plan:", plan)
-    fmt.Println("LookupTable:", lookupTable)
+
+    log.Printf("Plan: %s", plan)
+    log.Printf("LookupTable: %s", lookupTable)
     
     // Parse input into steps
     var inputSteps []Step
@@ -721,7 +720,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
         return nil, suppliedGas, err
     }
     log.Printf("Input string: %s", prompt)
-    fmt.Println("LookupTable:", lookupTable)
+    log.Printf("LookupTable: %s", lookupTable)
 
     // Use pre-defined steps for evaluatePrompt
     if len(steps) == 0 {
@@ -740,7 +739,7 @@ func UnpackEvaluatePromptInput(input []byte) (string, string, error) {
 		return "", "", err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
-	return parseEvalInputJSON(unpacked)
+	return parseEvalInputJSON(unpacked, "prompt")
 }
 
 // PackEvaluatePrompt packs [prompt] of type string into the appropriate arguments for evaluatePrompt.
