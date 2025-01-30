@@ -50,7 +50,6 @@ var demoPlans = map[string][]Step{
 				{
 					Lookup: true,
 					LookupKey: "CountA",
-					ReturnArgKey: 0,
 				},
 			},
 		},
