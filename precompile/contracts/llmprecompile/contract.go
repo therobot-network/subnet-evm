@@ -93,18 +93,37 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
                 log.Printf("No valid data found for key=%s, returning error", lookupKey.Hex())
                 return nil, fmt.Errorf("no valid data found for lookup key %s", arg.Lookup)
             }
+
+            log.Printf("Raw value retrieved from state (before sanitization): %s", lookupData)
         
             // Sanitize stepData: Remove leading and trailing null bytes
             sanitizedStepData := bytes.Trim(lookupData, "\x00")
-            log.Printf("Sanitized step data: %s", sanitizedStepData)
-        
-            // Decode the sanitized step data
+            log.Printf("Sanitized step data before decoding: %s", sanitizedStepData)
+
+            // Directly attempt JSON decoding
             var stepResults []interface{}
-            if err := json.Unmarshal(sanitizedStepData, &stepResults); err != nil {
+            err := json.Unmarshal(sanitizedStepData, &stepResults)
+            if err != nil {
                 log.Printf("Error unmarshaling sanitized step data: %v", err)
                 log.Printf("Raw sanitized step data causing issue: %s", sanitizedStepData)
                 return nil, fmt.Errorf("failed to decode step results from storage: %w", err)
             }
+
+            // // Decode Base64 first
+            // decodedBase64, base64Err := base64.StdEncoding.DecodeString(string(sanitizedStepData))
+            // if base64Err == nil {
+            //     log.Printf("Base64-decoded step data: %s", decodedBase64)
+            //     sanitizedStepData = decodedBase64
+            // }
+
+            // // Now, try JSON unmarshaling
+            // var stepResults []interface{}
+            // err := json.Unmarshal(sanitizedStepData, &stepResults)
+            // if err != nil {
+            //     log.Printf("Error unmarshaling sanitized step data: %v", err)
+            //     log.Printf("Raw sanitized step data causing issue: %s", sanitizedStepData)
+            //     return nil, fmt.Errorf("failed to decode step results from storage: %w", err)
+            // }
         
             // Check bounds for the ReturnArgKey
             if arg.ReturnArgKey >= len(stepResults) {
@@ -350,6 +369,15 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, outputKe
         return nil
     }
 
+    outputKeyHash := common.BytesToHash([]byte(outputKey))
+
+    // Check if a value already exists in state
+    existingValue := stateDB.GetState(addr, outputKeyHash)
+    if existingValue != (common.Hash{}) {
+        log.Printf("Clearing existing value for key: %s", outputKey)
+        stateDB.SetState(addr, outputKeyHash, common.Hash{}) // Clear the previous value
+    }
+
     // Convert decodedResults to a memory representation
     memory := make([][]byte, len(decodedResults))
     for i, value := range decodedResults {
@@ -368,7 +396,8 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, outputKe
 
     // Write to state using the outputKey
     log.Printf("Writing to state: Key=%s, EncodedMemory=%x", outputKey, encodedMemory)
-    stateDB.SetState(addr, common.BytesToHash([]byte(outputKey)), common.BytesToHash(encodedMemory))
+    stateDB.SetState(addr, outputKeyHash, common.BytesToHash(encodedMemory))
+    // stateDB.SetState(addr, outputKeyHash, common.BytesToHash([]byte(base64.StdEncoding.EncodeToString(encodedMemory))))
     return nil
 }
 
