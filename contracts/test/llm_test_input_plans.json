@@ -23,8 +23,7 @@
       "Args": [
         {
           "Lookup": true,
-          "LookupKey": "CountA",
-          "ReturnArgKey": 0
+          "LookupKey": "CountA"
         }
       ],
       "Method": "increase"

@@ -46,7 +46,7 @@ type Arg struct {
 	Value  string `json:"Value"`
 	Lookup bool    `json:"Lookup"`
     LookupKey string `json:"LookupKey"`
-    ReturnArgKey    int `json:"ReturnArgKey"` 
+    ReturnArgKey    int `json:"ReturnArgKey"` // Default to zero
 }
 
 type Step struct {
