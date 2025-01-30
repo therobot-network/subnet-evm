@@ -44,8 +44,7 @@ var (
 
 type Arg struct {
 	Value  string `json:"Value"`
-	Lookup bool    `json:"Lookup"`
-    LookupKey string `json:"LookupKey"`
+	Lookup string    `json:"Lookup"`
     ReturnArgKey    int `json:"ReturnArgKey"` // Default to zero
 }
 
@@ -85,14 +84,14 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 		arg := args[i]
 		argValue := arg.Value
 
-		if arg.Lookup {
+		if arg.Lookup != "" {
             // Perform lookup in blockchain storage
-            lookupKey := common.BytesToHash([]byte(arg.LookupKey))
+            lookupKey := common.BytesToHash([]byte(arg.Lookup))
             lookupData := stateDB.GetState(ContractAddress, lookupKey).Bytes()
         
             if len(lookupData) == 0 || isAllZeroBytes(lookupData) {
                 log.Printf("No valid data found for key=%s, returning error", lookupKey.Hex())
-                return nil, fmt.Errorf("no valid data found for lookup key %s", arg.LookupKey)
+                return nil, fmt.Errorf("no valid data found for lookup key %s", arg.Lookup)
             }
         
             // Sanitize stepData: Remove leading and trailing null bytes
@@ -110,7 +109,7 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
             // Check bounds for the ReturnArgKey
             if arg.ReturnArgKey >= len(stepResults) {
                 log.Printf("Index '%d' out of bounds for step results, length=%d", arg.ReturnArgKey, len(stepResults))
-                return nil, fmt.Errorf("key '%d' not found in storage at key %s", arg.ReturnArgKey, arg.LookupKey)
+                return nil, fmt.Errorf("key '%d' not found in storage at key %s", arg.ReturnArgKey, arg.Lookup)
             }
         
             // Retrieve and process the value

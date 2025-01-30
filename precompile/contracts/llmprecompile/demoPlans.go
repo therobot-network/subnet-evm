@@ -48,8 +48,7 @@ var demoPlans = map[string][]Step{
 			Primitive: "counter",
 			Args: []Arg{
 				{
-					Lookup: true,
-					LookupKey: "CountA",
+					Lookup: "CountA",
 				},
 			},
 		},
@@ -118,7 +117,7 @@ var demoPlans = map[string][]Step{
 			]`,
 			Args: []Arg{
 				{
-					Lookup: true,
+					Lookup: "hello",
 				},
 				{
 					Value: "2",
@@ -156,7 +155,7 @@ var demoPlans = map[string][]Step{
 			]`,
 			Args: []Arg{
 				{
-					Lookup: true,
+					Lookup: "hello",
 				},
 				{
 					Value:  "10",
@@ -177,7 +176,7 @@ var demoPlans = map[string][]Step{
 					Value:  "true",
 				},
 				{
-					Lookup: true,
+					Lookup: "hello",
 				},
 			},
 		},
@@ -215,7 +214,7 @@ var demoPlans = map[string][]Step{
 					Value:  "0xad660da80c8D32E1a4Fb8DF6925A428060b58616",
 				},
 				{
-					Lookup: true,
+					Lookup: "hello",
 				},
 			},
 		},

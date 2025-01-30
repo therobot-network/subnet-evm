@@ -22,8 +22,7 @@
       "Primitive": "counter",
       "Args": [
         {
-          "Lookup": true,
-          "LookupKey": "CountA"
+          "Lookup": "CountA"
         }
       ],
       "Method": "increase"
