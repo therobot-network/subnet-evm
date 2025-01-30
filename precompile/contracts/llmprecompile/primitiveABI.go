@@ -511,12 +511,12 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
@@ -524,7 +524,7 @@ var primitiveABI = map[string]string{
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "result",
+          "name": "",
           "type": "uint256"
         }
       ],

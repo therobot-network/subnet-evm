@@ -49,5 +49,58 @@
       ],
       "Method": "increase"
     }
+  ],
+  "withMathAndErc20": [
+    {
+      "Method": "transfer",
+      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Primitive": "erc20",
+      "Args": [
+        {
+          "Value": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        },
+        {
+          "Value": "6"
+        }
+      ]
+    },
+    {
+      "Method": "balanceOf",
+      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Primitive": "erc20",
+      "Args": [
+        {
+          "value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        }
+      ],
+      "Output": "signerbalance"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "signerbalance"
+        },
+        {
+          "Value": "2"
+        }
+      ],
+      "Contract": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D",
+      "Method": "divide",
+      "Output": "half_balance",
+      "Primitive": "math"
+    },
+    {
+      "Args": [
+        {
+          "Value": "0x8A1b3C4D5E6F7890AaBbCcDdEeF0123456789Ab1"
+        },
+        {
+          "Lookup": "half_balance"
+        }
+      ],
+      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Method": "transfer",
+      "Primitive": "erc20"
+    }
   ]
 }
