@@ -9,6 +9,10 @@ import (
 	"log"
 	"math/big"
 	"strings"
+    "io/ioutil"
+    "net/http"
+    "time"
+    "regexp"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -50,7 +54,7 @@ type Arg struct {
 
 type Step struct {
 	Method    string   `json:"Method,omitempty"`
-	Contract  string   `json:"Contract,omitempty"`
+	Contract  Arg      `json:"Contract,omitempty"`
 	Primitive string   `json:"Primitive,omitempty"`
 	Args      []Arg    `json:"Args,omitempty"`
     Output    string   `json:"Output,omitempty"`
@@ -71,6 +75,91 @@ func isAllZeroBytes(data []byte) bool {
 	return true
 }
 
+func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
+    reqBytes, err := json.Marshal(requestBody)
+    if err != nil {
+        return nil, fmt.Errorf("failed to marshal request body: %w", err)
+    }
+    log.Printf("Sending HTTP POST to %s with JSON body: %s", url, string(reqBytes))
+
+    client := &http.Client{
+        Timeout: 60 * time.Second,
+    }
+
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBytes))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("HTTP request failed: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        body, _ := ioutil.ReadAll(resp.Body)
+        log.Printf("Non-200 response: %d, body: %s", resp.StatusCode, body)
+        return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
+    }
+
+    respBytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read HTTP response: %w", err)
+    }
+
+    log.Printf("respBytes: %s", respBytes)
+    return respBytes, nil
+}
+
+func getLookupValue(arg Arg, stateDB contract.StateDB) (string, error) {
+	// If Value is provided, use it; otherwise, use Lookup.
+	argValue := arg.Value
+	if arg.Lookup != "" {
+		// Retrieve the stored data.
+        lookupKey := common.BytesToHash([]byte(arg.Lookup))
+        lookupData, err := getLargeState(stateDB, ContractAddress, lookupKey)
+        if err != nil {
+            return "", fmt.Errorf("failed to retrieve data from state for key %s: %w", lookupKey, err)
+        }
+        log.Printf("Raw value retrieved from state (before sanitization): %s", lookupData)
+
+        sanitizedData := bytes.ReplaceAll(lookupData, []byte("\x00"), []byte(""))
+        log.Printf("Retrieved and sanitized data for key(%s) %s: %s", arg.Lookup, lookupKey.Hex(), sanitizedData)
+
+        // Directly attempt JSON decoding
+        var stepResults []interface{}
+        err = json.Unmarshal(sanitizedData, &stepResults)
+        if err != nil {
+            log.Printf("Error unmarshaling sanitized step data: %v", err)
+            log.Printf("Raw sanitized step data causing issue: %s", sanitizedData)
+            return "", fmt.Errorf("failed to decode step results from storage: %w", err)
+        }
+
+        // Check bounds for the ReturnArgKey
+        if arg.ReturnArgKey >= len(stepResults) {
+            log.Printf("Index '%d' out of bounds for step results, length=%d", arg.ReturnArgKey, len(stepResults))
+            return "", fmt.Errorf("key '%d' not found in storage at key %s", arg.ReturnArgKey, arg.Lookup)
+        }
+
+        // Retrieve and process the value
+        retrievedValue := fmt.Sprintf("%v", stepResults[arg.ReturnArgKey])
+
+        // Attempt Base64 decoding
+        decodedValue, err := base64.StdEncoding.DecodeString(retrievedValue)
+        if err == nil {
+            retrievedValue = string(decodedValue) // Use the decoded value if successful
+            log.Printf("Base64-decoded value: %s", retrievedValue)
+        } else {
+            log.Printf("Base64 decoding failed: %v", err)
+        }
+
+        argValue = retrievedValue
+	}
+
+	return argValue, nil
+}
 
 // ProcessArguments converts arguments based on the expected types from the Primitive.
 func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
@@ -82,91 +171,33 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 	for i, input := range inputs {
 		expectedType := input.Type.String()
 		arg := args[i]
-		argValue := arg.Value
-
-		if arg.Lookup != "" {
-            // Perform lookup in blockchain storage
-            lookupKey := common.BytesToHash([]byte(arg.Lookup))
-            lookupData := stateDB.GetState(ContractAddress, lookupKey).Bytes()
-        
-            if len(lookupData) == 0 || isAllZeroBytes(lookupData) {
-                log.Printf("No valid data found for key=%s, returning error", lookupKey.Hex())
-                return nil, fmt.Errorf("no valid data found for lookup key %s", arg.Lookup)
-            }
-
-            log.Printf("Raw value retrieved from state (before sanitization): %s", lookupData)
-        
-            // Sanitize stepData: Remove leading and trailing null bytes
-            sanitizedStepData := bytes.Trim(lookupData, "\x00")
-            log.Printf("Sanitized step data before decoding: %s", sanitizedStepData)
-
-            // Directly attempt JSON decoding
-            var stepResults []interface{}
-            err := json.Unmarshal(sanitizedStepData, &stepResults)
-            if err != nil {
-                log.Printf("Error unmarshaling sanitized step data: %v", err)
-                log.Printf("Raw sanitized step data causing issue: %s", sanitizedStepData)
-                return nil, fmt.Errorf("failed to decode step results from storage: %w", err)
-            }
-
-            // // Decode Base64 first
-            // decodedBase64, base64Err := base64.StdEncoding.DecodeString(string(sanitizedStepData))
-            // if base64Err == nil {
-            //     log.Printf("Base64-decoded step data: %s", decodedBase64)
-            //     sanitizedStepData = decodedBase64
-            // }
-
-            // // Now, try JSON unmarshaling
-            // var stepResults []interface{}
-            // err := json.Unmarshal(sanitizedStepData, &stepResults)
-            // if err != nil {
-            //     log.Printf("Error unmarshaling sanitized step data: %v", err)
-            //     log.Printf("Raw sanitized step data causing issue: %s", sanitizedStepData)
-            //     return nil, fmt.Errorf("failed to decode step results from storage: %w", err)
-            // }
-        
-            // Check bounds for the ReturnArgKey
-            if arg.ReturnArgKey >= len(stepResults) {
-                log.Printf("Index '%d' out of bounds for step results, length=%d", arg.ReturnArgKey, len(stepResults))
-                return nil, fmt.Errorf("key '%d' not found in storage at key %s", arg.ReturnArgKey, arg.Lookup)
-            }
-        
-            // Retrieve and process the value
-            retrievedValue := fmt.Sprintf("%v", stepResults[arg.ReturnArgKey])
-        
-            // Attempt Base64 decoding
-            decodedValue, err := base64.StdEncoding.DecodeString(retrievedValue)
-            if err == nil {
-                retrievedValue = string(decodedValue) // Use the decoded value if successful
-                log.Printf("Base64-decoded value: %s", retrievedValue)
-            } else {
-                log.Printf("Base64 decoding failed: %v", err)
-            }
-        
-            argValue = retrievedValue
+		argValue, err := getLookupValue(arg, stateDB)
+        if err != nil {
+            log.Printf("Failed fetching contract address: %v", err)
+            return nil, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
         }
         
 		switch expectedType {
-		case "address":
-			packedArgs[i] = common.HexToAddress(argValue) // Convert to Ethereum address
-		case "uint256":
-			bigIntValue := new(big.Int)
-			if _, success := bigIntValue.SetString(argValue, 10); !success {
-				return nil, fmt.Errorf("invalid uint256 value: %s", argValue)
-			}
-			packedArgs[i] = bigIntValue
-		case "bool":
-			if argValue == "true" {
-				packedArgs[i] = true
-			} else if argValue == "false" {
-				packedArgs[i] = false
-			} else {
-				return nil, fmt.Errorf("invalid boolean value: %s", argValue)
-			}
-		case "string":
-			packedArgs[i] = argValue // Use string as-is
-		default:
-			return nil, fmt.Errorf("unsupported type: %s", expectedType)
+            case "address":
+                packedArgs[i] = common.HexToAddress(argValue) // Convert to Ethereum address
+            case "uint256":
+                bigIntValue := new(big.Int)
+                if _, success := bigIntValue.SetString(argValue, 10); !success {
+                    return nil, fmt.Errorf("invalid uint256 value: %s", argValue)
+                }
+                packedArgs[i] = bigIntValue
+            case "bool":
+                if argValue == "true" {
+                    packedArgs[i] = true
+                } else if argValue == "false" {
+                    packedArgs[i] = false
+                } else {
+                    return nil, fmt.Errorf("invalid boolean value: %s", argValue)
+                }
+            case "string":
+                packedArgs[i] = argValue // Use string as-is
+            default:
+                return nil, fmt.Errorf("unsupported type: %s", expectedType)
 		}
 
 		// Log the conversion
@@ -176,7 +207,17 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 	return packedArgs, nil
 }
 
+func ProcessContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
+	// If Value is provided, use it; otherwise, use Lookup.
+	addrStr, err := getLookupValue(contract, stateDB)
+    if err != nil {
+        log.Printf("Failed fetching contract address: %v", err)
+        return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+    }
 
+	// Convert the string to a common.Address.
+	return common.HexToAddress(addrStr), nil
+}
 
 // Singleton StatefulPrecompiledContract and signatures.
 var (
@@ -193,6 +234,8 @@ var (
     pcKey    = common.BytesToHash([]byte("pc"))
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
+
+    llmApiURL = "http://robotbrain-v2-loadbalancer-2026683595.eu-west-1.elb.amazonaws.com/eval_prompt"
 )
 
 // ILLMContractMethodParams is an auto generated low-level Go binding around an user-defined struct.
@@ -295,6 +338,7 @@ func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
 // Utility function to decode results into an ordered array
 func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
     log.Printf("Decoding results for method: %s", method.Name)
+    log.Printf("Decoding result: %s", result)
 
     // Attempt to unpack the results
     decodedResults, err := method.Outputs.Unpack(result)
@@ -320,6 +364,7 @@ func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodP
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
     // Parse the ABI
+    // TODO: handle assignment/jump if primitives in go
     parsedABI, err := abi.JSON(strings.NewReader(primitiveABI[step.Primitive]))
     if err != nil {
         log.Printf("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
@@ -351,10 +396,16 @@ func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodP
     }
     log.Printf("Successfully packed method data for Method=%s. Method Data (hex): %x", step.Method, methodData)
 
+    contractAddress, err := ProcessContractAddress(step.Contract, stateDB)
+    if err != nil {
+        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        return nil, fmt.Errorf("failed to parse contract address: %w", err)
+    }
+
     // Return the prepared contract method parameters
     contractParams := []ILLMContractMethodParams{
         {
-            ContractAddress: common.HexToAddress(step.Contract),
+            ContractAddress: contractAddress,
             MethodData:      append(method.ID, methodData...),
         },
     }
@@ -396,7 +447,8 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, outputKe
 
     // Write to state using the outputKey
     log.Printf("Writing to state: Key=%s, EncodedMemory=%x", outputKey, encodedMemory)
-    stateDB.SetState(addr, outputKeyHash, common.BytesToHash(encodedMemory))
+    setLargeState(stateDB, addr, outputKeyHash, encodedMemory)
+    // stateDB.SetState(addr, outputKeyHash, common.BytesToHash(encodedMemory))
     // stateDB.SetState(addr, outputKeyHash, common.BytesToHash([]byte(base64.StdEncoding.EncodeToString(encodedMemory))))
     return nil
 }
@@ -704,6 +756,58 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
     return packedOutput, remainingGas, nil
 }
 
+func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) error {
+    // If the JSON string is empty, return an empty map (i.e. {}).
+	if lookupJsonString == "" {
+		return nil
+	}
+
+    // Unmarshal the input JSON string into a map.
+	var lookupMap map[string]string
+	if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
+		return fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
+	}
+
+	// Iterate over the map and for each key/value pair, create a JSON array and store it.
+	for key, val := range lookupMap {
+		// Create an array with the value as the first (and only) entry.
+		arr := []interface{}{val}
+
+		// Marshal the array into JSON.
+		arrBytes, err := json.Marshal(arr)
+		if err != nil {
+			return fmt.Errorf("failed to marshal array for key %s: %w", key, err)
+		}
+
+		// Convert the key string to a storage key (common.Hash).
+		storageKey := common.BytesToHash([]byte(key))
+
+		// Store the JSON array using your setLargeState function.
+		setLargeState(stateDB, addr, storageKey, arrBytes)
+	}
+
+    return nil
+}
+
+func extractAtValues(input string) []string {
+	// Define a regex pattern that matches "@" followed by one or more word characters.
+	// The parenthesis creates a capturing group for the word without the "@".
+	pattern := regexp.MustCompile(`@(\w+)`)
+
+	// Find all matches; each match will be a slice where index 0 is the full match,
+	// and index 1 is the captured group.
+	matches := pattern.FindAllStringSubmatch(input, -1)
+
+	// Prepare a slice to hold the results.
+	var results []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			results = append(results, match[1])
+		}
+	}
+	return results
+}
+
 // evaluatePlan uses evaluateSteps for its logic.
 func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
     if readOnly {
@@ -719,6 +823,14 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 
     log.Printf("Plan: %s", plan)
     log.Printf("LookupTable: %s", lookupTable)
+
+    stateDB := accessibleState.GetStateDB()
+    // Store the lookup entries.
+	err = storeLookupEntries(stateDB, addr, lookupTable)
+	if err != nil {
+		log.Fatalf("Error storing lookup entries: %v", err)
+        return nil, suppliedGas, fmt.Errorf("Error storing lookup entries: %w", err)
+	}
     
     // Parse input into steps
     var inputSteps []Step
@@ -750,12 +862,45 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     log.Printf("Input string: %s", prompt)
     log.Printf("LookupTable: %s", lookupTable)
 
+    stateDB := accessibleState.GetStateDB()
+
+	// Store the lookup entries.
+	err = storeLookupEntries(stateDB, addr, lookupTable)
+	if err != nil {
+		log.Fatalf("Error storing lookup entries: %v", err)
+	}
+
+	keys := extractAtValues(prompt)
+	// Print the keys.
+	fmt.Printf("Extracted keys: %v\n", keys)
+
+    // Define the API endpoint and the request payload.
+	requestPayload := map[string]interface{}{
+		"user_prompt": prompt,
+		"predefinedVariables": keys,
+	}
+
+	// Call the HTTP API.
+	respBytes, err := HTTPPostJSON(llmApiURL, requestPayload)
+    if err != nil {
+        return nil, suppliedGas, fmt.Errorf("HTTP API call failed: %w", err)
+    }
+
+    log.Printf("API returned result: %s\n", respBytes)
+
+    var inputSteps []Step
+    if err := json.Unmarshal(respBytes, &inputSteps); err != nil {
+        log.Printf("Error: Failed to parse response string as steps. Error: %v", err)
+        return nil, suppliedGas, fmt.Errorf("invalid response format: %w", err)
+    }
+    log.Printf("Parsed %d steps from input string.", len(inputSteps))
+
     // Use pre-defined steps for evaluatePrompt
-    if len(steps) == 0 {
+    if len(inputSteps) == 0 {
         return nil, suppliedGas, fmt.Errorf("evaluatePrompt: no predefined steps available")
     }
 
-    return evaluateSteps(accessibleState, addr, steps, suppliedGas, EvaluatePromptGasCost)
+    return evaluateSteps(accessibleState, addr, inputSteps, suppliedGas, EvaluatePromptGasCost)
 }
 
 

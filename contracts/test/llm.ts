@@ -92,7 +92,7 @@ describe("LLM Precompiled Contract", function () {
     const countAStart = await counterAContract.getCounter();
     const countBStart = await counterBContract.getCounter();
 
-    const inputPrompt = `Hello World`;
+    const inputPrompt = `transfer 5 @USDC to @user1`;
     let promptIdRead: string;
 
     // should fail when prompt key is not passed
@@ -108,7 +108,9 @@ describe("LLM Precompiled Contract", function () {
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
+          USDC: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
           recipient: "0x000000000000000000000000000000000000dead",
+          user1: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         }),
       }),
     );
@@ -222,6 +224,7 @@ describe("LLM Precompiled Contract", function () {
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["basic"]),
       lookupTable: JSON.stringify({
+        USDC: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
         recipient: "0x000000000000000000000000000000000000dead",
       }),
     });
@@ -406,7 +409,7 @@ describe("LLM Precompiled Contract", function () {
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 
-  it.only("should test evaluatePlan and continueEvaluation with erc20 and math", async function () {
+  it("should test evaluatePlan and continueEvaluation with erc20 and math", async function () {
     const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
 
     // Read the JSON file containing the plans
@@ -414,6 +417,9 @@ describe("LLM Precompiled Contract", function () {
     const plans = JSON.parse(fileContent);
     const withMathAndErc20Plan = JSON.stringify({
       plan: JSON.stringify(plans["withMathAndErc20"]),
+      lookupTable: JSON.stringify({
+        user1: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+      })
     });
 
     let adminBalanceStart = await erc20Contract.balanceOf(ADMIN_ADDRESS);
@@ -454,8 +460,8 @@ describe("LLM Precompiled Contract", function () {
       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     );
 
-    expect(adminBalanceEnd).to.equal(adminBalanceStart - 6n);
-    expect(userBalanceEnd).to.equal(userBalanceStart + 6n);
+    expect(adminBalanceEnd).to.equal(adminBalanceStart - 600n);
+    expect(userBalanceEnd).to.equal(userBalanceStart + 600n);
 
     adminBalanceStart = adminBalanceEnd;
     userBalanceStart = userBalanceEnd;
@@ -535,7 +541,7 @@ describe("LLM Precompiled Contract", function () {
 
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
       // contractMethodResults,
     );
     await tx.wait();

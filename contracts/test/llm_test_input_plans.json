@@ -2,7 +2,7 @@
   "withLookup": [
     {
       "Method": "increase",
-      "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Primitive": "counter",
       "Args": [
         {
@@ -12,13 +12,13 @@
     },
     {
       "Method": "getCounter",
-      "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Primitive": "counter",
       "Args": [],
       "Output": "CountA"
     },
     {
-      "Contract": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
       "Primitive": "counter",
       "Args": [
         {
@@ -31,7 +31,7 @@
   "basic": [
     {
       "Method": "increase",
-      "Contract": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Primitive": "counter",
       "Args": [
         {
@@ -40,7 +40,7 @@
       ]
     },
     {
-      "Contract": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
       "Primitive": "counter",
       "Args": [
         {
@@ -53,20 +53,20 @@
   "withMathAndErc20": [
     {
       "Method": "transfer",
-      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
       "Primitive": "erc20",
       "Args": [
         {
           "Value": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         },
         {
-          "Value": "6"
+          "Value": "600"
         }
       ]
     },
     {
       "Method": "balanceOf",
-      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
       "Primitive": "erc20",
       "Args": [
         {
@@ -84,7 +84,7 @@
           "Value": "2"
         }
       ],
-      "Contract": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D",
+      "Contract": { "Value": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D" },
       "Method": "divide",
       "Output": "half_balance",
       "Primitive": "math"
@@ -92,13 +92,13 @@
     {
       "Args": [
         {
-          "Value": "0x8A1b3C4D5E6F7890AaBbCcDdEeF0123456789Ab1"
+          "Lookup": "user1"
         },
         {
           "Lookup": "half_balance"
         }
       ],
-      "Contract": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9",
+      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
       "Method": "transfer",
       "Primitive": "erc20"
     }
