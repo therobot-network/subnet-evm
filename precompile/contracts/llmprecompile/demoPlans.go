@@ -5,7 +5,9 @@ var demoPlans = map[string][]Step{
 	"basic": {
 	{
 		Method:   "increase",
-		Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+		Contract: Arg{
+			Lookup: "USDC" ,
+		},
 		Primitive: "counter",
 		Args: []Arg{
 			{
@@ -15,7 +17,9 @@ var demoPlans = map[string][]Step{
 	},
 	{
 		Method:   "increase",
-		Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+		Contract: Arg{
+			Value: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+		},
 		Primitive: "counter",
 		Args: []Arg{
 			{
@@ -27,7 +31,9 @@ var demoPlans = map[string][]Step{
   "withLookup": {
     {
       Method:   "increase",
-      Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+      Contract: Arg{
+				Value: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+			},
       Primitive: "counter",
 	  Args: []Arg{
         {
@@ -37,14 +43,18 @@ var demoPlans = map[string][]Step{
     },
 		{
 			Method:   "getCounter",
-			Contract: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+			Contract: Arg{
+				Value: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+			},
 			Primitive: "counter",
 			Args: []Arg{},
 			Output: "CountA",
 		},
 		{
 			Method:   "increase",
-			Contract: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+			Contract: Arg{
+				Value: "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e",
+			},
 			Primitive: "counter",
 			Args: []Arg{
 				{
@@ -58,7 +68,9 @@ var demoPlans = map[string][]Step{
 	"erc20Plan": {
 		{
 			Method:   "balanceOf",
-			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			Contract: Arg{
+				Value: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			},
 			Primitive: `[
 				{
 					"inputs": [
@@ -88,7 +100,9 @@ var demoPlans = map[string][]Step{
 		},
 		{
 			Method:   "divide",
-			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			Contract: Arg{
+				Value: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			},
 			Primitive: `[
 				{
 					"inputs": [
@@ -126,7 +140,9 @@ var demoPlans = map[string][]Step{
 		},
 		{
 			Method:   "isLessThanOrEqual",
-			Contract: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			Contract: Arg{
+				Value: "0xC6d7eF1e8BEd05586A46Bef5e1E392DF64070503",
+			},
 			Primitive: `[
 				{
 					"inputs": [
@@ -182,7 +198,9 @@ var demoPlans = map[string][]Step{
 		},
 		{
 			Method:   "transfer",
-			Contract: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			Contract: Arg{
+				Value: "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922",
+			},
 			Primitive: `[
 				{
 					"inputs": [

@@ -300,7 +300,7 @@ var primitiveABI = map[string]string{
       "outputs": [
         {
           "internalType": "bool",
-          "name": "success",
+          "name": "",
           "type": "bool"
         }
       ],
