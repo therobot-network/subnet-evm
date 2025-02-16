@@ -86,14 +86,12 @@ describe("LLM Precompiled Contract", function () {
   });
 
   it("should test evaluatePrompt and continueEvaluation with lookup", async function () {
-    // const recipientAddress = "0x000000000000000000000000000000000000dead";
-    // const amount = ethers.parseUnits("10", 18).toString();
-
-    const countAStart = await counterAContract.getCounter();
-    const countBStart = await counterBContract.getCounter();
-
     const inputPrompt = `transfer 5 @USDC to @user1`;
     let promptIdRead: string;
+    const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+
+    const adminBalanceStart = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceStart = await erc20Contract.balanceOf(user1Address);
 
     // should fail when prompt key is not passed
     let isFailed = false;
@@ -108,9 +106,8 @@ describe("LLM Precompiled Contract", function () {
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
-          USDC: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
-          recipient: "0x000000000000000000000000000000000000dead",
-          user1: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+          USDC: erc20Address,
+          user1: user1Address,
         }),
       }),
     );
@@ -140,55 +137,7 @@ describe("LLM Precompiled Contract", function () {
 
     tx = await testContract.continueEvaluation(
       promptIdRead,
-      ["0x000000000000000000000000000000000000000000000000000000000000000b"],
-      // contractMethodResults,
-    );
-    await tx.wait();
-    await expect(tx)
-      .to.emit(testContract, "ContinueEvaluationEvent")
-      .withArgs(
-        (evaluationDone) => evaluationDone == false,
-        (contractMethodParams) => {
-          calleeContractAddress = contractMethodParams[0].contractAddress;
-          methodData = contractMethodParams[0].methodData;
-          return true;
-        },
-      );
-
-    // Read counter A
-    // result = await owner.sendTransaction({
-    let resultTx = await owner.call({
-      to: calleeContractAddress,
-      data: methodData,
-    });
-
-    tx = await testContract.continueEvaluation(
-      promptIdRead,
-      [resultTx],
-      // contractMethodResults,
-    );
-    await tx.wait();
-    await expect(tx)
-      .to.emit(testContract, "ContinueEvaluationEvent")
-      .withArgs(
-        (evaluationDone) => evaluationDone == false,
-        (contractMethodParams) => {
-          calleeContractAddress = contractMethodParams[0].contractAddress;
-          methodData = contractMethodParams[0].methodData;
-          return true;
-        },
-      );
-
-    // Update Counter B
-    result = await owner.sendTransaction({
-      // let result = await owner.call({
-      to: calleeContractAddress,
-      data: methodData,
-    });
-
-    tx = await testContract.continueEvaluation(
-      promptIdRead,
-      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
       // contractMethodResults,
     );
     await tx.wait();
@@ -196,14 +145,16 @@ describe("LLM Precompiled Contract", function () {
       .to.emit(testContract, "ContinueEvaluationEvent")
       .withArgs(
         (evaluationDone) => evaluationDone == true,
-        (contractMethodParams) => true,
+        (contractMethodParams) => {
+          return true;
+        },
       );
 
-    const countAEnd = await counterAContract.getCounter();
-    const countBEnd = await counterBContract.getCounter();
+    const adminBalanceEnd = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceEnd = await erc20Contract.balanceOf(user1Address);
 
-    expect(countAEnd).to.equal(countAStart + 10n);
-    expect(countBEnd).to.equal(countBStart + countAEnd);
+    expect(adminBalanceEnd).to.equal(adminBalanceStart - 5n);
+    expect(userBalanceEnd).to.equal(userBalanceStart + 5n);
   });
 
   it("should test evaluatePlan and continueEvaluation basic", async function () {
@@ -418,8 +369,8 @@ describe("LLM Precompiled Contract", function () {
     const withMathAndErc20Plan = JSON.stringify({
       plan: JSON.stringify(plans["withMathAndErc20"]),
       lookupTable: JSON.stringify({
-        user1: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
-      })
+        user1: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      }),
     });
 
     let adminBalanceStart = await erc20Contract.balanceOf(ADMIN_ADDRESS);
