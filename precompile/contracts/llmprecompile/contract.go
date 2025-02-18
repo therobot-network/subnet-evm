@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
+	"net/http"
+	"regexp"
 	"strings"
-    "io/ioutil"
-    "net/http"
-    "time"
-    "regexp"
+	"time"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -55,24 +55,11 @@ type Arg struct {
 type Step struct {
 	Method    string   `json:"Method,omitempty"`
 	Contract  Arg      `json:"Contract,omitempty"`
-	Primitive string   `json:"Primitive,omitempty"`
 	Args      []Arg    `json:"Args,omitempty"`
     Output    string   `json:"Output,omitempty"`
 	PcStep    bool     `json:"PcStep,omitempty"` // GoStep
 	Condition string   `json:"Condition,omitempty"`
 	SkipTo    int      `json:"SkipTo,omitempty"`
-}
-
-var	steps = demoPlans["withLookup"]
-
-// isAllZeroBytes checks if a byte slice contains only zero bytes.
-func isAllZeroBytes(data []byte) bool {
-	for _, b := range data {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
@@ -207,16 +194,15 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 	return packedArgs, nil
 }
 
-func ProcessContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
+func getContractAddress(contract Arg, stateDB contract.StateDB) (string, error) {
 	// If Value is provided, use it; otherwise, use Lookup.
 	addrStr, err := getLookupValue(contract, stateDB)
     if err != nil {
         log.Printf("Failed fetching contract address: %v", err)
-        return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+        return "", fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
     }
-
-	// Convert the string to a common.Address.
-	return common.HexToAddress(addrStr), nil
+    
+	return addrStr, nil
 }
 
 // Singleton StatefulPrecompiledContract and signatures.
@@ -359,13 +345,41 @@ func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
     return decodedResults, nil
 }
 
+// Temporary function. Later we will use a DB
+func getContractPrimitive(address string) (string, error) {
+    contract, exists := contractsAddresses[address]
+    if !exists {
+        return "", fmt.Errorf("contract address not found: %s", address)
+    }
+
+    primitive, exists := primitiveABI[contract]
+    if !exists {
+        return "", fmt.Errorf("primitive not found for contract: %s", contract)
+    }
+
+    return primitive, nil
+}
+
+
 // Utility function to prepare the next step's contract call
 func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
+    contractAddress, err := getContractAddress(step.Contract, stateDB)
+    if err != nil {
+        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        return nil, fmt.Errorf("failed to parse contract address: %w", err)
+    }
+
+    contractAbi, err := getContractPrimitive(contractAddress)
+    if err != nil {
+        log.Printf("Error: Failed to get contract primitive ABI. Error: %v", err)
+        return nil, fmt.Errorf("failed to get contract primitive abi: %w", err)
+    }
+
     // Parse the ABI
     // TODO: handle assignment/jump if primitives in go
-    parsedABI, err := abi.JSON(strings.NewReader(primitiveABI[step.Primitive]))
+    parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
     if err != nil {
         log.Printf("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
         return nil, fmt.Errorf("failed to parse ABI: %w", err)
@@ -396,16 +410,10 @@ func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodP
     }
     log.Printf("Successfully packed method data for Method=%s. Method Data (hex): %x", step.Method, methodData)
 
-    contractAddress, err := ProcessContractAddress(step.Contract, stateDB)
-    if err != nil {
-        log.Printf("Error: Failed to parse contract address. Error: %v", err)
-        return nil, fmt.Errorf("failed to parse contract address: %w", err)
-    }
-
     // Return the prepared contract method parameters
     contractParams := []ILLMContractMethodParams{
         {
-            ContractAddress: contractAddress,
+            ContractAddress: common.HexToAddress(contractAddress),
             MethodData:      append(method.ID, methodData...),
         },
     }
@@ -526,7 +534,19 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     currentStep := steps[currentPC.Int64()]
     log.Printf("Processing step %d: Method=%s, Contract=%s", currentPC.Int64(), currentStep.Method, currentStep.Contract)
 
-    parsedABI, err := abi.JSON(strings.NewReader(primitiveABI[currentStep.Primitive]))
+    contractAddress, err := getContractAddress(currentStep.Contract, stateDB)
+    if err != nil {
+        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
+    }
+
+    contractAbi, err := getContractPrimitive(contractAddress)
+    if err != nil {
+        log.Printf("Error: Failed to get contract primitive ABI. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi: %w", err)
+    }
+
+    parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
     if err != nil {
         log.Printf("Error: Failed to parse ABI for step %d. Error: %v", currentPC.Int64(), err)
         return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
