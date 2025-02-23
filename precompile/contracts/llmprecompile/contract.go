@@ -142,6 +142,10 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (string, error) {
             log.Printf("Base64 decoding failed: %v", err)
         }
 
+        retrievedValue = strings.TrimSpace(retrievedValue) // Remove spaces
+        retrievedValue = strings.Trim(retrievedValue, `"`) // Remove extra double quotes
+
+        log.Printf("Final processed value: %s", retrievedValue)
         argValue = retrievedValue
 	}
 
@@ -360,16 +364,30 @@ func getContractPrimitive(address string) (string, error) {
     return primitive, nil
 }
 
+func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB) (*big.Int, error) {
+    arg :=  step.Args[0]
+    argValue, err := getLookupValue(arg, stateDB)
+        if err != nil {
+            log.Printf("Failed fetching contract address: %v", err)
+            return nil, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+        }
+    if err != nil {
+        log.Printf("Failed fetching contract address: %v", err)
+        return currentPC, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+    }
+    if step.Method == "assign"{
+        if err := updateMemoryInState(stateDB, llmAddr, step.Output, []interface{}{argValue}); err != nil {
+            log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
+            return currentPC, err
+        }
+        log.Printf("Successfully updated memory in state for assign step under key: %s.",  step.Output)
+    }
+    return currentPC.Add(currentPC, big.NewInt(1)), nil
+}
 
 // Utility function to prepare the next step's contract call
-func prepareNextStep(step Step, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
+func prepareNextStep(step Step, contractAddress string, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
-
-    contractAddress, err := getContractAddress(step.Contract, stateDB)
-    if err != nil {
-        log.Printf("Error: Failed to parse contract address. Error: %v", err)
-        return nil, fmt.Errorf("failed to parse contract address: %w", err)
-    }
 
     contractAbi, err := getContractPrimitive(contractAddress)
     if err != nil {
@@ -569,12 +587,12 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
     // Increment the program counter
     nextPC := currentPC.Add(currentPC, big.NewInt(1))
-    savePCToState(stateDB, addr, nextPC)
     log.Printf("Updated program counter to %d.", nextPC.Int64())
 
     // Check if evaluation is done
     if nextPC.Int64() >= int64(len(steps)) {
         log.Printf("Evaluation completed. No more steps to process.")
+        savePCToState(stateDB, addr, nextPC)
         output := ContinueEvaluationOutput{EvaluationDone: true}
         packedOutput, err := PackContinueEvaluationOutput(output)
         if err != nil {
@@ -589,7 +607,43 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     nextStep := steps[nextPC.Int64()]
     log.Printf("Preparing next step %d: Method=%s, Contract=%s", nextPC.Int64(), nextStep.Method, nextStep.Contract)
 
-    contractMethodParams, err := prepareNextStep(nextStep, stateDB)
+    
+
+    contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
+    if err != nil {
+        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
+    }
+
+    for contractAddress == "" {
+        nextPC, err = systemPrimitiveStep(nextPC, nextStep, addr, stateDB)
+        if err != nil {
+            log.Printf("Error: Failed to do system primitive step. Error: %v", err)
+            return nil, remainingGas, err
+        }
+        if nextPC.Int64() >= int64(len(steps)) {
+            log.Printf("Evaluation completed. No more steps to process.")
+            savePCToState(stateDB, addr, nextPC)
+            output := ContinueEvaluationOutput{EvaluationDone: true}
+            packedOutput, err := PackContinueEvaluationOutput(output)
+            if err != nil {
+                log.Printf("Error: Failed to pack final output. Error: %v", err)
+                return nil, remainingGas, err
+            }
+            log.Printf("Successfully packed final output. Returning.")
+            return packedOutput, remainingGas, nil
+        }
+        nextStep = steps[nextPC.Int64()]
+        contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
+        if err != nil {
+            log.Printf("Error: Failed to parse contract address. Error: %v", err)
+            return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
+        }
+    }
+    
+    savePCToState(stateDB, addr, nextPC)
+    
+    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, stateDB)
     if err != nil {
         log.Printf("Error: Failed to prepare next step %d. Error: %v", nextPC.Int64(), err)
         return nil, remainingGas, err
@@ -745,14 +799,47 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 
     // Initialize the program counter to 0
     currentPC := big.NewInt(0)
-    savePCToState(stateDB, addr, currentPC)
     log.Printf("Initialized program counter to: %v", currentPC)
 
     // Prepare the first step
     nextStep := inputSteps[0]
     log.Printf("Current step: %+v", nextStep)
 
-    contractMethodParams, err := prepareNextStep(nextStep, stateDB)
+    contractAddress, err := getContractAddress(nextStep.Contract, stateDB)
+    if err != nil {
+        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
+    }
+
+    for contractAddress == "" {
+        currentPC, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB)
+        if err != nil {
+            log.Printf("Error: Failed to do system primitive step. Error: %v", err)
+            return nil, remainingGas, err
+        }
+        if currentPC.Int64() >= int64(len(inputSteps)) {
+            log.Printf("Evaluation completed. No more steps to process.")
+            savePCToState(stateDB, addr, currentPC)
+            output := ContinueEvaluationOutput{EvaluationDone: true}
+            packedOutput, err := PackContinueEvaluationOutput(output)
+            if err != nil {
+                log.Printf("Error: Failed to pack final output. Error: %v", err)
+                return nil, remainingGas, err
+            }
+            log.Printf("Successfully packed final output. Returning.")
+            return packedOutput, remainingGas, nil
+        }
+        nextStep = inputSteps[currentPC.Int64()]
+        contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
+        if err != nil {
+            log.Printf("Error: Failed to parse contract address. Error: %v", err)
+            return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
+        }
+    }
+    
+    savePCToState(stateDB, addr, currentPC)
+
+    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, stateDB)
     if err != nil {
         log.Printf("Error: Failed to prepare next step. Error: %v", err)
         return nil, remainingGas, err

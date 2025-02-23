@@ -1,4 +1,40 @@
 {
+  "withAssign": [
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [
+        {
+          "Value": "10"
+        }
+      ]
+    },
+    {
+      "Method": "getCounter",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [],
+      "Output": "CountA"
+    },
+    {
+      "Method": "assign",
+      "Contract": { "Value": "" },
+      "Args": [
+        {
+          "Lookup": "CountA"
+        }
+      ],
+      "Output": "CountANew"
+    },
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Args": [
+        {
+          "Lookup": "CountANew"
+        }
+      ]
+    }
+  ],
   "withLookup": [
     {
       "Method": "increase",
