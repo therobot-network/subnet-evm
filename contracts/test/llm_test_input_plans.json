@@ -1,4 +1,62 @@
 {
+  "withJumpIf": [
+    {
+      "Method": "reset",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": []
+    },
+    {
+      "Method": "JumpIf",
+      "Contract": { "Value": "" },
+      "Args": [
+        {
+          "Value": "3"
+        },
+        {
+          "Value": "true"
+        }
+      ]
+    },
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [
+        {
+          "Value": "10"
+        }
+      ]
+    },
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [
+        {
+          "Value": "20"
+        }
+      ]
+    },
+    {
+      "Method": "JumpIf",
+      "Contract": { "Value": "" },
+      "Args": [
+        {
+          "Value": "6"
+        },
+        {
+          "Value": "false"
+        }
+      ]
+    },
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [
+        {
+          "Value": "30"
+        }
+      ]
+    }
+  ],
   "withAssign": [
     {
       "Method": "increase",

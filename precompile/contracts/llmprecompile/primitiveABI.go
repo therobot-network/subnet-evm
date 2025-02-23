@@ -34,7 +34,20 @@ var primitiveABI = map[string]string{
 				],
 				"stateMutability": "view",
 				"type": "function"
-			}]`,
+			},
+      {
+      "inputs": [],
+      "name": "reset",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }]`,
 	"erc20": `[
     {
       "inputs": [],

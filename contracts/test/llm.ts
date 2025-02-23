@@ -606,4 +606,107 @@ describe("LLM Precompiled Contract", function () {
     expect(countAEnd).to.equal(countAStart + 10n);
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
+
+  it("should test evaluatePlan and continueEvaluation with jumpIf system primitive", async function () {
+    const withJumpIfPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withJumpIf"]),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withJumpIfPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Reset Counter A
+    let result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    let countATemp = await counterAContract.getCounter();
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // First JumpIf - should jump to 'increase 20'
+    result = await owner.sendTransaction({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    countATemp = await counterAContract.getCounter();
+
+    // Should not Jump to end
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Increase 30
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    countATemp = await counterAContract.getCounter();
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => true,
+      );
+
+    const countAEnd = await counterAContract.getCounter();
+    expect(countAEnd).to.equal(20n + 30n);
+  });
 });
