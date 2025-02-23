@@ -365,23 +365,50 @@ func getContractPrimitive(address string) (string, error) {
 }
 
 func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB) (*big.Int, error) {
-    arg :=  step.Args[0]
-    argValue, err := getLookupValue(arg, stateDB)
+    processedArgs := make([]interface{}, len(step.Args))
+    var err error
+
+    for i, arg := range step.Args {
+        processedArgs[i], err = getLookupValue(arg, stateDB)
         if err != nil {
-            log.Printf("Failed fetching contract address: %v", err)
-            return nil, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+            log.Printf("Failed fetching system primitive arg: %v", err)
+            return nil, fmt.Errorf("failed to fetch system primitive arg from lookup storage: %w", err)
         }
-    if err != nil {
-        log.Printf("Failed fetching contract address: %v", err)
-        return currentPC, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
     }
     if step.Method == "assign"{
-        if err := updateMemoryInState(stateDB, llmAddr, step.Output, []interface{}{argValue}); err != nil {
+        if err := updateMemoryInState(stateDB, llmAddr, step.Output, []interface{}{processedArgs[0]}); err != nil {
             log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
             return currentPC, err
         }
         log.Printf("Successfully updated memory in state for assign step under key: %s.",  step.Output)
     }
+    if step.Method == "JumpIf" {
+        // Convert processedArgs[0] (string) -> big.Int
+        jumpStr, ok := processedArgs[0].(string)
+        if !ok {
+            return nil, fmt.Errorf("JumpIf: expected string for jump target, got %T", processedArgs[0])
+        }
+    
+        jumpTarget := new(big.Int)
+        if _, success := jumpTarget.SetString(jumpStr, 10); !success {
+            return nil, fmt.Errorf("JumpIf: failed to convert string '%s' to big.Int", jumpStr)
+        }
+    
+        // Convert processedArgs[1] (string) -> bool
+        conditionStr, ok := processedArgs[1].(string)
+        if !ok {
+            return nil, fmt.Errorf("JumpIf: expected string for condition, got %T", processedArgs[1])
+        }
+    
+        condition := strings.ToLower(conditionStr) == "true" // Convert "true"/"false" to bool
+    
+        log.Printf("JumpIf: Condition=%t, JumpTarget=%s", condition, jumpTarget.String())
+    
+        if condition {
+            return jumpTarget, nil
+        }
+    }
+    
     return currentPC.Add(currentPC, big.NewInt(1)), nil
 }
 
@@ -606,8 +633,6 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     // Prepare the next step
     nextStep := steps[nextPC.Int64()]
     log.Printf("Preparing next step %d: Method=%s, Contract=%s", nextPC.Int64(), nextStep.Method, nextStep.Contract)
-
-    
 
     contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
     if err != nil {
