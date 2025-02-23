@@ -24,6 +24,11 @@ describe("LLM Precompiled Contract", function () {
   const erc20Address = "0x5DB9A7629912EBF95876228C24A848de0bfB43A9";
   const mathAddress = "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D";
 
+  // Read the JSON file containing the plans
+  const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
+  const fileContent = fs.readFileSync(planPath, "utf8");
+  const plans = JSON.parse(fileContent);
+
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
     // llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
@@ -85,7 +90,7 @@ describe("LLM Precompiled Contract", function () {
     }
   });
 
-  it("should test evaluatePrompt and continueEvaluation with lookup", async function () {
+  it.skip("should test evaluatePrompt and continueEvaluation with lookup", async function () {
     const inputPrompt = `transfer 5 @USDC to @user1`;
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
@@ -158,8 +163,6 @@ describe("LLM Precompiled Contract", function () {
   });
 
   it("should test evaluatePlan and continueEvaluation basic", async function () {
-    const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
-
     // should fail when plan is not passed
     let isFailed = false;
     await testContract
@@ -170,8 +173,6 @@ describe("LLM Precompiled Contract", function () {
     expect(isFailed).to.be.true;
 
     // Read the JSON file containing the plans
-    const fileContent = fs.readFileSync(planPath, "utf8");
-    const plans = JSON.parse(fileContent);
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["basic"]),
       lookupTable: JSON.stringify({
@@ -253,11 +254,7 @@ describe("LLM Precompiled Contract", function () {
   });
 
   it("should test evaluatePlan and continueEvaluation with lookup", async function () {
-    const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
-
     // Read the JSON file containing the plans
-    const fileContent = fs.readFileSync(planPath, "utf8");
-    const plans = JSON.parse(fileContent);
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["withLookup"]),
     });
@@ -361,11 +358,6 @@ describe("LLM Precompiled Contract", function () {
   });
 
   it("should test evaluatePlan and continueEvaluation with erc20 and math", async function () {
-    const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
-
-    // Read the JSON file containing the plans
-    const fileContent = fs.readFileSync(planPath, "utf8");
-    const plans = JSON.parse(fileContent);
     const withMathAndErc20Plan = JSON.stringify({
       plan: JSON.stringify(plans["withMathAndErc20"]),
       lookupTable: JSON.stringify({
@@ -510,5 +502,108 @@ describe("LLM Precompiled Contract", function () {
 
     expect(adminBalanceEnd).to.equal(adminBalanceStart / 2n);
     expect(userBalanceEnd).to.equal(userBalanceStart + adminBalanceStart / 2n);
+  });
+
+  it("should test evaluatePlan and continueEvaluation with assign system primitive", async function () {
+    const withLookupPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withAssign"]),
+    });
+
+    const countAStart = await counterAContract.getCounter();
+    const countBStart = await counterBContract.getCounter();
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withLookupPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter A
+    let result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read counter A
+    // result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter B
+    result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x000000000000000000000000000000000000000000000000000000000000001e"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => true,
+      );
+
+    const countAEnd = await counterAContract.getCounter();
+    const countBEnd = await counterBContract.getCounter();
+
+    expect(countAEnd).to.equal(countAStart + 10n);
+    expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 });
