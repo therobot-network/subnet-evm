@@ -363,52 +363,66 @@ func getContractPrimitive(address string) (string, error) {
     return primitive, nil
 }
 
-func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB) (*big.Int, error) {
-    processedArgs := make([]interface{}, len(step.Args))
+func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, accessibleState contract.AccessibleState, remainingGas uint64) (*big.Int, uint64, error) {
+    processedArgs := make([]string, len(step.Args))
     var err error
 
     for i, arg := range step.Args {
         processedArgs[i], err = getLookupValue(arg, stateDB)
         if err != nil {
             log.Printf("Failed fetching system primitive arg: %v", err)
-            return nil, fmt.Errorf("failed to fetch system primitive arg from lookup storage: %w", err)
+            return nil, 0, fmt.Errorf("failed to fetch system primitive arg from lookup storage: %w", err)
+        }
+    }
+    if step.Method == "printAnswerToQuestion"{
+        question := processedArgs[0]
+        answer := processedArgs[1]
+        if contract.IsDurangoActivated(accessibleState) {
+            eventData := QuestionAnswerEventData{
+                Question: question,
+                Answer:   answer,
+            }
+            QuestionAnswerEventGasCost := GetQuestionAnswerEventGasCost(eventData)
+            if remainingGas, err = contract.DeductGas(remainingGas, QuestionAnswerEventGasCost); err != nil {
+                return nil, 0, err
+            }
+
+            topics, data, err := PackQuestionAnswerEvent(eventData)
+            if err != nil {
+                return nil, remainingGas, err
+            }
+            stateDB.AddLog(
+                ContractAddress,
+                topics,
+                data,
+                accessibleState.GetBlockContext().Number().Uint64(),
+            )
         }
     }
     if step.Method == "assign"{
         if err := updateMemoryInState(stateDB, llmAddr, step.Output, []interface{}{processedArgs[0]}); err != nil {
             log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
-            return currentPC, err
+            return currentPC, remainingGas, err
         }
         log.Printf("Successfully updated memory in state for assign step under key: %s.",  step.Output)
     }
-    if step.Method == "JumpIf" {
-        // Convert processedArgs[0] (string) -> big.Int
-        jumpStr, ok := processedArgs[0].(string)
-        if !ok {
-            return nil, fmt.Errorf("JumpIf: expected string for jump target, got %T", processedArgs[0])
-        }
+    if step.Method == "JumpIfNot" {
     
         jumpTarget := new(big.Int)
-        if _, success := jumpTarget.SetString(jumpStr, 10); !success {
-            return nil, fmt.Errorf("JumpIf: failed to convert string '%s' to big.Int", jumpStr)
+        if _, success := jumpTarget.SetString(processedArgs[0], 10); !success {
+            return nil, 0, fmt.Errorf("JumpIfNot: failed to convert string '%s' to big.Int", processedArgs[0])
         }
     
-        // Convert processedArgs[1] (string) -> bool
-        conditionStr, ok := processedArgs[1].(string)
-        if !ok {
-            return nil, fmt.Errorf("JumpIf: expected string for condition, got %T", processedArgs[1])
-        }
+        condition := strings.ToLower(processedArgs[1]) == "false" // Convert "true"/"false" to bool
     
-        condition := strings.ToLower(conditionStr) == "true" // Convert "true"/"false" to bool
-    
-        log.Printf("JumpIf: Condition=%t, JumpTarget=%s", condition, jumpTarget.String())
+        log.Printf("JumpIfNot: Jump=%t, JumpTarget=%s", condition, jumpTarget.String())
     
         if condition {
-            return jumpTarget, nil
+            return jumpTarget, remainingGas, nil
         }
     }
     
-    return currentPC.Add(currentPC, big.NewInt(1)), nil
+    return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
 }
 
 // Utility function to prepare the next step's contract call
@@ -640,7 +654,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     }
 
     for contractAddress == "" {
-        nextPC, err = systemPrimitiveStep(nextPC, nextStep, addr, stateDB)
+        nextPC, remainingGas, err = systemPrimitiveStep(nextPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
             log.Printf("Error: Failed to do system primitive step. Error: %v", err)
             return nil, remainingGas, err
@@ -836,7 +850,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
     }
 
     for contractAddress == "" {
-        currentPC, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB)
+        currentPC, remainingGas, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
             log.Printf("Error: Failed to do system primitive step. Error: %v", err)
             return nil, remainingGas, err

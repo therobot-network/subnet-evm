@@ -186,6 +186,26 @@ func TestLLMPrecompileRun(t *testing.T) {
 	}
 }
 
+// TestPackUnpackQuestionAnswerEventData tests the Pack/UnpackQuestionAnswerEventData.
+func TestPackUnpackQuestionAnswerEventData(t *testing.T) {
+	// CUSTOM CODE STARTS HERE
+	// set test inputs with proper values here
+
+	dataInput := QuestionAnswerEventData{
+		Question: "",
+		Answer:   "",
+	}
+
+	_, data, err := PackQuestionAnswerEvent(
+		dataInput,
+	)
+	require.NoError(t, err)
+
+	unpacked, err := UnpackQuestionAnswerEventData(data)
+	require.NoError(t, err)
+	require.Equal(t, dataInput, unpacked)
+}
+
 func BenchmarkLLMPrecompile(b *testing.B) {
 	// Benchmark tests.
 	for name, test := range tests {

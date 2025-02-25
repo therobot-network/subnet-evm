@@ -4,6 +4,8 @@
 pragma solidity ^0.8.20;
 
 interface ILLM {
+  event QuestionAnswer(string question, string answer);
+
   struct ContractMethodParams {
     address contractAddress;
     bytes methodData;
