@@ -10,7 +10,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -121,7 +120,7 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (string, error) {
         if err != nil {
             log.Printf("Error unmarshaling sanitized step data: %v", err)
             log.Printf("Raw sanitized step data causing issue: %s", sanitizedData)
-            return "", fmt.Errorf("failed to decode step results from storage: %w", err)
+            return "", fmt.Errorf("failed to decode data from storage: %w", err)
         }
 
         // Check bounds for the ReturnArgKey
@@ -164,8 +163,8 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 		arg := args[i]
 		argValue, err := getLookupValue(arg, stateDB)
         if err != nil {
-            log.Printf("Failed fetching contract address: %v", err)
-            return nil, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+            log.Printf("Failed fetching argument value: %v", err)
+            return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
         }
         
 		switch expectedType {
@@ -918,27 +917,22 @@ func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJso
 		setLargeState(stateDB, addr, storageKey, arrBytes)
 	}
 
+    // signerKey := common.BytesToHash([]byte("signer"))
+    // signerHex := caller.Hex()
+    // signerArray := []interface{}{signerHex} // Store in an array to match other entries
+
+    // signerBytes, err := json.Marshal(signerArray)
+    // if err != nil {
+    //     return fmt.Errorf("failed to encode signer array: %w", err)
+    // }
+
+    // setLargeState(stateDB, addr, signerKey, signerBytes)
+
+    // log.Printf("Stored signer as array: %s under key: signer", signerHex)
+
     return nil
 }
 
-func extractAtValues(input string) []string {
-	// Define a regex pattern that matches "@" followed by one or more word characters.
-	// The parenthesis creates a capturing group for the word without the "@".
-	pattern := regexp.MustCompile(`@(\w+)`)
-
-	// Find all matches; each match will be a slice where index 0 is the full match,
-	// and index 1 is the captured group.
-	matches := pattern.FindAllStringSubmatch(input, -1)
-
-	// Prepare a slice to hold the results.
-	var results []string
-	for _, match := range matches {
-		if len(match) > 1 {
-			results = append(results, match[1])
-		}
-	}
-	return results
-}
 
 // evaluatePlan uses evaluateSteps for its logic.
 func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
@@ -1003,14 +997,9 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, suppliedGas, err
 	}
 
-	keys := extractAtValues(prompt)
-	// Print the keys.
-	fmt.Printf("Extracted keys: %v\n", keys)
-
     // Define the API endpoint and the request payload.
 	requestPayload := map[string]interface{}{
 		"user_prompt": prompt,
-		"predefinedVariables": keys,
 	}
 
 	// Call the HTTP API.
