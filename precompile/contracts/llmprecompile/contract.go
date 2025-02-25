@@ -999,7 +999,8 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 	// Store the lookup entries.
 	err = storeLookupEntries(stateDB, addr, lookupTable)
 	if err != nil {
-		log.Fatalf("Error storing lookup entries: %v", err)
+		log.Printf("Error storing lookup entries: %v", err)
+		return nil, suppliedGas, err
 	}
 
 	keys := extractAtValues(prompt)
