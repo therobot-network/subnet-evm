@@ -367,149 +367,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "llmPrecompile",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "metadata",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "inputs": [],
-      "name": "DivisionByZero",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "InvalidInitialization",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "NotInitializing",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "OnlyProxy",
-      "type": "error"
-    },
-    {
-      "inputs": [],
-      "name": "Overflow",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "OwnableInvalidOwner",
-      "type": "error"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        }
-      ],
-      "name": "OwnableUnauthorizedAccount",
-      "type": "error"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint64",
-          "name": "version",
-          "type": "uint64"
-        }
-      ],
-      "name": "Initialized",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "previousOwner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "OwnershipTransferred",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "LLM_PRECOMPILE",
-      "outputs": [
-        {
-          "internalType": "contract ILLM",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
       "name": "add",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "result",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "first_number",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "second_number",
-          "type": "uint256"
-        }
-      ],
-      "name": "ceilDiv",
       "outputs": [
         {
           "internalType": "uint256",
@@ -545,86 +413,19 @@ var primitiveABI = map[string]string{
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "getInfo",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "customRules",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getMetadata",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getPrimitiveAddress",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "name_",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "customRules_",
-          "type": "string"
-        }
-      ],
-      "name": "initialize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "isGreater",
+      "name": "equal",
       "outputs": [
         {
           "internalType": "bool",
@@ -639,16 +440,16 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "isGreaterOrEqual",
+      "name": "greaterThan",
       "outputs": [
         {
           "internalType": "bool",
@@ -663,16 +464,88 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "max",
+      "name": "greaterThanOrEqual",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
+          "type": "uint256"
+        }
+      ],
+      "name": "lessThan",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
+          "type": "uint256"
+        }
+      ],
+      "name": "lessThanOrEqual",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
+          "type": "uint256"
+        }
+      ],
+      "name": "maximum",
       "outputs": [
         {
           "internalType": "uint256",
@@ -687,16 +560,16 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "min",
+      "name": "minimum",
       "outputs": [
         {
           "internalType": "uint256",
@@ -711,16 +584,16 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "mod",
+      "name": "modulo",
       "outputs": [
         {
           "internalType": "uint256",
@@ -735,41 +608,12 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "x",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "y",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "denominator",
-          "type": "uint256"
-        }
-      ],
-      "name": "mulDiv",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "first_number",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
@@ -785,39 +629,24 @@ var primitiveABI = map[string]string{
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "owner",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "renounceOwnership",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
           "type": "uint256"
         }
       ],
-      "name": "sqrt",
+      "name": "notEqual",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "bool",
           "name": "",
-          "type": "uint256"
+          "type": "bool"
         }
       ],
       "stateMutability": "pure",
@@ -827,12 +656,12 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "first_number",
+          "name": "a",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "second_number",
+          "name": "b",
           "type": "uint256"
         }
       ],
@@ -840,24 +669,11 @@ var primitiveABI = map[string]string{
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "result",
+          "name": "",
           "type": "uint256"
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "transferOwnership",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     }
   ]`,
