@@ -20,40 +20,40 @@ contract MathPrimitive {
     return a / b;
   }
 
-  function modulo(uint256 a, uint256 b) public pure returns (uint256) {
+  function mod(uint256 a, uint256 b) public pure returns (uint256) {
     require(b > 0, "Math: modulo by zero");
     return a % b;
   }
 
-  function maximum(uint256 a, uint256 b) public pure returns (uint256) {
+  function max(uint256 a, uint256 b) public pure returns (uint256) {
     return a >= b ? a : b;
   }
 
-  function minimum(uint256 a, uint256 b) public pure returns (uint256) {
+  function min(uint256 a, uint256 b) public pure returns (uint256) {
     return a <= b ? a : b;
   }
 
-  function isGreaterThan(uint256 a, uint256 b) public pure returns (bool) {
+  function greaterThan(uint256 a, uint256 b) public pure returns (bool) {
     return a > b;
   }
 
-  function isLessThan(uint256 a, uint256 b) public pure returns (bool) {
+  function lessThan(uint256 a, uint256 b) public pure returns (bool) {
     return a < b;
   }
 
-  function isGreaterThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
+  function greaterThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a >= b;
   }
 
-  function isLessThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
+  function lessThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a <= b;
   }
 
-  function isEqual(uint256 a, uint256 b) public pure returns (bool) {
+  function equal(uint256 a, uint256 b) public pure returns (bool) {
     return a == b;
   }
 
-  function isNotEqual(uint256 a, uint256 b) public pure returns (bool) {
+  function notEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a != b;
   }
 }
