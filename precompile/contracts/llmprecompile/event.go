@@ -48,3 +48,40 @@ accessibleState.GetStateDB().AddLog(
 	accessibleState.GetBlockContext().Number().Uint64(),
 )
 */
+
+// LlmprecompileQuestionAnswer represents a QuestionAnswer non-indexed event data raised by the Llmprecompile contract.
+type QuestionAnswerEventData struct {
+	Question string
+	Answer   string
+}
+
+
+// GetQuestionAnswerEventGasCost returns the gas cost of the event.
+// The gas cost of an event is the base gas cost + the gas cost of the topics + the gas cost of the non-indexed data.
+// The base gas cost and the gas cost of per topics are fixed and can be found in the contract package.
+// The gas cost of the non-indexed data depends on the data type and the data size.
+func GetQuestionAnswerEventGasCost(data QuestionAnswerEventData) uint64 {
+	gas := contract.LogGas // Base gas cost for the event
+
+	// Calculate gas cost for the `question` string
+	gas += contract.LogDataGas * uint64(len(data.Question))
+
+	// Calculate gas cost for the `answer` string
+	gas += contract.LogDataGas * uint64(len(data.Answer))
+
+	// Return total computed gas cost
+	return gas
+}
+
+// PackQuestionAnswerEvent packs the event into the appropriate arguments for QuestionAnswer.
+// It returns topic hashes and the encoded non-indexed data.
+func PackQuestionAnswerEvent(data QuestionAnswerEventData) ([]common.Hash, []byte, error) {
+	return LLMPrecompileABI.PackEvent("QuestionAnswer", data.Question, data.Answer)
+}
+
+// UnpackQuestionAnswerEventData attempts to unpack non-indexed [dataBytes].
+func UnpackQuestionAnswerEventData(dataBytes []byte) (QuestionAnswerEventData, error) {
+	eventData := QuestionAnswerEventData{}
+	err := LLMPrecompileABI.UnpackIntoInterface(&eventData, "QuestionAnswer", dataBytes)
+	return eventData, err
+}

@@ -31,7 +31,7 @@ describe("LLM Precompiled Contract", function () {
 
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
-    // llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
+    llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
 
     let llmCode = await ethers.provider.getCode(LLM_ADDRESS);
     expect(llmCode).to.not.equal("0x");
@@ -160,6 +160,65 @@ describe("LLM Precompiled Contract", function () {
 
     expect(adminBalanceEnd).to.equal(adminBalanceStart - 5n);
     expect(userBalanceEnd).to.equal(userBalanceStart + 5n);
+  });
+  it("Prompt: How much #USDC do I have?", async function () {
+    const inputPrompt = `How much #USDC do I have?`;
+    let promptIdRead: string;
+
+    const adminBalance = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+
+    let tx = await testContract.evaluatePrompt(
+      JSON.stringify({
+        prompt: inputPrompt,
+        lookupTable: JSON.stringify({
+          USDC: erc20Address,
+          signer: ADMIN_ADDRESS,
+        }),
+      }),
+    );
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePromptEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read balance
+    // let result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+      [resultTx],
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => {
+          return true;
+        },
+      )
+      .and.to.emit(llmContract, "QuestionAnswer")
+      .withArgs(
+        (question) => question == inputPrompt,
+        (answer) => answer == String(adminBalance),
+      );
   });
 
   it("should test evaluatePlan and continueEvaluation basic", async function () {
