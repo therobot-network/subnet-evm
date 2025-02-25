@@ -58,7 +58,7 @@ var demoPlans = map[string][]Step{
 			},
 		},
 	},
-  "withJumpIf": {
+  "withJumpIfNot": {
 	},
 	"erc20Plan": {
 		{
@@ -102,12 +102,12 @@ var demoPlans = map[string][]Step{
 		},
 		{
 			PcStep:    true, // GoStep
-			Method:    "jumpIf",
+			Method:    "JumpIfNot",
 			Condition: "StoredMemoryA", // Change to output
 			SkipTo:    5,
 		},
 		{
-			Method:   "jumpIf",
+			Method:   "JumpIfNot",
 			Args: []Arg{
 				{
 					Value:  "true",

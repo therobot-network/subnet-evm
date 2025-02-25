@@ -90,8 +90,9 @@ describe("LLM Precompiled Contract", function () {
     }
   });
 
-  it.skip("should test evaluatePrompt and continueEvaluation with lookup", async function () {
-    const inputPrompt = `transfer 5 @USDC to @user1`;
+  it("Prompt: Transfer 5 #USDC to @user1", async function () {
+    const inputPrompt = `transfer 5 #USDC to @user1`;
+    // const inputPrompt = `Please transfer half my #USDC to @j`;
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
@@ -113,6 +114,7 @@ describe("LLM Precompiled Contract", function () {
         lookupTable: JSON.stringify({
           USDC: erc20Address,
           user1: user1Address,
+          signer: ADMIN_ADDRESS,
         }),
       }),
     );
@@ -161,6 +163,142 @@ describe("LLM Precompiled Contract", function () {
     expect(adminBalanceEnd).to.equal(adminBalanceStart - 5n);
     expect(userBalanceEnd).to.equal(userBalanceStart + 5n);
   });
+
+  it("Prompt: If I have more than 10 #USDC, transfer 5 #USDC to @alice", async function () {
+    const inputPrompt = `If I have more than 10 #USDC, transfer 5 #USDC to @alice`;
+    let promptIdRead: string;
+    const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+
+    const adminBalanceStart = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceStart = await erc20Contract.balanceOf(user1Address);
+
+    let tx = await testContract.evaluatePrompt(
+      JSON.stringify({
+        prompt: inputPrompt,
+        lookupTable: JSON.stringify({
+          USDC: erc20Address,
+          alice: user1Address,
+          signer: ADMIN_ADDRESS,
+          calculator: mathAddress,
+        }),
+      }),
+    );
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePromptEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read balance
+    // let result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+      [resultTx],
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Check if greater than 10
+    resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    if (adminBalanceStart > 10n) {
+      tx = await testContract.continueEvaluation(
+        promptIdRead,
+        // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+        [resultTx],
+      );
+      await tx.wait();
+      await expect(tx)
+        .to.emit(testContract, "ContinueEvaluationEvent")
+        .withArgs(
+          (evaluationDone) => evaluationDone == false,
+          (contractMethodParams) => {
+            calleeContractAddress = contractMethodParams[0].contractAddress;
+            methodData = contractMethodParams[0].methodData;
+            return true;
+          },
+        );
+
+      // Send 5 USDC
+      let result = await owner.sendTransaction({
+        // let result = await owner.call({
+        to: calleeContractAddress,
+        data: methodData,
+      });
+
+      tx = await testContract.continueEvaluation(
+        promptIdRead,
+        ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+        // contractMethodResults,
+      );
+      await tx.wait();
+      await expect(tx)
+        .to.emit(testContract, "ContinueEvaluationEvent")
+        .withArgs(
+          (evaluationDone) => evaluationDone == true,
+          (contractMethodParams) => {
+            return true;
+          },
+        );
+
+      const adminBalanceEnd = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+      const userBalanceEnd = await erc20Contract.balanceOf(user1Address);
+
+      expect(adminBalanceEnd).to.equal(adminBalanceStart - 5n);
+      expect(userBalanceEnd).to.equal(userBalanceStart + 5n);
+    } else {
+      tx = await testContract.continueEvaluation(
+        promptIdRead,
+        ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+        // contractMethodResults,
+      );
+      await tx.wait();
+      await expect(tx)
+        .to.emit(testContract, "ContinueEvaluationEvent")
+        .withArgs(
+          (evaluationDone) => evaluationDone == true,
+          (contractMethodParams) => {
+            return true;
+          },
+        );
+
+      const adminBalanceEnd = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+      const userBalanceEnd = await erc20Contract.balanceOf(user1Address);
+
+      expect(adminBalanceEnd).to.equal(adminBalanceStart);
+      expect(userBalanceEnd).to.equal(userBalanceStart);
+    }
+  });
+
   it("Prompt: How much #USDC do I have?", async function () {
     const inputPrompt = `How much #USDC do I have?`;
     let promptIdRead: string;
@@ -666,14 +804,14 @@ describe("LLM Precompiled Contract", function () {
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 
-  it("should test evaluatePlan and continueEvaluation with jumpIf system primitive", async function () {
-    const withJumpIfPlan = JSON.stringify({
-      plan: JSON.stringify(plans["withJumpIf"]),
+  it("should test evaluatePlan and continueEvaluation with JumpIfNot system primitive", async function () {
+    const withJumpIfNotPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withJumpIfNot"]),
     });
 
     let promptIdRead: string;
 
-    let tx = await testContract.evaluatePlan(withJumpIfPlan);
+    let tx = await testContract.evaluatePlan(withJumpIfNotPlan);
     await tx.wait();
     let methodData: string;
     let calleeContractAddress: string;
@@ -717,7 +855,7 @@ describe("LLM Precompiled Contract", function () {
         },
       );
 
-    // First JumpIf - should jump to 'increase 20'
+    // First JumpIfNot - should jump to 'increase 20'
     result = await owner.sendTransaction({
       to: calleeContractAddress,
       data: methodData,

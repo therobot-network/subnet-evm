@@ -1,19 +1,60 @@
 {
-  "withJumpIf": [
+  "questionAnswer": [
+    {
+      "Args": [
+        {
+          "Lookup": "signer"
+        }
+      ],
+      "Contract": {
+        "Lookup": "USDC"
+      },
+      "Method": "balanceOf",
+      "Output": "call_result_1"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "call_result_1"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": "usdc_balance"
+    },
+    {
+      "Args": [
+        {
+          "Value": "How much #USDC do I have?"
+        },
+        {
+          "Lookup": "usdc_balance"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "printAnswerToQuestion",
+      "Output": "call_result_2"
+    }
+  ],
+  "withJumpIfNot": [
     {
       "Method": "reset",
       "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Args": []
     },
     {
-      "Method": "JumpIf",
+      "Method": "JumpIfNot",
       "Contract": { "Value": "" },
       "Args": [
         {
           "Value": "3"
         },
         {
-          "Value": "true"
+          "Value": "false"
         }
       ]
     },
@@ -36,14 +77,14 @@
       ]
     },
     {
-      "Method": "JumpIf",
+      "Method": "JumpIfNot",
       "Contract": { "Value": "" },
       "Args": [
         {
           "Value": "6"
         },
         {
-          "Value": "false"
+          "Value": "true"
         }
       ]
     },
