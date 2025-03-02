@@ -101,10 +101,7 @@ var demoPlans = map[string][]Step{
 			},
 		},
 		{
-			PcStep:    true, // GoStep
 			Method:    "JumpIfNot",
-			Condition: "StoredMemoryA", // Change to output
-			SkipTo:    5,
 		},
 		{
 			Method:   "JumpIfNot",
