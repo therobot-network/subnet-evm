@@ -346,19 +346,20 @@ func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
 }
 
 // Temporary function. Later we will use a DB
-func getContractPrimitive(address string) (string, error) {
+func getContractPrimitive(address string) (contract string, primitive string) {
     contract, exists := contractsAddresses[address]
     if !exists {
-        return "", fmt.Errorf("contract address not found: %s", address)
+        return "", "" // Return empty values instead of an error
     }
 
-    primitive, exists := primitiveABI[contract]
+    primitive, exists = primitiveABI[contract]
     if !exists {
-        return "", fmt.Errorf("primitive not found for contract: %s", contract)
+        return contract, "" // Return contract but empty primitive
     }
 
-    return primitive, nil
+    return contract, primitive
 }
+
 
 func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, accessibleState contract.AccessibleState, remainingGas uint64) (*big.Int, uint64, error) {
     processedArgs := make([]string, len(step.Args))
@@ -426,10 +427,10 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 func prepareNextStep(step Step, contractAddress string, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
-    contractAbi, err := getContractPrimitive(contractAddress)
-    if err != nil {
-        log.Printf("Error: Failed to get contract primitive ABI. Error: %v", err)
-        return nil, fmt.Errorf("failed to get contract primitive abi: %w", err)
+    _,contractAbi := getContractPrimitive(contractAddress)
+    if contractAbi == "" {
+        log.Printf("Error: Failed to get contract primitive ABI.")
+        return nil, fmt.Errorf("failed to get contract primitive abi")
     }
 
     // Parse the ABI
@@ -595,10 +596,10 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
-    contractAbi, err := getContractPrimitive(contractAddress)
-    if err != nil {
-        log.Printf("Error: Failed to get contract primitive ABI. Error: %v", err)
-        return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi: %w", err)
+    _, contractAbi := getContractPrimitive(contractAddress)
+    if contractAbi == "" {
+        log.Printf("Error: Failed to get contract primitive ABI")
+        return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi")
     }
 
     parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
@@ -898,16 +899,16 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
     return packedOutput, remainingGas, nil
 }
 
-func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) error {
+func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) (map[string]string, error) {
     // If the JSON string is empty, return an empty map (i.e. {}).
 	if lookupJsonString == "" {
-		return nil
+		return map[string]string{}, nil
 	}
 
     // Unmarshal the input JSON string into a map.
 	var lookupMap map[string]string
 	if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
-		return fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
 	}
 
 	// Iterate over the map and for each key/value pair, create a JSON array and store it.
@@ -918,7 +919,7 @@ func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJso
 		// Marshal the array into JSON.
 		arrBytes, err := json.Marshal(arr)
 		if err != nil {
-			return fmt.Errorf("failed to marshal array for key %s: %w", key, err)
+			return nil, fmt.Errorf("failed to marshal array for key %s: %w", key, err)
 		}
 
 		// Convert the key string to a storage key (common.Hash).
@@ -941,7 +942,7 @@ func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJso
 
     // log.Printf("Stored signer as array: %s under key: signer", signerHex)
 
-    return nil
+    return lookupMap, nil
 }
 
 
@@ -963,7 +964,7 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 
     stateDB := accessibleState.GetStateDB()
     // Store the lookup entries.
-	err = storeLookupEntries(stateDB, addr, lookupTable)
+	_, err = storeLookupEntries(stateDB, addr, lookupTable)
 	if err != nil {
 		log.Fatalf("Error storing lookup entries: %v", err)
         return nil, suppliedGas, fmt.Errorf("Error storing lookup entries: %w", err)
@@ -991,26 +992,38 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     }
 
     // Unpack the input to retrieve the string argument
-    prompt, lookupTable, err := UnpackEvaluatePromptInput(input)
+    prompt, lookupTableString, err := UnpackEvaluatePromptInput(input)
     if err != nil {
         log.Printf("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
     log.Printf("Input string: %s", prompt)
-    log.Printf("LookupTable: %s", lookupTable)
+    log.Printf("LookupTable: %s", lookupTableString)
 
     stateDB := accessibleState.GetStateDB()
 
 	// Store the lookup entries.
-	err = storeLookupEntries(stateDB, addr, lookupTable)
+	lookupTable , err := storeLookupEntries(stateDB, addr, lookupTableString)
 	if err != nil {
 		log.Printf("Error storing lookup entries: %v", err)
 		return nil, suppliedGas, err
 	}
 
+    // Initialize primitiveMapping as a map
+    primitiveMapping := make(map[string]string)
+
+    // Iterate over lookupTable
+    for key, value := range lookupTable {
+        contract, _ := getContractPrimitive(value) // Check if value is a contract
+        if contract != ""  { // Ensure both exist
+            primitiveMapping[key] = contract // Store {lookupTable key: primitive value}
+        }
+    }
+
     // Define the API endpoint and the request payload.
 	requestPayload := map[string]interface{}{
 		"user_prompt": prompt,
+        "primitives": primitiveMapping,
 	}
 
 	// Call the HTTP API.
