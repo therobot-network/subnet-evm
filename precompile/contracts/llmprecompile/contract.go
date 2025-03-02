@@ -56,9 +56,6 @@ type Step struct {
 	Contract  Arg      `json:"Contract,omitempty"`
 	Args      []Arg    `json:"Args,omitempty"`
     Output    string   `json:"Output,omitempty"`
-	PcStep    bool     `json:"PcStep,omitempty"` // GoStep
-	Condition string   `json:"Condition,omitempty"`
-	SkipTo    int      `json:"SkipTo,omitempty"`
 }
 
 func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
