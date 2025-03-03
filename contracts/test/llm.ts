@@ -135,6 +135,30 @@ describe("LLM Precompiled Contract", function () {
         },
       );
 
+    // userFormatToContractFormat
+    let resultTx = await owner.call({
+      // let result = await owner.sendTransaction({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+      [resultTx],
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
     // Update Counter A
     let result = await owner.sendTransaction({
       // let result = await owner.call({
@@ -160,8 +184,10 @@ describe("LLM Precompiled Contract", function () {
     const adminBalanceEnd = await erc20Contract.balanceOf(ADMIN_ADDRESS);
     const userBalanceEnd = await erc20Contract.balanceOf(user1Address);
 
-    expect(adminBalanceEnd).to.equal(adminBalanceStart - 5n);
-    expect(userBalanceEnd).to.equal(userBalanceStart + 5n);
+    const transferedAmount = ethers.parseUnits("5", 18);
+
+    expect(adminBalanceEnd).to.equal(adminBalanceStart - transferedAmount);
+    expect(userBalanceEnd).to.equal(userBalanceStart + transferedAmount);
   });
 
   it("Prompt: If I have more than 10 #USDC, transfer 5 #USDC to @alice", async function () {
@@ -349,7 +375,7 @@ describe("LLM Precompiled Contract", function () {
     }
   });
 
-  it.only("Prompt: How much #USDC do I have?", async function () {
+  it("Prompt: How much #USDC do I have?", async function () {
     const inputPrompt = `How much #USDC do I have?`;
     let promptIdRead: string;
 
