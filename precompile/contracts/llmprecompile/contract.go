@@ -372,7 +372,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
             return nil, 0, fmt.Errorf("failed to fetch system primitive arg from lookup storage: %w", err)
         }
     }
-    if step.Method == "printAnswerToQuestion"{
+    if step.Method == "answerUserQuestion"{
         question := processedArgs[0]
         answer := processedArgs[1]
         if contract.IsDurangoActivated(accessibleState) {
