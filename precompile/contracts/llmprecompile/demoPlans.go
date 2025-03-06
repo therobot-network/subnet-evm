@@ -44,7 +44,9 @@ var demoPlans = map[string][]Step{
 				Value: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
 			},
 			Args: []Arg{},
-			Output: "CountA",
+			Output: []string{
+				"CountA",
+			},
 		},
 		{
 			Method:   "increase",
