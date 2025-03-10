@@ -56,4 +56,16 @@ contract MathPrimitive {
   function notEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a != b;
   }
+
+  function maxUint256Array(uint256[] memory arr) public pure returns (uint256) {
+    require(arr.length > 0, "Array must not be empty");
+
+    uint256 maxVal = arr[0];
+    for (uint256 i = 1; i < arr.length; i++) {
+      if (arr[i] > maxVal) {
+        maxVal = arr[i];
+      }
+    }
+    return maxVal;
+  }
 }
