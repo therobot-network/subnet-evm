@@ -6,6 +6,7 @@ import { Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
+import { maxHeaderSize } from "http";
 // import { test } from "./utils";
 
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
@@ -19,10 +20,12 @@ describe("LLM Precompiled Contract", function () {
   let counterBContract: Contract;
   let erc20Contract: Contract;
   let mathContract: Contract;
+  let eventContract: Contract;
   const counterAAddress = "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25";
   const counterBAddress = "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e";
   const erc20Address = "0x5DB9A7629912EBF95876228C24A848de0bfB43A9";
   const mathAddress = "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D";
+  const eventAddress = "0xA4cD3b0Eb6E5Ab5d8CE4065BcCD70040ADAB1F00";
 
   // Read the JSON file containing the plans
   const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
@@ -50,6 +53,8 @@ describe("LLM Precompiled Contract", function () {
       );
       const ERC20 = await ethers.getContractFactory("ERC20Primitive", owner);
       const Math = await ethers.getContractFactory("MathPrimitive", owner);
+      const Event = await ethers.getContractFactory("EventPrimitive", owner);
+
       counterAContract = await Counter.deploy();
       await counterAContract.waitForDeployment();
       counterBContract = await Counter.deploy();
@@ -58,14 +63,18 @@ describe("LLM Precompiled Contract", function () {
       await erc20Contract.waitForDeployment();
       mathContract = await Math.deploy();
       await mathContract.waitForDeployment();
+      eventContract = await Event.deploy();
+      await eventContract.waitForDeployment();
       const counterAAddressChain = await counterAContract.getAddress();
       const counterBAddressChain = await counterBContract.getAddress();
       const erc20AddressChain = await erc20Contract.getAddress();
       const mathAddressChain = await mathContract.getAddress();
+      const eventAddressChain = await eventContract.getAddress();
       console.log("counterAAddress: ", counterAAddressChain);
       console.log("counterBAddress: ", counterBAddressChain);
       console.log("erc20AddressChain: ", erc20AddressChain);
       console.log("mathAddressChain: ", mathAddressChain);
+      console.log("eventAddressChain: ", eventAddressChain);
     } else {
       counterAContract = await ethers.getContractAt(
         "CounterPrimitive",
@@ -85,6 +94,11 @@ describe("LLM Precompiled Contract", function () {
       mathContract = await ethers.getContractAt(
         "CounterPrimitive",
         mathAddress,
+        owner,
+      );
+      eventContract = await ethers.getContractAt(
+        "EventPrimitive",
+        eventAddress,
         owner,
       );
     }
