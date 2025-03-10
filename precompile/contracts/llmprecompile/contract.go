@@ -2,6 +2,7 @@ package llmprecompile
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	_ "embed"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -96,37 +98,184 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
 }
 
 func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
-    // If Value is provided, use it directly.
+    // If Value is provided, return it directly
     if arg.Value != "" {
         return arg.Value, nil
     }
 
-    lookupKey := common.BytesToHash([]byte(arg.Lookup))
-    lookupData, err := getLargeState(stateDB, ContractAddress, lookupKey)
-    if err != nil {
-        return nil, fmt.Errorf("failed to retrieve data from state for key %s: %w", lookupKey, err)
+    if arg.Lookup == "" {
+        return nil, nil
     }
 
-    log.Printf("Retrieved ABI-encoded data for Key=%s: %x", arg.Lookup, lookupData)
+    // Convert lookup key to a hash
+    lookupKey := common.BytesToHash([]byte(arg.Lookup))
+    
+    // Retrieve ABI-encoded data from storage
+    lookupData, err := getLargeState(stateDB, ContractAddress, lookupKey)
+    if err != nil {
+        log.Printf(
+            "Error: Failed to retrieve data from state | Key=%s | HashedKey=%s | Error=%v", 
+            arg.Lookup, lookupKey.Hex(), err,
+        )
+        return nil, fmt.Errorf("failed to retrieve data from state for key %s (%s): %w", arg.Lookup, lookupKey.Hex(), err)
+    }
+
+    log.Printf(
+        "Retrieved ABI-encoded data | Key=%s | HashedKey=%s | Data=%x",
+        arg.Lookup, lookupKey.Hex(), lookupData,
+    )
 
     // Define ABI structure for decoding
     abiType, err := abi.NewType(arg.AbiType, "", nil)
     if err != nil {
+        log.Printf(
+            "Error: Failed to create ABI type | Key=%s | HashedKey=%s | ABIType=%s | Error=%v",
+            arg.Lookup, lookupKey.Hex(), arg.AbiType, err,
+        )
         return nil, fmt.Errorf("failed to create ABI type: %w", err)
     }
 
     abiArgs := abi.Arguments{{Type: abiType}}
 
-    // Decode ABI-encoded value
-    decodedValues, err := abiArgs.Unpack(lookupData)
-    if err != nil {
-        return nil, fmt.Errorf("ABI decoding failed for key %s: %w", arg.Lookup, err)
+    // Handle Dynamic Arrays Explicitly
+    var decodedValues []interface{}
+
+        decodedValues, err = abiArgs.Unpack(lookupData)
+        if err != nil {
+            log.Printf(
+                "Error: ABI decoding failed | Key=%s | HashedKey=%s | ABIType=%s | Error=%v",
+                arg.Lookup, lookupKey.Hex(), arg.AbiType, err,
+            )
+            return nil, fmt.Errorf("ABI decoding failed for key %s (%s): %w", arg.Lookup, lookupKey.Hex(), err)
+        }
+        log.Printf(
+            "Decoded ABI value | Key=%s | HashedKey=%s | DecodedValue=%+v",
+            arg.Lookup, lookupKey.Hex(), decodedValues,
+        )
+        return decodedValues[0], nil
+}
+
+func decodeDynamicArray(data []byte, elementType string) ([]interface{}, error) {
+    if len(data) < 32 {
+        return nil, fmt.Errorf("invalid ABI data length for array decoding")
     }
 
-    log.Printf("Decoded ABI value for Key=%s: %+v", arg.Lookup, decodedValues[0])
+    // Read the length of the array (first 32 bytes)
+    arrayLength := new(big.Int).SetBytes(data[:32]).Int64()
+    if arrayLength < 0 {
+        return nil, fmt.Errorf("negative array length in ABI encoding")
+    }
 
-    return decodedValues[0], nil // Return the properly typed value
+    log.Printf("Decoding dynamic array: elementType=%s, length=%d", elementType, arrayLength)
+
+    // Slice to hold the decoded values
+    values := make([]interface{}, arrayLength)
+
+    // Start decoding from index 32
+    offset := 32
+    elementSize := 32 // Each ABI-encoded element is 32 bytes
+
+    for i := int64(0); i < arrayLength; i++ {
+        if offset+elementSize > len(data) {
+            return nil, fmt.Errorf("ABI data length mismatch for array decoding")
+        }
+
+        rawValue := data[offset : offset+elementSize]
+
+        switch elementType {
+        case "uint256":
+            values[i] = new(big.Int).SetBytes(rawValue)
+        case "bool":
+            values[i] = rawValue[31] != 0 // Last byte determines boolean value
+        case "address":
+            values[i] = common.BytesToAddress(rawValue)
+        case "string":
+            return nil, fmt.Errorf("string[] not supported in direct ABI decoding")
+        default:
+            return nil, fmt.Errorf("unsupported element type for ABI array: %s", elementType)
+        }
+
+        offset += elementSize
+    }
+
+    return values, nil
 }
+
+
+
+
+
+// Dynamically converts a string value to the expected ABI type
+func convertToABIType(value interface{}, abiType abi.Type) (interface{}, error) {
+    switch abiType.T {
+    case abi.AddressTy:
+        strValue, ok := value.(string)
+        if !ok {
+            return nil, fmt.Errorf("expected string for address, got %T", value)
+        }
+        if !common.IsHexAddress(strValue) {
+            return nil, fmt.Errorf("invalid address format: %s", strValue)
+        }
+        return common.HexToAddress(strValue), nil
+
+    case abi.UintTy, abi.IntTy:
+        switch v := value.(type) {
+        case *big.Int:
+            return v, nil
+        case string:
+            bigIntValue, success := new(big.Int).SetString(v, 10)
+            if !success {
+                return nil, fmt.Errorf("invalid integer value: %s", v)
+            }
+            return bigIntValue, nil
+        default:
+            return nil, fmt.Errorf("expected integer-compatible type, got %T", value)
+        }
+
+    case abi.BoolTy:
+        switch v := value.(type) {
+        case bool:
+            return v, nil
+        case string:
+            if v == "true" {
+                return true, nil
+            } else if v == "false" {
+                return false, nil
+            }
+            return nil, fmt.Errorf("invalid boolean value: %s", v)
+        default:
+            return nil, fmt.Errorf("expected boolean-compatible type, got %T", value)
+        }
+
+    case abi.StringTy:
+        strValue, ok := value.(string)
+        if !ok {
+            return nil, fmt.Errorf("expected string, got %T", value)
+        }
+        return strValue, nil
+
+    case abi.SliceTy, abi.ArrayTy:
+        // Handle dynamic and static arrays
+        slice := reflect.ValueOf(value)
+        if slice.Kind() != reflect.Slice {
+            return nil, fmt.Errorf("expected array type, got %T", value)
+        }
+
+        convertedSlice := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(abiType.Elem)), slice.Len(), slice.Len())
+        for i := 0; i < slice.Len(); i++ {
+            convertedValue, err := convertToABIType(slice.Index(i).Interface(), *abiType.Elem)
+            if err != nil {
+                return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+            }
+            convertedSlice.Index(i).Set(reflect.ValueOf(convertedValue))
+        }
+        return convertedSlice.Interface(), nil
+
+    default:
+        return nil, fmt.Errorf("unsupported ABI type: %s", abiType.String())
+    }
+}
+
 
 
 func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
@@ -136,22 +285,40 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 
     packedArgs := make([]interface{}, len(args))
     for i, input := range inputs {
-        expectedType := input.Type.String()
         arg := args[i]
-        arg.AbiType = expectedType
-        // Retrieve ABI-decoded value directly
+        arg.AbiType = input.Type.String() // Ensure correct ABI type
+
+        // Retrieve ABI-decoded value or raw string from state
         argValue, err := getLookupValue(arg, stateDB)
         if err != nil {
             log.Printf("Failed fetching argument value: %v", err)
             return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
         }
 
-        packedArgs[i] = argValue // No more type conversion needed!
-        log.Printf("Arg %d: Retrieved Value=%v, ExpectedType=%s", i, argValue, expectedType)
+        // If argValue is a string, convert it dynamically. If arg.AbiType will be passed, we can skip this
+        if strVal, ok := argValue.(string); ok {
+            abiType, err := abi.NewType(arg.AbiType, "", nil)
+            if err != nil {
+                return nil, fmt.Errorf("failed to create ABI type: %w", err)
+            }
+
+            convertedValue, err := convertToABIType(strVal, abiType)
+            if err != nil {
+                return nil, fmt.Errorf("failed to convert string value: %w", err)
+            }
+
+            log.Printf("Converted string Arg[%d]: RawValue=%s, ConvertedValue=%v, ExpectedType=%s", i, strVal, convertedValue, arg.AbiType)
+            packedArgs[i] = convertedValue
+        } else {
+            packedArgs[i] = argValue
+        }
+
+        log.Printf("Processed Arg[%d]: Value=%v, ExpectedType=%s", i, packedArgs[i], arg.AbiType)
     }
 
     return packedArgs, nil
 }
+
 
 
 func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
@@ -163,15 +330,31 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
         return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
     }
 
-    // Ensure the returned value is of type common.Address
-    addr, ok := addrValue.(common.Address)
-    if !ok {
-        log.Printf("Error: Retrieved value is not a valid Ethereum address: %v", addrValue)
-        return common.Address{}, fmt.Errorf("invalid contract address type: %v", addrValue)
+    // If getLookupValue returns nil, return the zero address
+    if addrValue == nil {
+        log.Printf("Lookup value is nil, returning zero address.")
+        return common.Address{}, nil
     }
 
-    log.Printf("Successfully retrieved contract address: %s", addr.Hex())
-    return addr, nil
+    // If the value is already a common.Address, return it
+    if addr, ok := addrValue.(common.Address); ok {
+        log.Printf("Successfully retrieved contract address: %s", addr.Hex())
+        return addr, nil
+    }
+
+    // If the value is a string, attempt to convert it to common.Address
+    if addrStr, ok := addrValue.(string); ok {
+        if common.IsHexAddress(addrStr) {
+            addr := common.HexToAddress(addrStr)
+            log.Printf("Successfully converted string to contract address: %s", addr.Hex())
+            return addr, nil
+        }
+        log.Printf("Error: Retrieved string is not a valid Ethereum address: %s", addrStr)
+        return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
+    }
+
+    log.Printf("Error: Retrieved value is not a valid Ethereum address: %v", addrValue)
+    return common.Address{}, fmt.Errorf("invalid contract address type: %T", addrValue)
 }
 
 
@@ -417,13 +600,11 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, storageK
         return fmt.Errorf("ABI encoding failed: %w", err)
     }
 
-    log.Printf("Storing ABI-encoded data for Key=%s: %x", storageKey, encodedData)
+    log.Printf("Storing ABI-encoded data for Key=%s (%s): %x", storageKey, outputKeyHash, encodedData)
     setLargeState(stateDB, addr, outputKeyHash, encodedData)
 
     return nil
 }
-
-
 
 
 
@@ -572,7 +753,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
-    for contractAddress.Hex() == "" {
+    for contractAddress == (common.Address{}) {
         nextPC, remainingGas, err = systemPrimitiveStep(nextPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
             log.Printf("Error: Failed to do system primitive step. Error: %v", err)
@@ -821,34 +1002,40 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 }
 
 func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) (map[string]string, error) {
-    // If the JSON string is empty, return an empty map (i.e. {}).
-	if lookupJsonString == "" {
-		return map[string]string{}, nil
-	}
+    // If the JSON string is empty, return an empty map.
+    if lookupJsonString == "" {
+        log.Printf("No lookup entries")
+        return map[string]string{}, nil
+    }
 
     // Unmarshal the input JSON string into a map.
-	var lookupMap map[string]string
-	if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
-	}
+    var lookupMap map[string]string
+    if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
+    }
 
-	// Iterate over the map and for each key/value pair, create a JSON array and store it.
-	for key, val := range lookupMap {
-		// Create an array with the value as the first (and only) entry.
-		arr := []interface{}{val}
+    // Iterate over the map and store values as `common.Address`
+    for key, val := range lookupMap {
+        if !common.IsHexAddress(val) {
+            log.Printf("Warning: Skipping invalid address for key %s: %s", key, val)
+            continue // Skip invalid addresses
+        }
 
-		// Marshal the array into JSON.
-		arrBytes, err := json.Marshal(arr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal array for key %s: %w", key, err)
-		}
+        // Convert to `common.Address`
+        addressValue := common.HexToAddress(val)
 
-		// Convert the key string to a storage key (common.Hash).
-		storageKey := common.BytesToHash([]byte(key))
+        // Store using ABI encoding (as an address)
+        if err := updateMemoryInState(stateDB, addr, key, addressValue, "address"); err != nil {
+            log.Printf("Error: Failed to store lookup entry for key %s. Error: %v", key, err)
+            return nil, fmt.Errorf("failed to store lookup entry for key %s: %w", key, err)
+        }
 
-		// Store the JSON array using your setLargeState function.
-		setLargeState(stateDB, addr, storageKey, arrBytes)
-	}
+        log.Printf("Successfully stored lookup entry: Key=%s, Address=%s", key, addressValue.Hex())
+    }
+
+    return lookupMap, nil
+}
+
 
     // signerKey := common.BytesToHash([]byte("signer"))
     // signerHex := caller.Hex()
@@ -862,9 +1049,6 @@ func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJso
     // setLargeState(stateDB, addr, signerKey, signerBytes)
 
     // log.Printf("Stored signer as array: %s under key: signer", signerHex)
-
-    return lookupMap, nil
-}
 
 
 // evaluatePlan uses evaluateSteps for its logic.
@@ -1037,50 +1221,96 @@ func encodeSteps(steps []Step) ([]byte, error) {
     return encoded, nil
 }
 
+
+// setLargeState stores [data] and includes its total length as an 8-byte prefix.
 func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash, data []byte) {
-    chunks := len(data) / common.HashLength
-    if len(data)%common.HashLength != 0 {
-        chunks++
-    }
-
-    for i := 0; i < chunks; i++ {
-        start := i * common.HashLength
-        end := (i + 1) * common.HashLength
-        if end > len(data) {
-            end = len(data)
-        }
-        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
-        stateDB.SetState(addr, chunkKey, common.BytesToHash(data[start:end]))
-    }
-}
-
-func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash) ([]byte, error) {
-    var data []byte
+    // 1) Clear old data
     for i := 0; ; i++ {
         chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+        oldChunk := stateDB.GetState(addr, chunkKey)
+        if oldChunk == (common.Hash{}) {
+            break
+        }
+        stateDB.SetState(addr, chunkKey, common.Hash{})
+    }
+
+    // 2) Write length + data
+    // The first chunk stores the length in the first 8 bytes
+    // The rest is data chunking
+    totalLen := uint64(len(data))
+    prefix := make([]byte, 8)
+    binary.BigEndian.PutUint64(prefix, totalLen) // 8-byte length prefix
+
+    fullData := append(prefix, data...) // Combine length prefix + actual data
+
+    // 3) Store [fullData] in 32-byte chunks
+    chunkSize := common.HashLength // 32
+    chunks := (len(fullData) + chunkSize - 1) / chunkSize
+    for i := 0; i < chunks; i++ {
+        start := i * chunkSize
+        end := start + chunkSize
+        if end > len(fullData) {
+            end = len(fullData)
+        }
+
+        // Pad the chunk to 32 bytes if needed
+        chunkData := make([]byte, chunkSize)
+        copy(chunkData, fullData[start:end])
+
+        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+        stateDB.SetState(addr, chunkKey, common.BytesToHash(chunkData))
+    }
+}
+
+
+func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash) ([]byte, error) {
+    // 1) Read the first chunk for length prefix
+    firstChunkKey := common.BytesToHash(append(key.Bytes(), byte(0)))
+    firstChunk := stateDB.GetState(addr, firstChunkKey).Bytes()
+    if len(firstChunk) == 0 {
+        // No data at all
+        return nil, fmt.Errorf("no data found for key %s", key.Hex())
+    }
+
+    // The first 8 bytes store the total length
+    if len(firstChunk) < 8 {
+        return nil, fmt.Errorf("invalid length prefix in first chunk")
+    }
+    totalLen := binary.BigEndian.Uint64(firstChunk[:8])
+
+    // Full data includes the first chunk's leftover part after length prefix
+    data := append([]byte(nil), firstChunk[8:]...) // Copy remainder after length
+    chunkIndex := 1
+
+    // 2) Read subsequent chunks until we collect totalLen
+    bytesNeeded := int(totalLen) - len(data)
+    for bytesNeeded > 0 {
+        chunkKey := common.BytesToHash(append(key.Bytes(), byte(chunkIndex)))
         chunk := stateDB.GetState(addr, chunkKey).Bytes()
-
-        // checks for empty chunk
-        isEmptyChunk := true
-		for _, b := range chunk {
-			if b != 0 {
-				isEmptyChunk = false
-				break
-			}
-		}
-
-		// Break the loop if no valid data is found
-		if isEmptyChunk {
-			break
-		}
-
+        if len(chunk) == 0 {
+            // Means no more data is stored
+            break
+        }
         data = append(data, chunk...)
+        bytesNeeded = int(totalLen) - len(data)
+        chunkIndex++
     }
-    if len(data) == 0 {
-        return nil, errors.New("no data found in state")
+
+    // 3) If data is longer than totalLen, truncate
+    if len(data) > int(totalLen) {
+        data = data[:totalLen]
     }
+
+    // If data is still less than totalLen, user stored incomplete data
+    if len(data) < int(totalLen) {
+        return nil, fmt.Errorf("incomplete data retrieved for key %s: expected %d bytes, got %d",
+            key.Hex(), totalLen, len(data))
+    }
+
     return data, nil
 }
+
+
 
 // UnpackPublishCustomPrimitiveInput attempts to unpack [input] as PublishCustomPrimitiveInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)

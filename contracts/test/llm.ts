@@ -668,7 +668,7 @@ describe("LLM Precompiled Contract", function () {
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 
-  it("should test evaluatePlan and continueEvaluation with erc20 and math", async function () {
+  it("should test evaluatePlan with erc20 and math", async function () {
     const withMathAndErc20Plan = JSON.stringify({
       plan: JSON.stringify(plans["withMathAndErc20"]),
       lookupTable: JSON.stringify({
@@ -815,7 +815,7 @@ describe("LLM Precompiled Contract", function () {
     expect(userBalanceEnd).to.equal(userBalanceStart + adminBalanceStart / 2n);
   });
 
-  it("should test evaluatePlan and continueEvaluation with assign system primitive", async function () {
+  it("should test evaluatePlan with assign system primitive", async function () {
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAssign"]),
     });
@@ -918,7 +918,156 @@ describe("LLM Precompiled Contract", function () {
     expect(countBEnd).to.equal(countBStart + countAEnd);
   });
 
-  it("should test evaluatePlan and continueEvaluation with JumpIfNot system primitive", async function () {
+  it("should test evaluatePlan with assignArray system primitive", async function () {
+    const withAssignArrayPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withAssignArray"]),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withAssignArrayPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Update Counter A
+    let result = await owner.sendTransaction({
+      // let result = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      ["0x0000000000000000000000000000000000000000000000000000000000000001"],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read counter A
+    // result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read counter B
+    // result = await owner.sendTransaction({
+    resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read counter B Again
+    // result = await owner.sendTransaction({
+    resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      [resultTx],
+      // contractMethodResults,
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    const countA = await counterAContract.getCounter();
+    const countB = await counterBContract.getCounter();
+
+    // Get Max
+    // result = await owner.sendTransaction({
+    resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(promptIdRead, [resultTx]);
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => true,
+      )
+      .and.to.emit(llmContract, "QuestionAnswer")
+      .withArgs(
+        (question) => question == "What's the max value of the counters?",
+        (answer) => {
+          const max = countA > countB ? countA : countB;
+          return answer == max.toString();
+        },
+      );
+  });
+
+  it("should test evaluatePlan with JumpIfNot system primitive", async function () {
     const withJumpIfNotPlan = JSON.stringify({
       plan: JSON.stringify(plans["withJumpIfNot"]),
     });
@@ -1019,5 +1168,89 @@ describe("LLM Precompiled Contract", function () {
 
     const countAEnd = await counterAContract.getCounter();
     expect(countAEnd).to.equal(20n + 30n);
+  });
+
+  it("should test evaluatePlan with answerUserQuestion system primitive", async function () {
+    const adminBalance = await erc20Contract.balanceOf(ADMIN_ADDRESS);
+
+    const withAnswerUserQuestionPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withAnswerUserQuestion"]),
+      lookupTable: JSON.stringify({
+        signer: ADMIN_ADDRESS,
+        USDC: erc20Address,
+      }),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withAnswerUserQuestionPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read balance
+    // let result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+      [resultTx],
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == false,
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // userFormatToContractFormat
+    resultTx = await owner.call({
+      // let result = await owner.sendTransaction({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    tx = await testContract.continueEvaluation(
+      promptIdRead,
+      // ["0x0000000000000000000000000000000000000000000000000000000000000001"], //  'true'
+      [resultTx],
+    );
+    await tx.wait();
+    await expect(tx)
+      .to.emit(testContract, "ContinueEvaluationEvent")
+      .withArgs(
+        (evaluationDone) => evaluationDone == true,
+        (contractMethodParams) => {
+          return true;
+        },
+      )
+      .and.to.emit(llmContract, "QuestionAnswer")
+      .withArgs(
+        (question) => question == "How much USDC do I have?",
+        (answer) =>
+          ethers.parseUnits(answer, 18).toString() == adminBalance.toString(),
+      );
   });
 });

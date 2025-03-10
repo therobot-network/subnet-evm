@@ -10,7 +10,7 @@
         "Lookup": "USDC"
       },
       "Method": "balanceOf",
-      "Output": "call_result_1"
+      "Output": ["call_result_1"]
     },
     {
       "Args": [
@@ -22,7 +22,7 @@
         "Value": ""
       },
       "Method": "assign",
-      "Output": "usdc_balance"
+      "Output": ["usdc_balance"]
     },
     {
       "Args": [
@@ -37,7 +37,7 @@
         "Value": ""
       },
       "Method": "answerUserQuestion",
-      "Output": "call_result_2"
+      "Output": ["call_result_2"]
     }
   ],
   "withJumpIfNot": [
@@ -112,17 +112,18 @@
       "Method": "getCounter",
       "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Args": [],
-      "Output": "CountA"
+      "Output": ["CountA"]
     },
     {
       "Method": "assign",
       "Contract": { "Value": "" },
       "Args": [
         {
-          "Lookup": "CountA"
+          "Lookup": "CountA",
+          "AbiType": "uint256"
         }
       ],
-      "Output": "CountANew"
+      "Output": ["CountANew"]
     },
     {
       "Method": "increase",
@@ -132,6 +133,76 @@
           "Lookup": "CountANew"
         }
       ]
+    }
+  ],
+  "withAssignArray": [
+    {
+      "Method": "increase",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [
+        {
+          "Value": "10"
+        }
+      ]
+    },
+    {
+      "Method": "getCounter",
+      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Args": [],
+      "Output": ["CountA"]
+    },
+    {
+      "Method": "getCounter",
+      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Args": [],
+      "Output": ["CountB"]
+    },
+    {
+      "Method": "getCounter",
+      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Args": [],
+      "Output": ["CountBAgain"]
+    },
+    {
+      "Method": "assignArray",
+      "Contract": { "Value": "" },
+      "Args": [
+        {
+          "Lookup": "CountA",
+          "AbiType": "uint256"
+        },
+        {
+          "Lookup": "CountBAgain",
+          "AbiType": "uint256"
+        }
+      ],
+      "Output": ["CountArray"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "CountArray"
+        }
+      ],
+      "Contract": { "Value": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D" },
+      "Method": "maxUint256Array",
+      "Output": ["maxValue"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "What's the max value of the counters?"
+        },
+        {
+          "Lookup": "maxValue",
+          "AbiType": "uint256"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "answerUserQuestion",
+      "Output": []
     }
   ],
   "withLookup": [
@@ -148,7 +219,7 @@
       "Method": "getCounter",
       "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
       "Args": [],
-      "Output": "CountA"
+      "Output": ["CountA"]
     },
     {
       "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
@@ -201,7 +272,7 @@
           "value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
         }
       ],
-      "Output": "signerbalance"
+      "Output": ["signerbalance"]
     },
     {
       "Args": [
@@ -214,7 +285,7 @@
       ],
       "Contract": { "Value": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D" },
       "Method": "divide",
-      "Output": "half_balance"
+      "Output": ["half_balance"]
     },
     {
       "Args": [
@@ -227,6 +298,75 @@
       ],
       "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
       "Method": "transfer"
+    }
+  ],
+  "withAnswerUserQuestion": [
+    {
+      "Args": [
+        {
+          "Lookup": "signer"
+        }
+      ],
+      "Contract": {
+        "Lookup": "USDC"
+      },
+      "Method": "balanceOf",
+      "Output": ["call_result_1"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "call_result_1",
+          "AbiType": "uint256"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["balance"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "balance"
+        }
+      ],
+      "Contract": {
+        "Lookup": "USDC"
+      },
+      "Method": "contractFormatToUserFormat",
+      "Output": ["call_result_2"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "call_result_2",
+          "AbiType": "string"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["user_format_balance"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "How much USDC do I have?"
+        },
+        {
+          "Lookup": "user_format_balance"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "answerUserQuestion",
+      "Output": ["call_result_3"]
     }
   ]
 }
