@@ -500,18 +500,26 @@ func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
 
 // Temporary function. Later we will use a DB
 func getContractPrimitive(address string) (contract string, primitive string) {
+    log.Printf("Fetching contract primitive for address: %s", address)
+
     contract, exists := contractsAddresses[address]
     if !exists {
+        log.Printf("No contract found for address: %s", address)
         return "", "" // Return empty values instead of an error
     }
 
+    log.Printf("Found contract: %s for address: %s", contract, address)
+
     primitive, exists = primitiveABI[contract]
     if !exists {
+        log.Printf("No primitive found for contract: %s", contract)
         return contract, "" // Return contract but empty primitive
     }
 
+    log.Printf("Found primitive: %.150s for contract: %s", primitive, contract)
     return contract, primitive
 }
+
 
 
 
