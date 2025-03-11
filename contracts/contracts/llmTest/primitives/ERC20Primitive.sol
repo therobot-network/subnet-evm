@@ -9,7 +9,7 @@ contract ERC20Primitive is ERC20 {
   error InvalidString(string reason);
 
   constructor() ERC20("Test Token", "TT") {
-    _mint(msg.sender, 10000 * 10 ** 18);
+    _mint(msg.sender, 100000 * 10 ** 18);
   }
 
   // Converts an unsigned integer to a fixed-point string
