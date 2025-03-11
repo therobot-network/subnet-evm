@@ -90,15 +90,26 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			// Ensure correct ABI type for condition
-			step.Args[1].AbiType = "string"
+
+			if step.Args[1].AbiType == "" {
+				step.Args[1].AbiType = "string"
+			}
 			conditionStr, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
 				log.Printf("Error fetching condition: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch condition: %w", err)
 			}
 
-			// Convert `conditionStr` (string) to bool
-			condition := strings.ToLower(conditionStr.(string)) == "true"
+			var condition bool
+			switch v := conditionStr.(type) {
+			case string:
+				condition = strings.ToLower(v) == "true"
+			case bool:
+				condition = v
+			default:
+				log.Printf("Unexpected type for conditionStr: %T", v)
+				return nil, 0, fmt.Errorf("invalid type for conditionStr: expected string or bool, got %T", v)
+			}
 
 			log.Printf("JumpIfNot: Parsed Condition=%s as bool=%t", conditionStr, condition)
 		
