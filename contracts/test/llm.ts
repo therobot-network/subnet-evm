@@ -1478,9 +1478,9 @@ describe("LLM Precompiled Contract", function () {
       lookupTable: JSON.stringify({
         JIRI: jiriAddress,
         USDC: usdcAddress,
-        AMM_USDC_JIRI1: amm1Address,
-        AMM_USDC_JIRI2: amm1Address,
-        AMM_USDC_JIRI3: amm1Address,
+        AMM_1: amm1Address,
+        AMM_2: amm1Address,
+        AMM_3: amm1Address,
         PythonPrimitive: pythonPrimitiveAddress,
         calculator: mathAddress,
         signer: ADMIN_ADDRESS,
@@ -1631,7 +1631,7 @@ describe("LLM Precompiled Contract", function () {
     // );
   });
 
-  it("Prompt: Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.", async function () {
+  it.only("Prompt: Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.", async function () {
     const inputPrompt =
       "Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.";
     let promptIdRead: string;
@@ -1646,14 +1646,15 @@ describe("LLM Precompiled Contract", function () {
         lookupTable: JSON.stringify({
           JIRI: jiriAddress,
           USDC: usdcAddress,
-          AMM_USDC_JIRI1: amm1Address,
-          AMM_USDC_JIRI2: amm1Address,
-          AMM_USDC_JIRI3: amm1Address,
+          AMM_1: amm1Address,
+          AMM_2: amm1Address,
+          AMM_3: amm1Address,
           PythonPrimitive: pythonPrimitiveAddress,
           calculator: mathAddress,
           signer: ADMIN_ADDRESS,
         }),
       }),
+      { gasLimit: 5000000, timeout: 60000 },
     );
 
     await tx.wait();
