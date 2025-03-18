@@ -368,5 +368,675 @@
       "Method": "answerUserQuestion",
       "Output": ["call_result_3"]
     }
+  ],
+  "withAMM": [
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "JIRI"
+        }
+      ],
+      "Contract": {
+        "Lookup": "AMM_USDC_JIRI1"
+      },
+      "Method": "price",
+      "Output": ["call_result_1"],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_1"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["price1"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "JIRI"
+        }
+      ],
+      "Contract": {
+        "Lookup": "AMM_USDC_JIRI2"
+      },
+      "Method": "price",
+      "Output": ["call_result_2"],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_2"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["price2"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "JIRI"
+        }
+      ],
+      "Contract": {
+        "Lookup": "AMM_USDC_JIRI3"
+      },
+      "Method": "price",
+      "Output": ["call_result_3"],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_3"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["price3"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "price1"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price2"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price3"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assignArray",
+      "Output": ["Array0"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "Array0"
+        }
+      ],
+      "Contract": {
+        "Lookup": "PythonPrimitive"
+      },
+      "Method": "max",
+      "Output": ["call_result_4"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_4"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["max_price"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "price1"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price2"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price3"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assignArray",
+      "Output": ["Array1"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "Array1"
+        }
+      ],
+      "Contract": {
+        "Lookup": "PythonPrimitive"
+      },
+      "Method": "min",
+      "Output": ["call_result_5"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_5"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["min_price"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "max_price"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price1"
+        }
+      ],
+      "Contract": {
+        "Lookup": "calculator"
+      },
+      "Method": "equal",
+      "Output": ["condition_result_6"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "16"
+        },
+        {
+          "AbiType": "bool",
+          "Lookup": "condition_result_6"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI1"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["max_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "23"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "max_price"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price2"
+        }
+      ],
+      "Contract": {
+        "Lookup": "calculator"
+      },
+      "Method": "equal",
+      "Output": ["condition_result_10"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "20"
+        },
+        {
+          "AbiType": "bool",
+          "Lookup": "condition_result_10"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI2"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["max_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "22"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI3"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["max_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "22"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "23"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "min_price"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price1"
+        }
+      ],
+      "Contract": {
+        "Lookup": "calculator"
+      },
+      "Method": "equal",
+      "Output": ["condition_result_14"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "27"
+        },
+        {
+          "AbiType": "bool",
+          "Lookup": "condition_result_14"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI1"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["min_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "34"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "min_price"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "price2"
+        }
+      ],
+      "Contract": {
+        "Lookup": "calculator"
+      },
+      "Method": "equal",
+      "Output": ["condition_result_18"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "31"
+        },
+        {
+          "AbiType": "bool",
+          "Lookup": "condition_result_18"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI2"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["min_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "33"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "AMM_USDC_JIRI3"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["min_exchange"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "33"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "string",
+          "Value": "34"
+        },
+        {
+          "AbiType": "string",
+          "Value": "true"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "JumpIfNot",
+      "Output": [null]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "signer"
+        }
+      ],
+      "Contract": {
+        "Lookup": "JIRI"
+      },
+      "Method": "balanceOf",
+      "Output": ["call_result_22"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_22"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["jiri_balance"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "jiri_balance"
+        },
+        {
+          "AbiType": "string",
+          "Value": "2"
+        }
+      ],
+      "Contract": {
+        "Lookup": "calculator"
+      },
+      "Method": "divide",
+      "Output": ["half_jiri"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "max_exchange"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "half_jiri"
+        }
+      ],
+      "Contract": {
+        "Lookup": "JIRI"
+      },
+      "Method": "approve",
+      "Output": ["call_result_23"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "JIRI"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "half_jiri"
+        }
+      ],
+      "Contract": {
+        "Lookup": "max_exchange"
+      },
+      "Method": "swap",
+      "Output": ["call_result_24"],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "signer"
+        }
+      ],
+      "Contract": {
+        "Lookup": "USDC"
+      },
+      "Method": "balanceOf",
+      "Output": ["call_result_25"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "uint256",
+          "Lookup": "call_result_25"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "assign",
+      "Output": ["usdc_balance"]
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "min_exchange"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "usdc_balance"
+        }
+      ],
+      "Contract": {
+        "Lookup": "USDC"
+      },
+      "Method": "approve",
+      "Output": ["call_result_26"],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "AbiType": "address",
+          "Lookup": "USDC"
+        },
+        {
+          "AbiType": "uint256",
+          "Lookup": "usdc_balance"
+        }
+      ],
+      "Contract": {
+        "Lookup": "min_exchange"
+      },
+      "Method": "swap",
+      "Output": ["call_result_27"],
+      "Primitive": "unknown"
+    }
   ]
 }
