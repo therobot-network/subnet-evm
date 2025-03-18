@@ -378,7 +378,7 @@
         }
       ],
       "Contract": {
-        "Lookup": "AMM_USDC_JIRI1"
+        "Lookup": "AMM_1"
       },
       "Method": "price",
       "Output": ["call_result_1"],
@@ -405,7 +405,7 @@
         }
       ],
       "Contract": {
-        "Lookup": "AMM_USDC_JIRI2"
+        "Lookup": "AMM_2"
       },
       "Method": "price",
       "Output": ["call_result_2"],
@@ -432,7 +432,7 @@
         }
       ],
       "Contract": {
-        "Lookup": "AMM_USDC_JIRI3"
+        "Lookup": "AMM_3"
       },
       "Method": "price",
       "Output": ["call_result_3"],
@@ -583,7 +583,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI1"
+          "Lookup": "AMM_1"
         }
       ],
       "Contract": {
@@ -647,7 +647,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI2"
+          "Lookup": "AMM_2"
         }
       ],
       "Contract": {
@@ -677,7 +677,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI3"
+          "Lookup": "AMM_3"
         }
       ],
       "Contract": {
@@ -758,7 +758,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI1"
+          "Lookup": "AMM_1"
         }
       ],
       "Contract": {
@@ -822,7 +822,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI2"
+          "Lookup": "AMM_2"
         }
       ],
       "Contract": {
@@ -852,7 +852,7 @@
       "Args": [
         {
           "AbiType": "address",
-          "Lookup": "AMM_USDC_JIRI3"
+          "Lookup": "AMM_3"
         }
       ],
       "Contract": {
