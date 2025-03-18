@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -58,6 +59,29 @@ type Step struct {
 	Args      []Arg    `json:"Args,omitempty"`
     Output    []string   `json:"Output,omitempty"`
 }
+
+// Singleton StatefulPrecompiledContract and signatures.
+var (
+
+	// LLMPrecompileRawABI contains the raw ABI of LLMPrecompile contract.
+	//go:embed contract.abi
+	LLMPrecompileRawABI string
+
+	LLMPrecompileABI = contract.ParseABI(LLMPrecompileRawABI)
+
+	// Prompt Counter for identification of evaluations
+	promptCounterKey = common.BytesToHash([]byte("promptCounter"))
+	stepsKey = common.BytesToHash([]byte("steps"))
+    pcKey    = common.BytesToHash([]byte("pc"))
+    lookupStorageKey = crypto.Keccak256Hash([]byte("lookupStorage")) // Base slot key
+    // utilNameToAddressKey = common.BytesToHash([]byte("primitiveNameToAddress"))
+    addressToPrimitiveName = common.BytesToHash([]byte("addressToPrimitiveName"))
+
+
+	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
+
+    llmApiURL = "http://robotbrain-v2-loadbalancer-2026683595.eu-west-1.elb.amazonaws.com/eval_prompt"
+)
 
 func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
     reqBytes, err := json.Marshal(requestBody)
@@ -108,21 +132,21 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
     }
 
     // Convert lookup key to a hash
-    lookupKey := common.BytesToHash([]byte(arg.Lookup))
-    
+    lookupKeyHash := crypto.Keccak256Hash([]byte(arg.Lookup)) // Lookup key hash
+    storageKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), lookupKeyHash.Bytes()...))    
     // Retrieve ABI-encoded data from storage
-    lookupData, err := getLargeState(stateDB, ContractAddress, lookupKey)
+    lookupData, err := getLargeState(stateDB, ContractAddress, storageKey)
     if err != nil {
         log.Printf(
             "Error: Failed to retrieve data from state | Key=%s | HashedKey=%s | Error=%v", 
-            arg.Lookup, lookupKey.Hex(), err,
+            arg.Lookup, storageKey.Hex(), err,
         )
-        return nil, fmt.Errorf("failed to retrieve data from state for key %s (%s): %w", arg.Lookup, lookupKey.Hex(), err)
+        return nil, fmt.Errorf("failed to retrieve data from state for key %s (%s): %w", arg.Lookup, storageKey.Hex(), err)
     }
 
     log.Printf(
         "Retrieved ABI-encoded data | Key=%s | HashedKey=%s | Data=%x",
-        arg.Lookup, lookupKey.Hex(), lookupData,
+        arg.Lookup, storageKey.Hex(), lookupData,
     )
 
     // Define ABI structure for decoding
@@ -130,7 +154,7 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
     if err != nil {
         log.Printf(
             "Error: Failed to create ABI type | Key=%s | HashedKey=%s | ABIType=%s | Error=%v",
-            arg.Lookup, lookupKey.Hex(), arg.AbiType, err,
+            arg.Lookup, storageKey.Hex(), arg.AbiType, err,
         )
         return nil, fmt.Errorf("failed to create ABI type: %w", err)
     }
@@ -140,69 +164,20 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
     // Handle Dynamic Arrays Explicitly
     var decodedValues []interface{}
 
-        decodedValues, err = abiArgs.Unpack(lookupData)
-        if err != nil {
-            log.Printf(
-                "Error: ABI decoding failed | Key=%s | HashedKey=%s | ABIType=%s | Error=%v",
-                arg.Lookup, lookupKey.Hex(), arg.AbiType, err,
-            )
-            return nil, fmt.Errorf("ABI decoding failed for key %s (%s): %w", arg.Lookup, lookupKey.Hex(), err)
-        }
+    decodedValues, err = abiArgs.Unpack(lookupData)
+    if err != nil {
         log.Printf(
-            "Decoded ABI value | Key=%s | HashedKey=%s | DecodedValue=%+v",
-            arg.Lookup, lookupKey.Hex(), decodedValues,
+            "Error: ABI decoding failed | Key=%s | HashedKey=%s | ABIType=%s | Error=%v",
+            arg.Lookup, storageKey.Hex(), arg.AbiType, err,
         )
-        return decodedValues[0], nil
+        return nil, fmt.Errorf("ABI decoding failed for key %s (%s): %w", arg.Lookup, storageKey.Hex(), err)
+    }
+    log.Printf(
+        "Decoded ABI value | Key=%s | HashedKey=%s | DecodedValue=%+v",
+        arg.Lookup, storageKey.Hex(), decodedValues,
+    )
+    return decodedValues[0], nil
 }
-
-func decodeDynamicArray(data []byte, elementType string) ([]interface{}, error) {
-    if len(data) < 32 {
-        return nil, fmt.Errorf("invalid ABI data length for array decoding")
-    }
-
-    // Read the length of the array (first 32 bytes)
-    arrayLength := new(big.Int).SetBytes(data[:32]).Int64()
-    if arrayLength < 0 {
-        return nil, fmt.Errorf("negative array length in ABI encoding")
-    }
-
-    log.Printf("Decoding dynamic array: elementType=%s, length=%d", elementType, arrayLength)
-
-    // Slice to hold the decoded values
-    values := make([]interface{}, arrayLength)
-
-    // Start decoding from index 32
-    offset := 32
-    elementSize := 32 // Each ABI-encoded element is 32 bytes
-
-    for i := int64(0); i < arrayLength; i++ {
-        if offset+elementSize > len(data) {
-            return nil, fmt.Errorf("ABI data length mismatch for array decoding")
-        }
-
-        rawValue := data[offset : offset+elementSize]
-
-        switch elementType {
-        case "uint256":
-            values[i] = new(big.Int).SetBytes(rawValue)
-        case "bool":
-            values[i] = rawValue[31] != 0 // Last byte determines boolean value
-        case "address":
-            values[i] = common.BytesToAddress(rawValue)
-        case "string":
-            return nil, fmt.Errorf("string[] not supported in direct ABI decoding")
-        default:
-            return nil, fmt.Errorf("unsupported element type for ABI array: %s", elementType)
-        }
-
-        offset += elementSize
-    }
-
-    return values, nil
-}
-
-
-
 
 
 // Dynamically converts a string value to the expected ABI type
@@ -358,24 +333,7 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
 }
 
 
-// Singleton StatefulPrecompiledContract and signatures.
-var (
 
-	// LLMPrecompileRawABI contains the raw ABI of LLMPrecompile contract.
-	//go:embed contract.abi
-	LLMPrecompileRawABI string
-
-	LLMPrecompileABI = contract.ParseABI(LLMPrecompileRawABI)
-
-	// Prompt Counter for identification of evaluations
-	promptCounterKey = common.BytesToHash([]byte("promptCounter"))
-	stepsKey = common.BytesToHash([]byte("steps"))
-    pcKey    = common.BytesToHash([]byte("pc"))
-
-	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
-
-    llmApiURL = "http://robotbrain-v2-loadbalancer-2026683595.eu-west-1.elb.amazonaws.com/eval_prompt"
-)
 
 // ILLMContractMethodParams is an auto generated low-level Go binding around an user-defined struct.
 type ILLMContractMethodParams struct {
@@ -499,18 +457,29 @@ func decodeResults(method abi.Method, result []byte) ([]interface{}, error) {
 }
 
 // Temporary function. Later we will use a DB
-func getContractPrimitive(address string) (contract string, primitive string) {
+func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address string) (contract string, primitive string) {
     log.Printf("Fetching contract primitive for address: %s", address)
 
-    contract, exists := contractsAddresses[address]
-    if !exists {
+    // Compute the key for retrieving the contract address
+    addressHash := common.BytesToHash([]byte(address))
+    fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
+
+    // Retrieve the contract from storage
+    contractBytes, err := getLargeState(stateDB, addr, fullKey)
+    if err != nil {
+        log.Printf("Error retrieving contract from state: %v", err)
+        return "", ""
+    }
+    if len(contractBytes) == 0 {
         log.Printf("No contract found for address: %s", address)
         return "", "" // Return empty values instead of an error
     }
 
+    contract = string(contractBytes)
     log.Printf("Found contract: %s for address: %s", contract, address)
 
-    primitive, exists = primitiveABI[contract]
+    // Retrieve the primitive associated with this contract
+    primitive, exists := primitiveABI[contract]
     if !exists {
         log.Printf("No primitive found for contract: %s", contract)
         return contract, "" // Return contract but empty primitive
@@ -520,15 +489,11 @@ func getContractPrimitive(address string) (contract string, primitive string) {
     return contract, primitive
 }
 
-
-
-
-
 // Utility function to prepare the next step's contract call
 func prepareNextStep(step Step, contractAddress common.Address, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
-    _,contractAbi := getContractPrimitive(contractAddress.Hex())
+    _,contractAbi := getContractPrimitive(stateDB, contractAddress, contractAddress.Hex())
     if contractAbi == "" {
         log.Printf("Error: Failed to get contract primitive ABI.")
         return nil, fmt.Errorf("failed to get contract primitive abi")
@@ -580,17 +545,20 @@ func prepareNextStep(step Step, contractAddress common.Address, stateDB contract
 }
 
 
-func updateMemoryInState(stateDB contract.StateDB, addr common.Address, storageKey string, storageData interface{}, typ string) error {
-    if storageKey == "" {
+func updateMemoryInState(stateDB contract.StateDB, addr common.Address, key string, storageData interface{}, typ string) error {
+    if key == "" {
         return nil
     }
 
-    outputKeyHash := common.BytesToHash([]byte(storageKey))
+    // outputKeyHash := common.BytesToHash([]byte(storageKey))
+
+    keyHash := crypto.Keccak256Hash([]byte(key)) // Key for this entry
+    storageKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), keyHash.Bytes()...))
 
     // Clear existing value if present
-    if stateDB.GetState(addr, outputKeyHash) != (common.Hash{}) {
+    if stateDB.GetState(addr, storageKey) != (common.Hash{}) {
         log.Printf("Clearing existing value for key: %s", storageKey)
-        stateDB.SetState(addr, outputKeyHash, common.Hash{}) // TODO: Clear large state if necessary
+        stateDB.SetState(addr, storageKey, common.Hash{}) // TODO: Clear large state if necessary
     }
 
     // Create ABI type
@@ -608,8 +576,8 @@ func updateMemoryInState(stateDB contract.StateDB, addr common.Address, storageK
         return fmt.Errorf("ABI encoding failed: %w", err)
     }
 
-    log.Printf("Storing ABI-encoded data for Key=%s (%s): %x", storageKey, outputKeyHash, encodedData)
-    setLargeState(stateDB, addr, outputKeyHash, encodedData)
+    log.Printf("Storing ABI-encoded data for Key=%s (%s): %x", key, storageKey, encodedData)
+    setLargeState(stateDB, addr, storageKey, encodedData)
 
     return nil
 }
@@ -694,7 +662,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
-    _, contractAbi := getContractPrimitive(contractAddress.Hex())
+    _, contractAbi := getContractPrimitive(stateDB, contractAddress, contractAddress.Hex())
     if contractAbi == "" {
         log.Printf("Error: Failed to get contract primitive ABI")
         return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi")
@@ -1005,7 +973,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
         return nil, remainingGas, err
     }
 
-    log.Printf("evaluateSteps completed successfully.")
+    log.Printf("evaluation completed successfully.")
     return packedOutput, remainingGas, nil
 }
 
@@ -1127,7 +1095,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 
     // Iterate over lookupTable
     for key, value := range lookupTable {
-        contract, _ := getContractPrimitive(value) // Check if value is a contract
+        contract, _ := getContractPrimitive(stateDB, addr, value) // Check if value is a contract
         if contract != ""  { // Ensure both exist
             primitiveMapping[key] = contract // Store {lookupTable key: primitive value}
         }
@@ -1232,17 +1200,8 @@ func encodeSteps(steps []Step) ([]byte, error) {
 
 // setLargeState stores [data] and includes its total length as an 8-byte prefix.
 func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash, data []byte) {
-    // 1) Clear old data
-    for i := 0; ; i++ {
-        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
-        oldChunk := stateDB.GetState(addr, chunkKey)
-        if oldChunk == (common.Hash{}) {
-            break
-        }
-        stateDB.SetState(addr, chunkKey, common.Hash{})
-    }
 
-    // 2) Write length + data
+    // 1) Write length + data
     // The first chunk stores the length in the first 8 bytes
     // The rest is data chunking
     totalLen := uint64(len(data))
@@ -1251,7 +1210,7 @@ func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Has
 
     fullData := append(prefix, data...) // Combine length prefix + actual data
 
-    // 3) Store [fullData] in 32-byte chunks
+    // 2) Store [fullData] in 32-byte chunks
     chunkSize := common.HashLength // 32
     chunks := (len(fullData) + chunkSize - 1) / chunkSize
     for i := 0; i < chunks; i++ {
@@ -1277,7 +1236,8 @@ func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Has
     firstChunk := stateDB.GetState(addr, firstChunkKey).Bytes()
     if len(firstChunk) == 0 {
         // No data at all
-        return nil, fmt.Errorf("no data found for key %s", key.Hex())
+        // return nil, fmt.Errorf("no data found for key %s", key.Hex())
+        return []byte{}, nil
     }
 
     // The first 8 bytes store the total length
@@ -1341,22 +1301,48 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	if readOnly {
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
-	// attempts to unpack [input] into the arguments to the PublishCustomPrimitiveInput.
-	// Assumes that [input] does not include selector
-	// You can use unpacked [inputStruct] variable in your code
+
+	// Unpack input values
 	inputStruct, err := UnpackPublishCustomPrimitiveInput(input)
 	if err != nil {
+		log.Printf("Error: Failed to unpack input. Error: %v", err)
 		return nil, remainingGas, err
 	}
 
-	// CUSTOM CODE STARTS HERE
-	_ = inputStruct // CUSTOM CODE OPERATES ON INPUT
-	// this function does not return an output, leave this one as is
-	packedOutput := []byte{}
+	stateDB := accessibleState.GetStateDB()
 
-	// Return the packed output and the remaining gas
-	return packedOutput, remainingGas, nil
+	contractAddress := inputStruct.ContractAddress
+	primitiveAddress := inputStruct.PrimitiveAddress
+
+	// Generate key to retrieve the name using primitive address
+	primitiveAddressHash := common.BytesToHash([]byte(primitiveAddress.Hex()))
+	fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), primitiveAddressHash.Bytes()...))
+
+	// Retrieve name from storage using the primitive address
+	storedName, err := getLargeState(stateDB, addr, fullKey)
+	if err != nil {
+		log.Printf("Error retrieving primitive name from state: %v", err)
+		return nil, remainingGas, err
+	}
+
+	if len(storedName) == 0 {
+		log.Printf("Error: No primitive name found for address: %s", primitiveAddress.Hex())
+		return nil, remainingGas, fmt.Errorf("primitive name not found for address %s", primitiveAddress.Hex())
+	}
+
+	// Generate key to store the name under the contractAddress
+	contractAddressHash := common.BytesToHash([]byte(contractAddress.Hex()))
+	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
+
+	// Store the retrieved name under contractAddress
+	setLargeState(stateDB, addr, fullKey, storedName)
+
+	log.Printf("Stored primitive mapping: Name=%s, ContractAddress=%s", string(storedName), contractAddress.Hex())
+
+	// No output is expected for this function, so return an empty byte array
+	return []byte{}, remainingGas, nil
 }
+
 
 // UnpackPublishPrimitiveInput attempts to unpack [input] as PublishPrimitiveInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
@@ -1379,21 +1365,51 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
 	if readOnly {
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
-	// attempts to unpack [input] into the arguments to the PublishPrimitiveInput.
-	// Assumes that [input] does not include selector
-	// You can use unpacked [inputStruct] variable in your code
-	inputStruct, err := UnpackPublishPrimitiveInput(input)
-	if err != nil {
-		return nil, remainingGas, err
-	}
 
-	// CUSTOM CODE STARTS HERE
-	_ = inputStruct // CUSTOM CODE OPERATES ON INPUT
-	// this function does not return an output, leave this one as is
-	packedOutput := []byte{}
+    stateDB := accessibleState.GetStateDB()
 
-	// Return the packed output and the remaining gas
-	return packedOutput, remainingGas, nil
+    // Unpack input values
+    inputStruct, err := UnpackPublishPrimitiveInput(input)
+    if err != nil {
+        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        return nil, remainingGas, err
+    }
+
+    contractAddress := inputStruct.ContractAddress
+    metadata := inputStruct.Metadata
+
+    // Compute the metadata hash
+    metadataHash := common.BytesToHash([]byte(metadata))
+
+    // Generate the final key as keccak256(baseKey || metadataHash)
+    fullKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), metadataHash.Bytes()...))    
+    // fullKey := common.BytesToHash(append(utilNameToAddressKey.Bytes(), metadataHash.Bytes()...))
+
+    // Check if the metadata key already exists
+    existingValue, err := getLargeState(stateDB, addr, fullKey)
+    if err != nil {
+        log.Printf("Error retrieving metadata key from state: %v", err)
+        return nil, remainingGas, err
+    }
+    if len(existingValue) > 0 {
+        log.Printf("Error: Metadata key already exists in state: %s", metadata)
+        return nil, remainingGas, fmt.Errorf("util name already registered")
+    }
+
+    // Store the mapping (metadata -> contractAddress)
+    setLargeState(stateDB, addr, fullKey, contractAddress.Bytes())
+    log.Printf("Stored primitive mapping name -> address: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
+
+    addressHash := common.BytesToHash([]byte(contractAddress.Hex()))
+    fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
+    metadataBytes := []byte(metadata)  // Convert string to []byte
+    setLargeState(stateDB, addr, fullKey, metadataBytes)
+
+    log.Printf("Stored primitive mapping address -> name: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
+
+
+    // No output is expected for this function, so return an empty byte array
+    return []byte{}, remainingGas, nil
 }
 
 // createLLMPrecompilePrecompile returns a StatefulPrecompiledContract with getters and setters for the precompile.
