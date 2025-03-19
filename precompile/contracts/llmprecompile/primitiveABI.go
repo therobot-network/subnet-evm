@@ -241,11 +241,6 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "account",
-          "type": "address"
-        },
-        {
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
