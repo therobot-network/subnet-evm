@@ -461,8 +461,18 @@ func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address
     log.Printf("Fetching contract primitive for address: %s", address)
 
     // Compute the key for retrieving the contract address
-    addressHash := common.BytesToHash([]byte(address))
+    parsedAddress := common.HexToAddress(address)
+    addressHash := common.BytesToHash(parsedAddress.Bytes())
     fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
+
+    log.Printf(
+        "Attempting to fetch primitive: Address=%s, AddrForStorage=%s, addressHash=%s, fullKey=%s",
+        address,
+        addr.Hex(),
+        addressHash.Hex(),
+        fullKey.Hex(),
+    )
+    
 
     // Retrieve the contract from storage
     contractBytes, err := getLargeState(stateDB, addr, fullKey)
@@ -490,10 +500,10 @@ func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address
 }
 
 // Utility function to prepare the next step's contract call
-func prepareNextStep(step Step, contractAddress common.Address, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
+func prepareNextStep(step Step, contractAddress common.Address, addr common.Address, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
     log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
-    _,contractAbi := getContractPrimitive(stateDB, contractAddress, contractAddress.Hex())
+    _,contractAbi := getContractPrimitive(stateDB, addr, contractAddress.Hex())
     if contractAbi == "" {
         log.Printf("Error: Failed to get contract primitive ABI.")
         return nil, fmt.Errorf("failed to get contract primitive abi")
@@ -662,7 +672,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
-    _, contractAbi := getContractPrimitive(stateDB, contractAddress, contractAddress.Hex())
+    _, contractAbi := getContractPrimitive(stateDB, addr, contractAddress.Hex())
     if contractAbi == "" {
         log.Printf("Error: Failed to get contract primitive ABI")
         return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi")
@@ -757,7 +767,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     
     savePCToState(stateDB, addr, nextPC)
     
-    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, stateDB)
+    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, addr, stateDB)
     if err != nil {
         log.Printf("Error: Failed to prepare next step %d. Error: %v", nextPC.Int64(), err)
         return nil, remainingGas, err
@@ -953,7 +963,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
     
     savePCToState(stateDB, addr, currentPC)
 
-    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, stateDB)
+    contractMethodParams, err := prepareNextStep(nextStep, contractAddress, addr, stateDB)
     if err != nil {
         log.Printf("Error: Failed to prepare next step. Error: %v", err)
         return nil, remainingGas, err
@@ -1331,14 +1341,21 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	}
 
 	// Generate key to store the name under the contractAddress
-	contractAddressHash := common.BytesToHash([]byte(contractAddress.Hex()))
+	contractAddressHash := common.BytesToHash(contractAddress.Bytes())
 	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
 
 	// Store the retrieved name under contractAddress
 	setLargeState(stateDB, addr, fullKey, storedName)
 
-	log.Printf("Stored primitive mapping: Name=%s, ContractAddress=%s", string(storedName), contractAddress.Hex())
-
+    log.Printf(
+        "Stored primitive mapping: Name=%s, ContractAddress=%s, ContractAddressHash=%s, FullKey=%s, StorageAddr=%s",
+        string(storedName),
+        contractAddress.Hex(),
+        contractAddressHash.Hex(),
+        fullKey.Hex(),
+        addr.Hex(), // ← log the address you're storing into
+    )
+    
 	// No output is expected for this function, so return an empty byte array
 	return []byte{}, remainingGas, nil
 }
@@ -1378,6 +1395,14 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
     contractAddress := inputStruct.ContractAddress
     metadata := inputStruct.Metadata
 
+    // Store using ABI encoding (as an address)
+    if err := updateMemoryInState(stateDB, addr, metadata, contractAddress, "address"); err != nil {
+        log.Printf("Error: Failed to store permanent lookup entry for key %s. Error: %v", metadata, err)
+        return nil, remainingGas, fmt.Errorf("failed to permanent store lookup entry for key %s: %w", metadata, err)
+    }
+
+    log.Printf("Successfully stored permanent lookup entry: Key=%s, Address=%s", metadata, contractAddress.Hex())
+
     // Compute the metadata hash
     metadataHash := common.BytesToHash([]byte(metadata))
 
@@ -1406,6 +1431,21 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
     setLargeState(stateDB, addr, fullKey, metadataBytes)
 
     log.Printf("Stored primitive mapping address -> name: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
+
+    contractAddressHash := common.BytesToHash(contractAddress.Bytes())
+	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
+
+	// Store the retrieved name under contractAddress
+	setLargeState(stateDB, addr, fullKey, metadataBytes)
+
+    log.Printf(
+        "Stored primitive mapping: Name=%s, ContractAddress=%s, ContractAddressHash=%s, FullKey=%s, StorageAddr=%s",
+        string(metadataBytes),
+        contractAddress.Hex(),
+        contractAddressHash.Hex(),
+        fullKey.Hex(),
+        addr.Hex(), // ← log the address you're storing into
+    )
 
 
     // No output is expected for this function, so return an empty byte array
