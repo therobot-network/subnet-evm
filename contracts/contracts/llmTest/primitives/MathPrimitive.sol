@@ -1,71 +1,107 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.0;
 
-contract MathPrimitive {
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
+import {PrimitiveBase} from "./PrimitiveBase.sol";
+
+contract MathPrimitive is Initializable, PrimitiveBase {
+  error DivisionByZero();
+  error Overflow();
+
+  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
+
+  function initialize(address owner, string calldata name_, string calldata customRules_) external initializer {
+    __Primitive_init(owner, name_, customRules_);
+  }
+  // Add two numbers with overflow protection
   function add(uint256 a, uint256 b) public pure returns (uint256) {
-    return a + b;
+    (bool success, uint256 sum) = Math.tryAdd(a, b);
+    if (!success) revert Overflow();
+    return sum;
   }
 
+  // Subtract two numbers with underflow protection
   function subtract(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b <= a, "Math: subtraction underflow");
-    return a - b;
+    (bool success, uint256 difference) = Math.trySub(a, b);
+    if (!success) revert Overflow();
+    return difference;
   }
 
+  // Multiply two numbers with overflow protection
   function multiply(uint256 a, uint256 b) public pure returns (uint256) {
-    return a * b;
+    (bool success, uint256 product) = Math.tryMul(a, b);
+    if (!success) revert Overflow();
+    return product;
   }
 
+  // Divide two numbers with zero-division protection
   function divide(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b > 0, "Math: division by zero");
-    return a / b;
+    (bool success, uint256 quotient) = Math.tryDiv(a, b);
+    if (!success) revert DivisionByZero();
+    return quotient;
   }
 
+  // Divide two numbers with zero-division protection
   function mod(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b > 0, "Math: modulo by zero");
-    return a % b;
+    (bool success, uint256 result) = Math.tryMod(a, b);
+    if (!success) revert DivisionByZero();
+    return result;
   }
 
-  function max(uint256 a, uint256 b) public pure returns (uint256) {
-    return a >= b ? a : b;
-  }
-
-  function min(uint256 a, uint256 b) public pure returns (uint256) {
-    return a <= b ? a : b;
-  }
-
+  // check if number a is greater than number b
   function greaterThan(uint256 a, uint256 b) public pure returns (bool) {
     return a > b;
   }
 
-  function lessThan(uint256 a, uint256 b) public pure returns (bool) {
-    return a < b;
-  }
-
+  // check if number a is greater than or equal number b
   function greaterThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a >= b;
   }
 
+  // check if number a is less than number b
+  function lessThan(uint256 a, uint256 b) public pure returns (bool) {
+    return a < b;
+  }
+
+  // check if number a is less than or equal number b
   function lessThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a <= b;
   }
 
+  // check if number a equals number b
   function equal(uint256 a, uint256 b) public pure returns (bool) {
     return a == b;
   }
 
+  // check if number a is not equal number b
   function notEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a != b;
   }
 
-  function maxUint256Array(uint256[] memory arr) public pure returns (uint256) {
-    require(arr.length > 0, "Array must not be empty");
+  // Find the maximum of two numbers
+  function max(uint256 a, uint256 b) public pure returns (uint256) {
+    return Math.max(a, b);
+  }
 
-    uint256 maxVal = arr[0];
-    for (uint256 i = 1; i < arr.length; i++) {
-      if (arr[i] > maxVal) {
-        maxVal = arr[i];
-      }
-    }
-    return maxVal;
+  // Find the minimum of two numbers
+  function min(uint256 a, uint256 b) public pure returns (uint256) {
+    return Math.min(a, b);
+  }
+
+  // Divide two numbers and round up
+  function ceilDiv(uint256 a, uint256 b) public pure returns (uint256) {
+    return Math.ceilDiv(a, b);
+  }
+
+  // Compute the square root of a number
+  function sqrt(uint256 a) public pure returns (uint256) {
+    return Math.sqrt(a);
+  }
+
+  // Multiply two numbers and divide by a denominator with full precision
+  function mulDiv(uint256 x, uint256 y, uint256 denominator) public pure returns (uint256) {
+    return Math.mulDiv(x, y, denominator);
   }
 }

@@ -2,30 +2,34 @@
 
 pragma solidity ^0.8.20;
 
-// import {PrimitiveBase} from "./PrimitiveBase.sol";
+import {PrimitiveBase} from "./PrimitiveBase.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-//  is PrimitiveBase
-contract CounterPrimitive {
+contract CounterPrimitive is Initializable, PrimitiveBase {
   uint256 public counter;
 
-  constructor() {}
+  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
 
-  function increase(uint256 number) external returns (uint256) {
+  function initialize(address owner, string calldata name_, string calldata customRules_) external initializer {
+    __Primitive_init(owner, name_, customRules_);
+  }
+
+  function increase(uint256 number) external onlyProxy returns (uint256) {
     counter += number;
     return counter;
   }
 
-  function decrease(uint256 number) external returns (uint256) {
+  function decrease(uint256 number) external onlyProxy returns (uint256) {
     counter -= number;
     return counter;
   }
 
-  function reset() external returns (uint256) {
+  function reset() external onlyProxy returns (uint256) {
     counter = 0;
     return counter;
   }
 
-  function getCounter() external view returns (uint256) {
+  function getCounter() external view onlyProxy returns (uint256) {
     return counter;
   }
 }

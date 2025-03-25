@@ -2,35 +2,48 @@
 pragma solidity ^0.8.20;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SystemPrimitiveBase} from "./SystemPrimitiveBase.sol";
 
-contract PythonPrimitive {
+contract PythonPrimitive is SystemPrimitiveBase {
   error DivisionByZero();
   error Overflow();
   error ArrayCannotBeEmpty();
 
-  constructor() {}
+  constructor(address llmPrecompile) SystemPrimitiveBase(llmPrecompile, "PythonPrimitive") {}
 
+  // Add two numbers with overflow protection
   function add(uint256 a, uint256 b) public pure returns (uint256) {
-    return a + b;
+    (bool success, uint256 sum) = Math.tryAdd(a, b);
+    if (!success) revert Overflow();
+    return sum;
   }
 
+  // Subtract two numbers with underflow protection
   function subtract(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b <= a, "Math: subtraction underflow");
-    return a - b;
+    (bool success, uint256 difference) = Math.trySub(a, b);
+    if (!success) revert Overflow();
+    return difference;
   }
 
+  // Multiply two numbers with overflow protection
   function multiply(uint256 a, uint256 b) public pure returns (uint256) {
-    return a * b;
+    (bool success, uint256 product) = Math.tryMul(a, b);
+    if (!success) revert Overflow();
+    return product;
   }
 
+  // Divide two numbers with zero-division protection
   function divide(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b > 0, "Math: division by zero");
-    return a / b;
+    (bool success, uint256 quotient) = Math.tryDiv(a, b);
+    if (!success) revert DivisionByZero();
+    return quotient;
   }
 
+  // Divide two numbers with zero-division protection
   function mod(uint256 a, uint256 b) public pure returns (uint256) {
-    require(b > 0, "Math: modulo by zero");
-    return a % b;
+    (bool success, uint256 result) = Math.tryMod(a, b);
+    if (!success) revert DivisionByZero();
+    return result;
   }
 
   // Power function (equivalent to Python's pow)
@@ -56,6 +69,11 @@ contract PythonPrimitive {
   // check if number a is less than or equal number b
   function lessThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
     return a <= b;
+  }
+
+  // check if number a equals number b
+  function equal(uint256 a, uint256 b) public pure returns (bool) {
+    return a == b;
   }
 
   // check if number a is not equal number b
