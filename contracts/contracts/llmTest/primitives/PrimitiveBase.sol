@@ -2,12 +2,13 @@
 
 pragma solidity ^0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {ILLM} from "../../interfaces/ILLM.sol";
+// import {IExecutor} from "../interfaces/IExecutor.sol";
 
-abstract contract PrimitiveBase is Ownable, Initializable {
+abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   // llm precompile contract address for publishing new primitive
   // slither-disable-next-line naming-convention
   ILLM public immutable LLM_PRECOMPILE;
@@ -22,8 +23,11 @@ abstract contract PrimitiveBase is Ownable, Initializable {
   address private _proxy;
 
   // variables for defining custom primitives
-  string public name;
-  string public customRules;
+  string private _name;
+  string private _customRules;
+
+  // solhint-disable-next-line private-vars-leading-underscore
+  bytes32 internal constant EXECUTOR_SLOT = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
   error OnlyProxy();
 
@@ -37,14 +41,22 @@ abstract contract PrimitiveBase is Ownable, Initializable {
    * @param llmPrecompile LLM precompile address (TODO: hardcode address)
    * @param metadata ipfs hash
    */
-  constructor(address llmPrecompile, string memory metadata) Ownable() {
+  constructor(address llmPrecompile, string memory metadata) {
+    _initImplementation(msg.sender);
     LLM_PRECOMPILE = ILLM(llmPrecompile);
     _metadata = metadata;
 
     _IMPLEMENTATION_ADDRESS = address(this);
 
     // publish new primitive to llm
-    // LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, metadata);
+    LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, metadata);
+  }
+
+  /**
+   * @dev Initialize implementation contract.
+   */
+  function _initImplementation(address owner) private initializer {
+    __Ownable_init(owner);
   }
 
   /**
@@ -52,21 +64,21 @@ abstract contract PrimitiveBase is Ownable, Initializable {
    * for custom primitives and proxy address.
    * @param owner custom primitive owner address
    * @param name_ custom primitive name
-   * @param customRules_ custom primitive rules
+   * @param customRules custom primitive rules
    */
   // slither-disable-next-line naming-convention
   function __Primitive_init(
     // solhint-disable-previous-line
     address owner,
     string calldata name_,
-    string calldata customRules_
+    string calldata customRules
   ) internal initializer {
     if (address(this) == _IMPLEMENTATION_ADDRESS) revert OnlyProxy();
     _proxy = address(this);
-    _transferOwnership(owner);
+    __Ownable_init(owner);
 
-    name = name_;
-    customRules = customRules_;
+    _name = name_;
+    _customRules = customRules;
 
     _publishCustomPrimitive();
   }
@@ -95,7 +107,28 @@ abstract contract PrimitiveBase is Ownable, Initializable {
   /**
    * @dev Gets custom primitive name and rules.
    */
-  function getInfo() external view returns (string memory, string memory) {
-    return (name, customRules);
+  function getInfo() external view returns (string memory name, string memory customRules) {
+    return (_name, _customRules);
+  }
+
+  //   /**
+  //    * @dev Override openzeppelin's _msgSender function to get transaction signer address from the Executor
+  //    * contract if transaction is called by executor else use the msg sender address.
+  //    */
+  //   function _msgSender() internal view virtual override returns (address) {
+  //     // modifying msg sender (Temp fix)
+  //     address executor = _getExecutor();
+  //     return executor == msg.sender ? IExecutor(executor).getMsgSigner() : msg.sender;
+  //   }
+
+  /**
+   * @dev Returns the current implementation address.
+   */
+  function _getExecutor() internal view returns (address impl) {
+    // slither-disable-next-line assembly
+    assembly {
+      // solhint-disable-previous-line
+      impl := sload(EXECUTOR_SLOT)
+    }
   }
 }
