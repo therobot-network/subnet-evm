@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, accessibleState contract.AccessibleState, remainingGas uint64) (*big.Int, uint64, error) {
@@ -120,7 +121,8 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		
 		case "assignArray":	
 			outputKey := step.Output[0]
-			outputKeyHash := common.BytesToHash([]byte(outputKey))
+			keyHash := crypto.Keccak256Hash([]byte(outputKey)) // Key for this entry
+    		outputKeyHash := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), keyHash.Bytes()...))
 
 			// Clear existing value if present
 			if stateDB.GetState(llmAddr, outputKeyHash) != (common.Hash{}) {

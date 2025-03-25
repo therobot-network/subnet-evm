@@ -6,44 +6,66 @@ import { Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
-import { maxHeaderSize } from "http";
 // import { test } from "./utils";
 
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
-const user1Address = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
 const boolenTrueHash =
   "0x0000000000000000000000000000000000000000000000000000000000000001";
 
 describe("LLM Precompiled Contract", function () {
   let owner: Signer;
-  let user1: Signer;
+  // let user1: Signer;
   let llmContract: Contract;
   let testContract: Contract;
   let counterAContract: Contract;
+  let counterAContractAddress: String;
   let counterBContract: Contract;
-  let jiri: Contract;
+  let counterBContractAddress: String;
   let mathContract: Contract;
-  let eventContract: Contract;
+  let mathContractAddress: String;
   let ammContract1: Contract;
+  let ammContract1Address: string;
   let ammContract2: Contract;
+  let ammContract2Address: string;
   let ammContract3: Contract;
-  let usdc: Contract;
-  const counterAAddress = "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25";
-  const counterBAddress = "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e";
-  const jiriAddress = "0x5DB9A7629912EBF95876228C24A848de0bfB43A9";
-  const mathAddress = "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D";
-  const eventAddress = "0xA4cD3b0Eb6E5Ab5d8CE4065BcCD70040ADAB1F00";
-  const usdcAddress = "0xa4DfF80B4a1D748BF28BC4A271eD834689Ea3407";
-  const amm1Address = "0x95CA0a568236fC7413Cd2b794A7da24422c2BBb6";
-  const amm2Address = "0x789a5FDac2b37FCD290fb2924382297A6AE65860";
-  const amm3Address = "0xE3573540ab8A1C4c754Fd958Dc1db39BBE81b208";
-  const pythonPrimitiveAddress = "0xe336d36FacA76840407e6836d26119E1EcE0A2b4";
+  let ammContract3Address: string;
+  let usdcContract: Contract;
+  let usdcContractAddress: String;
+  let jiriContract: Contract;
+  let jiriContractAddress: String;
+
+  const erc20PrimitiveAddress = "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e";
+  const ammPrimitiveAddress = "0x5DB9A7629912EBF95876228C24A848de0bfB43A9";
+  const counterPrimitiveAddress = "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D";
+  const mathPrimitiveAddress = "0xA4cD3b0Eb6E5Ab5d8CE4065BcCD70040ADAB1F00";
+  const pythonPrimitiveAddress = "0xa4DfF80B4a1D748BF28BC4A271eD834689Ea3407";
 
   // Read the JSON file containing the plans
   const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
   const fileContent = fs.readFileSync(planPath, "utf8");
   const plans = JSON.parse(fileContent);
+
+  const abiCoder = new ethers.AbiCoder();
+
+  function generateFunctionCallData(methodName, argTypes = [], args = []) {
+    // Function signature and arguments
+    const functionSignature = `${methodName}(${argTypes.join(",")})`;
+
+    // Compute the function selector
+    const functionSelector = ethers.id(functionSignature).substring(0, 10);
+    if (!args.length) return functionSelector;
+
+    // Encode the data
+    const encodedData = abiCoder.encode(
+      argTypes, // Parameter types
+      args, // Arguments
+    );
+
+    // Combine function selector and encoded arguments
+    const data = functionSelector + encodedData.substring(2); // Remove the "0x" from encodedData
+    return data;
+  }
 
   async function continueEvaluationAndCall(
     testContract: any,
@@ -125,28 +147,33 @@ describe("LLM Precompiled Contract", function () {
     usdcAmount: string,
     jiriAmount: string,
   ) {
-    console.log(
-      `Approving USDC (${usdcAmount}) and JIRI (${jiriAmount}) for AMM: ${ammAddress}`,
-    );
+    // console.log(
+    //   `Approving USDC (${usdcAmount}) and JIRI (${jiriAmount}) for AMM: ${ammAddress}`,
+    // );
 
-    await usdc.approve(ammAddress, ethers.parseEther(usdcAmount));
-    await jiri.approve(ammAddress, ethers.parseEther(jiriAmount));
-
-    await pause(2000);
-    console.log(`Adding Liquidity: USDC=${usdcAmount}, JIRI=${jiriAmount}`);
-
-    await ammContract.addLiquidity(
-      usdcAddress,
+    let tx = await usdcContract.approve(
+      ammAddress,
       ethers.parseEther(usdcAmount),
-      jiriAddress,
+    );
+    await tx.wait();
+
+    tx = await jiriContract.approve(ammAddress, ethers.parseEther(jiriAmount));
+    await tx.wait();
+
+    // console.log(`Adding Liquidity: USDC=${usdcAmount}, JIRI=${jiriAmount}`);
+
+    tx = await ammContract.addLiquidity(
+      usdcContractAddress,
+      ethers.parseEther(usdcAmount),
+      jiriContractAddress,
       ethers.parseEther(jiriAmount),
     );
+    await tx.wait();
 
-    await pause();
-    console.log(`Activating AMM at ${ammAddress}`);
+    // console.log(`Activating AMM at ${ammAddress}`);
     await ammContract.activate();
 
-    console.log(`AMM ${ammAddress} setup complete.`);
+    // console.log(`AMM ${ammAddress} setup complete.`);
   }
 
   before(async function () {
@@ -190,179 +217,251 @@ describe("LLM Precompiled Contract", function () {
     testContract = (await ExampleLLM.deploy()) as unknown as Contract;
     await testContract.waitForDeployment();
 
-    const counterACode = await ethers.provider.getCode(counterAAddress);
-    // if (true) {
-    if (counterACode == "0x") {
-      const Counter = await ethers.getContractFactory(
-        "CounterPrimitive",
-        owner,
-      );
-      const ERC20 = await ethers.getContractFactory("ERC20Primitive", owner);
-      const Math = await ethers.getContractFactory("MathPrimitive", owner);
-      const Event = await ethers.getContractFactory("EventPrimitive", owner);
-      const Amm = await ethers.getContractFactory("AmmPrimitive", owner);
-      const PythonPrimitive = await ethers.getContractFactory(
-        "PythonPrimitive",
-        owner,
-      );
+    // May not need executor
+    const Executor = await ethers.getContractFactory("Executor");
+    const executor = await Executor.deploy(LLM_ADDRESS);
+    await executor.waitForDeployment();
 
-      counterAContract = (await Counter.deploy()) as unknown as Contract;
-      await counterAContract.waitForDeployment();
-      counterBContract = (await Counter.deploy()) as unknown as Contract;
-      await counterBContract.waitForDeployment();
-      jiri = (await ERC20.deploy()) as unknown as Contract;
-      await jiri.waitForDeployment();
-      mathContract = (await Math.deploy()) as unknown as Contract;
-      await mathContract.waitForDeployment();
-      eventContract = (await Event.deploy()) as unknown as Contract;
-      await eventContract.waitForDeployment();
-      usdc = (await ERC20.deploy()) as unknown as Contract;
-      await usdc.waitForDeployment();
-      const pythonPrimitive = await PythonPrimitive.deploy();
-      await pythonPrimitive.waitForDeployment();
-
-      // // Get balances of user1
-      // const jiriBalance = await jiri.balanceOf(user1Address);
-      // const usdcBalance = await usdc.balanceOf(user1Address);
-
-      // // Calculate 1/10th of their balances
-      // const jiriAmount = jiriBalance / 10n;
-      // const usdcAmount = usdcBalance / 10n;
-
-      // console.log(
-      //   `Transferring ${jiriAmount} JIRI and ${usdcAmount} USDC from User1 to Admin.`,
-      // );
-
-      // // Transfer to ADMIN_ADDRESS
-      // const txJiri = await jiri
-      //   .connect(user1)
-      //   .transfer(ADMIN_ADDRESS, jiriAmount);
-      // await txJiri.wait();
-
-      // const txUsdc = await usdc
-      //   .connect(user1)
-      //   .transfer(ADMIN_ADDRESS, usdcAmount);
-      // await txUsdc.wait();
-
-      // console.log(`Successfully transferred JIRI and USDC to Admin.`);
-
-      const counterAAddressChain = await counterAContract.getAddress();
-      const counterBAddressChain = await counterBContract.getAddress();
-      const jiriAddressChain = await jiri.getAddress();
-      const usdcAddressChain = await usdc.getAddress();
-      const mathAddressChain = await mathContract.getAddress();
-      const eventAddressChain = await eventContract.getAddress();
-      const pythonPrimitiveChain = await pythonPrimitive.getAddress();
-
-      ammContract1 = (await Amm.deploy(
-        usdcAddressChain,
-        jiriAddressChain,
-      )) as unknown as Contract;
-      await ammContract1.waitForDeployment();
-      ammContract2 = (await Amm.deploy(
-        usdcAddressChain,
-        jiriAddressChain,
-      )) as unknown as Contract;
-      await ammContract2.waitForDeployment();
-      ammContract3 = (await Amm.deploy(
-        usdcAddressChain,
-        jiriAddressChain,
-      )) as unknown as Contract;
-      await ammContract3.waitForDeployment();
-
-      const ammContract1Chain = await ammContract1.getAddress();
-      const ammContract2Chain = await ammContract2.getAddress();
-      const ammContract3Chain = await ammContract3.getAddress();
-
-      console.log("counterAAddress: ", counterAAddressChain);
-      console.log("counterBAddress: ", counterBAddressChain);
-      console.log("jiriAddressChain: ", jiriAddressChain);
-      console.log("usdcAddressChain: ", usdcAddressChain);
-      console.log("mathAddressChain: ", mathAddressChain);
-      console.log("eventAddressChain: ", eventAddressChain);
-      console.log("pythonPrimitiveChain: ", pythonPrimitiveChain);
-      console.log("ammContract1Chain: ", ammContract1Chain);
-      console.log("ammContract2Chain: ", ammContract2Chain);
-      console.log("ammContract3Chain: ", ammContract3Chain);
-
-      // await usdc.approve(ammContract1Chain, ethers.parseEther("100"));
-      // await jiri.approve(ammContract1Chain, ethers.parseEther("10"));
-      // await ammContract1.addLiquidity(
-      //   usdcAddressChain,
-      //   ethers.parseEther("100"),
-      //   jiriAddressChain,
-      //   ethers.parseEther("10"),
-      // );
-      // await ammContract1.activate();
-
-      // // let testResult = await ammContract1.price(jiriAddressChain);
-
-      // await usdc.approve(ammContract2Chain, ethers.parseEther("50"));
-      // await jiri.approve(ammContract2Chain, ethers.parseEther("50"));
-      // await ammContract2.addLiquidity(
-      //   usdcAddressChain,
-      //   ethers.parseEther("50"),
-      //   jiriAddressChain,
-      //   ethers.parseEther("50"),
-      // );
-      // await ammContract2.activate();
-
-      // await usdc.approve(ammContract3Chain, ethers.parseEther("10"));
-      // await jiri.approve(ammContract3Chain, ethers.parseEther("100"));
-      // await ammContract3.addLiquidity(
-      //   usdcAddressChain,
-      //   ethers.parseEther("10"),
-      //   jiriAddressChain,
-      //   ethers.parseEther("100"),
-      // );
-      // await ammContract3.activate();
-    } else {
-      counterAContract = (await ethers.getContractAt(
-        "CounterPrimitive",
-        counterAAddress,
-        owner,
-      )) as unknown as Contract;
-      counterBContract = (await ethers.getContractAt(
-        "CounterPrimitive",
-        counterBAddress,
-        owner,
-      )) as unknown as Contract;
-      jiri = (await ethers.getContractAt(
-        "ERC20Primitive",
-        jiriAddress,
-        owner,
-      )) as unknown as Contract;
-      usdc = (await ethers.getContractAt(
-        "ERC20Primitive",
-        usdcAddress,
-        owner,
-      )) as unknown as Contract;
-      mathContract = (await ethers.getContractAt(
-        "CounterPrimitive",
-        mathAddress,
-        owner,
-      )) as unknown as Contract;
-      eventContract = (await ethers.getContractAt(
-        "EventPrimitive",
-        eventAddress,
-        owner,
-      )) as unknown as Contract;
-      ammContract1 = (await ethers.getContractAt(
-        "AmmPrimitive",
-        amm1Address,
-        owner,
-      )) as unknown as Contract;
-      ammContract2 = (await ethers.getContractAt(
-        "AmmPrimitive",
-        amm2Address,
-        owner,
-      )) as unknown as Contract;
-      ammContract3 = (await ethers.getContractAt(
-        "AmmPrimitive",
-        amm3Address,
-        owner,
-      )) as unknown as Contract;
+    try {
+      const ERC20Primitive = await ethers.getContractFactory("ERC20Primitive");
+      const erc20Primitive = await ERC20Primitive.deploy(LLM_ADDRESS, "erc20");
+      await erc20Primitive.waitForDeployment();
+      const erc20PrimitiveAddr = await erc20Primitive.getAddress();
+      console.log("ERC20Primitive deployed at:", erc20PrimitiveAddr);
+    } catch (error) {
+      console.log("Did not deploy ERC20Primitive");
     }
+    try {
+      const AmmPrimitive = await ethers.getContractFactory("AmmPrimitive");
+      const ammPrimitive = await AmmPrimitive.deploy(LLM_ADDRESS, "amm");
+      await ammPrimitive.waitForDeployment();
+      const ammPrimitiveAddr = await ammPrimitive.getAddress();
+      console.log("AmmPrimitive deployed at:", ammPrimitiveAddr);
+    } catch (error) {
+      console.log("Did not deploy AmmPrimitive");
+    }
+    try {
+      const CounterPrimitive =
+        await ethers.getContractFactory("CounterPrimitive");
+      const counterPrimitive = await CounterPrimitive.deploy(
+        LLM_ADDRESS,
+        "counter",
+      );
+      await counterPrimitive.waitForDeployment();
+      const counterPrimitiveAddr = await counterPrimitive.getAddress();
+      console.log("CounterPrimitive deployed at:", counterPrimitiveAddr);
+    } catch (error) {
+      console.log("Did not deploy CounterPrimitive");
+    }
+    try {
+      const MathPrimitive = await ethers.getContractFactory("MathPrimitive");
+      const mathPrimitive = await MathPrimitive.deploy(LLM_ADDRESS, "math");
+      await mathPrimitive.waitForDeployment();
+      const mathPrimitiveAddr = await mathPrimitive.getAddress();
+      console.log("mathPrimitive deployed at:", mathPrimitiveAddr);
+    } catch (error) {
+      console.log("Did not deploy mathPrimitive");
+    }
+    try {
+      const PythonPrimitive =
+        await ethers.getContractFactory("PythonPrimitive");
+      const pythonPrimitive = await PythonPrimitive.deploy(LLM_ADDRESS);
+      await pythonPrimitive.waitForDeployment();
+      const pythonPrimitiveAddr = await pythonPrimitive.getAddress();
+      console.log("pythonPrimitive deployed at:", pythonPrimitiveAddr);
+    } catch (error) {
+      console.log("Did not deploy pythonPrimitive");
+    }
+
+    let initData = generateFunctionCallData(
+      "initialize",
+      ["address", "string", "string"],
+      [ADMIN_ADDRESS, "calculator", ""],
+    );
+
+    let tx = await executor.deployCustomPrimitive(
+      mathPrimitiveAddress,
+      initData,
+    );
+    let receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "calculator",
+        (cloneAddr) => {
+          mathContractAddress = cloneAddr;
+          return true;
+        },
+        mathPrimitiveAddress,
+      );
+
+    initData = generateFunctionCallData(
+      "initialize",
+      ["address", "string", "string"],
+      [ADMIN_ADDRESS, "xCounter", ""],
+    );
+    tx = await executor.deployCustomPrimitive(
+      counterPrimitiveAddress,
+      initData,
+    );
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "xCounter",
+        (cloneAddr) => {
+          counterAContractAddress = cloneAddr;
+          return true;
+        },
+        counterPrimitiveAddress,
+      );
+
+    counterAContract = await ethers.getContractAt(
+      "CounterPrimitive",
+      counterAContractAddress,
+      owner,
+    );
+
+    tx = await executor.deployCustomPrimitive(
+      counterPrimitiveAddress,
+      initData,
+    );
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "xCounter",
+        (cloneAddr) => {
+          counterBContractAddress = cloneAddr;
+          return true;
+        },
+        counterPrimitiveAddress,
+      );
+
+    counterBContract = await ethers.getContractAt(
+      "CounterPrimitive",
+      counterBContractAddress,
+      owner,
+    );
+
+    initData = generateFunctionCallData(
+      "initialize",
+      ["address", "string", "uint256", "string", "string"],
+      [ADMIN_ADDRESS, "USDC", ethers.parseEther("10000"), "USDC Token", ""],
+    );
+
+    tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "USDC Token",
+        (cloneAddr) => {
+          usdcContractAddress = cloneAddr;
+          return true;
+        },
+        erc20PrimitiveAddress,
+      );
+
+    usdcContract = await ethers.getContractAt(
+      "ERC20Primitive",
+      usdcContractAddress,
+      owner,
+    );
+
+    initData = generateFunctionCallData(
+      "initialize",
+      ["address", "string", "uint256", "string", "string"],
+      [ADMIN_ADDRESS, "JIRI", ethers.parseEther("10000"), "JIRI Token", ""],
+    );
+
+    tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "JIRI Token",
+        (cloneAddr) => {
+          jiriContractAddress = cloneAddr;
+          return true;
+        },
+        erc20PrimitiveAddress,
+      );
+
+    jiriContract = await ethers.getContractAt(
+      "ERC20Primitive",
+      jiriContractAddress,
+      owner,
+    );
+
+    initData = generateFunctionCallData(
+      "initialize",
+      ["address", "address", "address", "string", "string"],
+      [
+        ADMIN_ADDRESS,
+        usdcContractAddress,
+        jiriContractAddress,
+        "AMM USDC-JIRI",
+        "",
+      ],
+    );
+
+    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "AMM USDC-JIRI",
+        (cloneAddr) => {
+          ammContract1Address = cloneAddr;
+          return true;
+        },
+        ammPrimitiveAddress,
+      );
+
+    ammContract1 = await ethers.getContractAt(
+      "AmmPrimitive",
+      ammContract1Address,
+      owner,
+    );
+
+    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "AMM USDC-JIRI",
+        (cloneAddr) => {
+          ammContract2Address = cloneAddr;
+          return true;
+        },
+        ammPrimitiveAddress,
+      );
+
+    ammContract2 = await ethers.getContractAt(
+      "AmmPrimitive",
+      ammContract2Address,
+      owner,
+    );
+
+    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    receipt = await tx.wait();
+    await expect(receipt)
+      .to.emit(executor, "CustomPrimitiveDeployed")
+      .withArgs(
+        "AMM USDC-JIRI",
+        (cloneAddr) => {
+          ammContract3Address = cloneAddr;
+          return true;
+        },
+        ammPrimitiveAddress,
+      );
+
+    ammContract3 = await ethers.getContractAt(
+      "AmmPrimitive",
+      ammContract3Address,
+      owner,
+    );
   });
 
   it("Prompt: Transfer 5 #USDC to @user1", async function () {
@@ -371,8 +470,8 @@ describe("LLM Precompiled Contract", function () {
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
-    const adminBalanceStart = await jiri.balanceOf(ADMIN_ADDRESS);
-    const userBalanceStart = await jiri.balanceOf(user1Address);
+    const adminBalanceStart = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceStart = await usdcContract.balanceOf(user1Address);
 
     // should fail when prompt key is not passed
     let isFailed = false;
@@ -387,7 +486,7 @@ describe("LLM Precompiled Contract", function () {
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
-          USDC: jiriAddress,
+          USDC: usdcContractAddress,
           user1: user1Address,
           signer: ADMIN_ADDRESS,
         }),
@@ -456,8 +555,8 @@ describe("LLM Precompiled Contract", function () {
         },
       );
 
-    const adminBalanceEnd = await jiri.balanceOf(ADMIN_ADDRESS);
-    const userBalanceEnd = await jiri.balanceOf(user1Address);
+    const adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceEnd = await usdcContract.balanceOf(user1Address);
 
     const transferedAmount = ethers.parseUnits("5", 18);
 
@@ -470,17 +569,17 @@ describe("LLM Precompiled Contract", function () {
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
-    const adminBalanceStart = await jiri.balanceOf(ADMIN_ADDRESS);
-    const userBalanceStart = await jiri.balanceOf(user1Address);
+    const adminBalanceStart = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceStart = await usdcContract.balanceOf(user1Address);
 
     let tx = await testContract.evaluatePrompt(
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
-          USDC: jiriAddress,
+          USDC: usdcContractAddress,
           alice: user1Address,
           signer: ADMIN_ADDRESS,
-          calculator: mathAddress,
+          calculator: mathContractAddress,
         }),
       }),
     );
@@ -619,8 +718,8 @@ describe("LLM Precompiled Contract", function () {
           },
         );
 
-      const adminBalanceEnd = await jiri.balanceOf(ADMIN_ADDRESS);
-      const userBalanceEnd = await jiri.balanceOf(user1Address);
+      const adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
+      const userBalanceEnd = await usdcContract.balanceOf(user1Address);
 
       const transferedAmount = ethers.parseUnits("5", 18);
 
@@ -642,8 +741,8 @@ describe("LLM Precompiled Contract", function () {
           },
         );
 
-      const adminBalanceEnd = await jiri.balanceOf(ADMIN_ADDRESS);
-      const userBalanceEnd = await jiri.balanceOf(user1Address);
+      const adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
+      const userBalanceEnd = await usdcContract.balanceOf(user1Address);
 
       expect(adminBalanceEnd).to.equal(adminBalanceStart);
       expect(userBalanceEnd).to.equal(userBalanceStart);
@@ -654,13 +753,13 @@ describe("LLM Precompiled Contract", function () {
     const inputPrompt = `How much #USDC do I have?`;
     let promptIdRead: string;
 
-    const adminBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    const adminBalance = await usdcContract.balanceOf(ADMIN_ADDRESS);
 
     let tx = await testContract.evaluatePrompt(
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
-          USDC: jiriAddress,
+          USDC: usdcContractAddress,
           signer: ADMIN_ADDRESS,
         }),
       }),
@@ -748,7 +847,8 @@ describe("LLM Precompiled Contract", function () {
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["basic"]),
       lookupTable: JSON.stringify({
-        USDC: "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25",
+        CounterA: counterAContractAddress,
+        CounterB: counterBContractAddress,
         recipient: "0x000000000000000000000000000000000000dead",
       }),
     });
@@ -829,6 +929,10 @@ describe("LLM Precompiled Contract", function () {
     // Read the JSON file containing the plans
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["withLookup"]),
+      lookupTable: JSON.stringify({
+        CounterA: counterAContractAddress,
+        CounterB: counterBContractAddress,
+      }),
     });
 
     const countAStart = await counterAContract.getCounter();
@@ -933,12 +1037,14 @@ describe("LLM Precompiled Contract", function () {
     const withMathAndErc20Plan = JSON.stringify({
       plan: JSON.stringify(plans["withMathAndErc20"]),
       lookupTable: JSON.stringify({
+        USDC: usdcContractAddress,
+        signer: ADMIN_ADDRESS,
         user1: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       }),
     });
 
-    let adminBalanceStart = await jiri.balanceOf(ADMIN_ADDRESS);
-    let userBalanceStart = await jiri.balanceOf(
+    let adminBalanceStart = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    let userBalanceStart = await usdcContract.balanceOf(
       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     );
 
@@ -970,8 +1076,8 @@ describe("LLM Precompiled Contract", function () {
     });
     await result.wait();
 
-    let adminBalanceEnd = await jiri.balanceOf(ADMIN_ADDRESS);
-    let userBalanceEnd = await jiri.balanceOf(
+    let adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    let userBalanceEnd = await usdcContract.balanceOf(
       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     );
 
@@ -1014,8 +1120,8 @@ describe("LLM Precompiled Contract", function () {
         (contractMethodParams) => true,
       );
 
-    adminBalanceEnd = await jiri.balanceOf(ADMIN_ADDRESS);
-    userBalanceEnd = await jiri.balanceOf(
+    adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
+    userBalanceEnd = await usdcContract.balanceOf(
       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     );
 
@@ -1026,6 +1132,10 @@ describe("LLM Precompiled Contract", function () {
   it("should test evaluatePlan with assign system primitive", async function () {
     const withLookupPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAssign"]),
+      lookupTable: JSON.stringify({
+        CounterA: counterAContractAddress,
+        CounterB: counterBContractAddress,
+      }),
     });
 
     const countAStart = await counterAContract.getCounter();
@@ -1094,6 +1204,10 @@ describe("LLM Precompiled Contract", function () {
   it("should test evaluatePlan with assignArray system primitive", async function () {
     const withAssignArrayPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAssignArray"]),
+      lookupTable: JSON.stringify({
+        CounterA: counterAContractAddress,
+        CounterB: counterBContractAddress,
+      }),
     });
 
     let promptIdRead: string;
@@ -1243,6 +1357,10 @@ describe("LLM Precompiled Contract", function () {
   it("should test evaluatePlan with JumpIfNot system primitive", async function () {
     const withJumpIfNotPlan = JSON.stringify({
       plan: JSON.stringify(plans["withJumpIfNot"]),
+      lookupTable: JSON.stringify({
+        CounterA: counterAContractAddress,
+        CounterB: counterBContractAddress,
+      }),
     });
 
     let promptIdRead: string;
@@ -1344,13 +1462,13 @@ describe("LLM Precompiled Contract", function () {
   });
 
   it("should test evaluatePlan with answerUserQuestion system primitive", async function () {
-    const adminBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    const adminBalance = await usdcContract.balanceOf(ADMIN_ADDRESS);
 
     const withAnswerUserQuestionPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAnswerUserQuestion"]),
       lookupTable: JSON.stringify({
         signer: ADMIN_ADDRESS,
-        USDC: jiriAddress,
+        USDC: usdcContractAddress,
       }),
     });
 
@@ -1429,22 +1547,46 @@ describe("LLM Precompiled Contract", function () {
 
   it("should test evaluatePlan with AMM", async function () {
     let isActive = await ammContract1.isActive();
+    // const usdcOwned = ethers.formatEther(
+    //   await usdcContract.balanceOf(ADMIN_ADDRESS),
+    // );
+    // const jiriOwned = ethers.formatEther(
+    //   await usdcContract.balanceOf(ADMIN_ADDRESS),
+    // );
+    // console.log(`USDC Owned: ${usdcOwned}`);
+    // console.log(`JIRI Owned: ${jiriOwned}`);
+
     if (!isActive) {
-      await setupAmmLiquidity(ammContract1, amm1Address, "20000", "10000");
+      await setupAmmLiquidity(
+        ammContract1,
+        ammContract1Address,
+        "2000",
+        "1000",
+      );
     }
     isActive = await ammContract2.isActive();
     if (!isActive) {
-      await setupAmmLiquidity(ammContract2, amm2Address, "15000", "15000");
+      await setupAmmLiquidity(
+        ammContract2,
+        ammContract2Address,
+        "1500",
+        "1500",
+      );
     }
     isActive = await ammContract3.isActive();
     if (!isActive) {
-      await setupAmmLiquidity(ammContract3, amm3Address, "10000", "20000");
+      await setupAmmLiquidity(
+        ammContract3,
+        ammContract3Address,
+        "1000",
+        "2000",
+      );
     }
 
     const prices = [
-      await ammContract1.price(jiriAddress),
-      await ammContract2.price(jiriAddress),
-      await ammContract3.price(jiriAddress),
+      await ammContract1.price(jiriContractAddress),
+      await ammContract2.price(jiriContractAddress),
+      await ammContract3.price(jiriContractAddress),
     ];
 
     const lowestPrice = prices.reduce(
@@ -1456,11 +1598,11 @@ describe("LLM Precompiled Contract", function () {
       prices[0],
     );
 
-    console.log(`Lowest Price: ${lowestPrice}`);
-    console.log(`Highest Price: ${highestPrice}`);
+    // console.log(`Lowest Price: ${lowestPrice}`);
+    // console.log(`Highest Price: ${highestPrice}`);
 
-    const startJiriBalance = await jiri.balanceOf(ADMIN_ADDRESS);
-    const startUsdcBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    const startJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    const startUsdcBalance = await usdcContract.balanceOf(ADMIN_ADDRESS);
 
     const sellJiriAmount = startJiriBalance / 2n;
     const receivedUsdc = sellJiriAmount * highestPrice;
@@ -1476,13 +1618,12 @@ describe("LLM Precompiled Contract", function () {
     const withAMMPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAMM"]),
       lookupTable: JSON.stringify({
-        JIRI: jiriAddress,
-        USDC: usdcAddress,
-        AMM_1: amm1Address,
-        AMM_2: amm1Address,
-        AMM_3: amm1Address,
-        PythonPrimitive: pythonPrimitiveAddress,
-        calculator: mathAddress,
+        JIRI: jiriContractAddress,
+        USDC: usdcContractAddress,
+        AMM_1: ammContract1Address,
+        AMM_2: ammContract2Address,
+        AMM_3: ammContract3Address,
+        calculator: mathContractAddress,
         signer: ADMIN_ADDRESS,
       }),
     });
@@ -1619,8 +1760,8 @@ describe("LLM Precompiled Contract", function () {
         () => true,
       );
 
-    // const endJiriBalance = await jiri.balanceOf(ADMIN_ADDRESS);
-    // const endUsdcBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    // const endJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    // const endUsdcBalance = await usdcContract.balanceOf(ADMIN_ADDRESS);
     // expect(endJiriBalance).to.equal(endJiriBalanceExpected);
     // expect(endUsdcBalance).to.equal(endUsdcBalanceExpected);
 
@@ -1631,26 +1772,25 @@ describe("LLM Precompiled Contract", function () {
     // );
   });
 
-  it.only("Prompt: Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.", async function () {
+  it("Prompt: Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.", async function () {
     const inputPrompt =
       "Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.";
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
-    const adminBalanceStart = await jiri.balanceOf(ADMIN_ADDRESS);
-    const userBalanceStart = await jiri.balanceOf(user1Address);
+    const adminBalanceStart = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    const userBalanceStart = await jiriContract.balanceOf(user1Address);
 
     let tx = await testContract.evaluatePrompt(
       JSON.stringify({
         prompt: inputPrompt,
         lookupTable: JSON.stringify({
-          JIRI: jiriAddress,
-          USDC: usdcAddress,
-          AMM_1: amm1Address,
-          AMM_2: amm1Address,
-          AMM_3: amm1Address,
-          PythonPrimitive: pythonPrimitiveAddress,
-          calculator: mathAddress,
+          JIRI: jiriContractAddress,
+          USDC: usdcContractAddress,
+          AMM_1: ammContract1Address,
+          AMM_2: ammContract2Address,
+          AMM_3: ammContract3Address,
+          calculator: mathContractAddress,
           signer: ADMIN_ADDRESS,
         }),
       }),
@@ -1683,21 +1823,36 @@ describe("LLM Precompiled Contract", function () {
 
     let isActive = await ammContract1.isActive();
     if (!isActive) {
-      await setupAmmLiquidity(ammContract1, amm1Address, "20000", "10000");
+      await setupAmmLiquidity(
+        ammContract1,
+        ammContract1Address,
+        "20000",
+        "10000",
+      );
     }
     isActive = await ammContract2.isActive();
     if (!isActive) {
-      await setupAmmLiquidity(ammContract2, amm2Address, "15000", "15000");
+      await setupAmmLiquidity(
+        ammContract2,
+        ammContract2Address,
+        "15000",
+        "15000",
+      );
     }
     isActive = await ammContract3.isActive();
     if (!isActive) {
-      await setupAmmLiquidity(ammContract3, amm3Address, "10000", "20000");
+      await setupAmmLiquidity(
+        ammContract3,
+        ammContract3Address,
+        "10000",
+        "20000",
+      );
     }
 
     const prices = [
-      await ammContract1.price(jiriAddress),
-      await ammContract2.price(jiriAddress),
-      await ammContract3.price(jiriAddress),
+      await ammContract1.price(jiriContractAddress),
+      await ammContract2.price(jiriContractAddress),
+      await ammContract3.price(jiriContractAddress),
     ];
 
     const lowestPrice = prices.reduce(
@@ -1709,11 +1864,11 @@ describe("LLM Precompiled Contract", function () {
       prices[0],
     );
 
-    console.log(`Lowest Price: ${lowestPrice}`);
-    console.log(`Highest Price: ${highestPrice}`);
+    // console.log(`Lowest Price: ${lowestPrice}`);
+    // console.log(`Highest Price: ${highestPrice}`);
 
-    const startJiriBalance = await jiri.balanceOf(ADMIN_ADDRESS);
-    const startUsdcBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    const startJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    const startUsdcBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
 
     const sellJiriAmount = startJiriBalance / 2n;
     const receivedUsdc = sellJiriAmount * highestPrice;
@@ -1833,8 +1988,8 @@ describe("LLM Precompiled Contract", function () {
         () => true,
       );
 
-    // const endJiriBalance = await jiri.balanceOf(ADMIN_ADDRESS);
-    // const endUsdcBalance = await jiri.balanceOf(ADMIN_ADDRESS);
+    // const endJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    // const endUsdcBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
     // expect(endJiriBalance).to.equal(endJiriBalanceExpected);
     // expect(endUsdcBalance).to.equal(endUsdcBalanceExpected);
 
