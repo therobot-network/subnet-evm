@@ -43,7 +43,9 @@
   "withJumpIfNot": [
     {
       "Method": "reset",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": []
     },
     {
@@ -60,7 +62,9 @@
     },
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "10"
@@ -69,7 +73,9 @@
     },
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "20"
@@ -90,7 +96,9 @@
     },
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "30"
@@ -101,7 +109,9 @@
   "withAssign": [
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "10"
@@ -110,7 +120,9 @@
     },
     {
       "Method": "getCounter",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [],
       "Output": ["CountA"]
     },
@@ -127,7 +139,9 @@
     },
     {
       "Method": "increase",
-      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Contract": {
+        "Lookup": "CounterB"
+      },
       "Args": [
         {
           "Lookup": "CountANew"
@@ -138,7 +152,9 @@
   "withAssignArray": [
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "10"
@@ -147,19 +163,25 @@
     },
     {
       "Method": "getCounter",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [],
       "Output": ["CountA"]
     },
     {
       "Method": "getCounter",
-      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Contract": {
+        "Lookup": "CounterB"
+      },
       "Args": [],
       "Output": ["CountB"]
     },
     {
       "Method": "getCounter",
-      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Contract": {
+        "Lookup": "CounterB"
+      },
       "Args": [],
       "Output": ["CountBAgain"]
     },
@@ -184,8 +206,10 @@
           "Lookup": "CountArray"
         }
       ],
-      "Contract": { "Value": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D" },
-      "Method": "maxUint256Array",
+      "Contract": {
+        "Lookup": "PythonPrimitive"
+      },
+      "Method": "max",
       "Output": ["maxValue"]
     },
     {
@@ -208,7 +232,9 @@
   "withLookup": [
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "10"
@@ -217,12 +243,16 @@
     },
     {
       "Method": "getCounter",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [],
       "Output": ["CountA"]
     },
     {
-      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Contract": {
+        "Lookup": "CounterB"
+      },
       "Args": [
         {
           "Lookup": "CountA"
@@ -234,7 +264,9 @@
   "basic": [
     {
       "Method": "increase",
-      "Contract": { "Value": "0x17aB05351fC94a1a67Bf3f56DdbB941aE6c63E25" },
+      "Contract": {
+        "Lookup": "CounterA"
+      },
       "Args": [
         {
           "Value": "10"
@@ -242,7 +274,9 @@
       ]
     },
     {
-      "Contract": { "Value": "0x5aa01B3b5877255cE50cc55e8986a7a5fe29C70e" },
+      "Contract": {
+        "Lookup": "CounterB"
+      },
       "Args": [
         {
           "Value": "20"
@@ -254,7 +288,9 @@
   "withMathAndErc20": [
     {
       "Method": "transfer",
-      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
+      "Contract": {
+        "Lookup": "USDC"
+      },
       "Args": [
         {
           "Value": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
@@ -266,10 +302,12 @@
     },
     {
       "Method": "balanceOf",
-      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
+      "Contract": {
+        "Lookup": "USDC"
+      },
       "Args": [
         {
-          "value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+          "Lookup": "signer"
         }
       ],
       "Output": ["signerbalance"]
@@ -283,7 +321,9 @@
           "Value": "2"
         }
       ],
-      "Contract": { "Value": "0x4Ac1d98D9cEF99EC6546dEd4Bd550b0b287aaD6D" },
+      "Contract": {
+        "Lookup": "PythonPrimitive"
+      },
       "Method": "divide",
       "Output": ["half_balance"]
     },
@@ -296,7 +336,9 @@
           "Lookup": "half_balance"
         }
       ],
-      "Contract": { "Value": "0x5DB9A7629912EBF95876228C24A848de0bfB43A9" },
+      "Contract": {
+        "Lookup": "USDC"
+      },
       "Method": "transfer"
     }
   ],
