@@ -2,13 +2,12 @@
 
 pragma solidity ^0.8.20;
 
-// import {PrimitiveBase} from "./PrimitiveBase.sol";
+import {PrimitiveBase} from "./PrimitiveBase.sol";
 
-//  is PrimitiveBase
-contract EventPrimitive {
+contract EventPrimitive is PrimitiveBase {
   event uintArrayEvent(uint256[] uintArray);
 
-  constructor() {}
+  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
 
   function emitUintArrayEvent(uint256[] calldata uintArray) external {
     emit uintArrayEvent(uintArray);

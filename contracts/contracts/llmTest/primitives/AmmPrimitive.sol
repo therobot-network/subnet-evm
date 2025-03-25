@@ -2,9 +2,12 @@
 
 pragma solidity ^0.8.20;
 
+import {PrimitiveBase} from "./PrimitiveBase.sol";
+
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract AmmPrimitive {
+contract AmmPrimitive is Initializable, PrimitiveBase {
   bool public isActive;
 
   address private _token1;
@@ -46,8 +49,19 @@ contract AmmPrimitive {
     _;
   }
 
-  constructor(address token1Addr, address token2Addr) {
+  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
+
+  function initialize(
+    address owner,
+    address token1Addr,
+    address token2Addr,
+    string calldata name_,
+    string calldata customRules_
+  ) external initializer {
+    // set token pair
     _setTokens(token1Addr, token2Addr);
+
+    __Primitive_init(owner, name_, customRules_);
   }
 
   function _setTokens(address token1Addr, address token2Addr) private {
@@ -57,7 +71,7 @@ contract AmmPrimitive {
     _token2 = token2Addr;
   }
 
-  function setFee(uint256 newFee) external {
+  function setFee(uint256 newFee) external onlyOwner {
     if (newFee > 1000) revert FeeTooHigh(); // Max 10% (1000 bps)
     _fee = newFee;
     emit FeeSet(newFee);
@@ -67,14 +81,14 @@ contract AmmPrimitive {
     return _fee;
   }
 
-  function activate() external onlyWhenInactive {
+  function activate() external onlyOwner onlyWhenInactive {
     if (!(_areTokensSet())) revert TokensNotSet();
     if (_reserves1 == 0 || _reserves2 == 0) revert LiquidityNotAdded();
 
     isActive = true;
   }
 
-  function setTokens(address token1Addr, address token2Addr) public onlyWhenInactive {
+  function setTokens(address token1Addr, address token2Addr) public onlyOwner onlyWhenInactive {
     _setTokens(token1Addr, token2Addr);
     emit TokensSet(token1Addr, token2Addr);
   }
@@ -83,7 +97,7 @@ contract AmmPrimitive {
     if (!(_areTokensSet())) revert TokensNotSet();
     if (token1 == token2) revert InvalidToken();
 
-    address msgSender = msg.sender;
+    address msgSender = _msgSender();
 
     uint256 _amount1 = amount1;
     uint256 _amount2 = amount2;
@@ -139,25 +153,25 @@ contract AmmPrimitive {
 
   function removeLiquidity(uint256 amount) external {
     if (amount == 0) revert InvalidAmount();
-    address msgSender = msg.sender;
+    address msgSender = _msgSender();
     if (amount > liquidityShare[msgSender]) revert InsufficientLiquidityShare();
 
     // Compute token amounts using proper proportional scaling
-    uint256 token1Amount = (_reserves1 * amount) / totalLiquidityShares;
-    uint256 token2Amount = (_reserves2 * amount) / totalLiquidityShares;
+    uint256 tokenAmountFirst = (_reserves1 * amount) / totalLiquidityShares;
+    uint256 tokenAmountSecond = (_reserves2 * amount) / totalLiquidityShares;
 
     // Deduct liquidity shares
     liquidityShare[msgSender] -= amount;
     totalLiquidityShares -= amount;
 
     // Update reserves
-    _reserves1 -= token1Amount;
-    _reserves2 -= token2Amount;
+    _reserves1 -= tokenAmountFirst;
+    _reserves2 -= tokenAmountSecond;
 
-    emit LiquidityRemoved(msgSender, token1Amount, token2Amount);
+    emit LiquidityRemoved(msgSender, tokenAmountFirst, tokenAmountSecond);
 
-    _transferTokenOut(_token1, msgSender, token1Amount);
-    _transferTokenOut(_token2, msgSender, token2Amount);
+    _transferTokenOut(_token1, msgSender, tokenAmountFirst);
+    _transferTokenOut(_token2, msgSender, tokenAmountSecond);
   }
 
   function swap(address token, uint256 amountIn) external onlyWhenActive {

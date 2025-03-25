@@ -1,15 +1,53 @@
-//SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+pragma solidity ^0.8.20;
+
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-contract ERC20Primitive is ERC20 {
+import {PrimitiveBase} from "./PrimitiveBase.sol";
+
+contract ERC20Primitive is Initializable, PrimitiveBase, ERC20Upgradeable {
+  uint256 public constant MINT_AMOUNT = 100 * 1e18; // 10 tokens
+  uint256 public constant MINT_TIME_LIMIT = 3600; // 1 hour in seconds
+
+  mapping(address => uint256) private _requestLog;
+
   error EmptyInputString();
   error InvalidString(string reason);
+  error RequestAfterSometime(uint256 timestamp);
 
-  constructor() ERC20("Test Token", "TT") {
-    _mint(msg.sender, 100000 * 10 ** 18);
+  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
+
+  function initialize(
+    address owner,
+    string calldata symbol,
+    uint256 amount,
+    string calldata name_,
+    string calldata customRules_
+  ) external initializer {
+    __Primitive_init(owner, name_, customRules_);
+    __ERC20_init(name_, symbol);
+    _mint(owner, amount);
+  }
+
+  // users other than owner can mint only a max of 100 tokens in a request
+  // users can request only once per hour
+  function mint(uint256 amount) external onlyProxy {
+    address sender = _msgSender();
+    if (sender != owner()) {
+      // temp faucet for testnet
+      // slither-disable-next-line timestamp
+      if (block.timestamp < _requestLog[sender] + MINT_TIME_LIMIT) revert RequestAfterSometime(MINT_TIME_LIMIT);
+
+      _requestLog[sender] = block.timestamp;
+      // users can mint only a max of MINT_AMOUNT
+      amount = amount > MINT_AMOUNT ? MINT_AMOUNT : amount;
+    }
+
+    _mint(sender, amount);
   }
 
   // Converts an unsigned integer to a fixed-point string
@@ -73,4 +111,8 @@ contract ERC20Primitive is ERC20 {
 
     return (integerPart * factor) + decimalPart;
   }
+
+  // function _msgSender() internal view override(ContextUpgradeable, PrimitiveBase) returns (address) {
+  //   return PrimitiveBase._msgSender();
+  // }
 }
