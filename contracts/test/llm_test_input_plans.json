@@ -1211,5 +1211,134 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "toArray": [
+    {
+      "Args": [
+        {
+          "Value": "adam"
+        },
+        {
+          "Value": "100"
+        },
+        {
+          "Value": "bill"
+        },
+        {
+          "Value": "200"
+        }
+      ],
+      "Method": "assignDict",
+      "Output": ["dict_1"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "keys"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "toArray",
+      "Output": ["keysArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "keysArray is"
+        },
+        {
+          "Lookup": "keysArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "values"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "toArray",
+      "Output": ["valuesArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "valuesArray is"
+        },
+        {
+          "Lookup": "valuesArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "dict"
+        }
+      ],
+      "Contract": {
+        "Value": ""
+      },
+      "Method": "toArray",
+      "Output": ["dictArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "dictArray is"
+        },
+        {
+          "Lookup": "dictArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        }
+      ],
+      "Method": "forItems",
+      "Output": ["forItemsKeysArray", "forItemsValuesArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "forItemsKeysArray is"
+        },
+        {
+          "Lookup": "forItemsKeysArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "forItemsValuesArray is"
+        },
+        {
+          "Lookup": "forItemsValuesArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }

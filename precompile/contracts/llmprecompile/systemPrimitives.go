@@ -172,6 +172,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			log.Printf("Successfully updated memory in state for assignDict step under key: %s", step.Output[0])
+		
 		case "getDict":
 			if len(step.Args) < 2 {
 				log.Printf("Error: getDict expects 3 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
@@ -224,7 +225,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored getDict result under key: %s | Value: %v", step.Output[0], val)
+			log.Printf("Successfully stored getDict result under key: %s | Value: %v", step.Output[0], val)		
 		
 		case "setDict":
 			if len(step.Args) != 3 {
@@ -281,12 +282,98 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			log.Printf("Successfully updated dict under key: %s", dictKey)
-		
 
-		// todo:
-		// assignDict
-		// getDict
-		// readDict
+		case "toArray":
+			if len(step.Args) != 2 || len(step.Output) != 1 {
+				log.Printf("Error: toArray expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				return currentPC, remainingGas, fmt.Errorf("toArray requires 2 args and 1 output")
+			}
+		
+			// Arg 0: dict (lookup)
+			dictRaw, err := getLookupValue(step.Args[0], stateDB)
+			if err != nil {
+				log.Printf("Error fetching dict from lookup: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch dictionary: %w", err)
+			}
+		
+			dict, ok := dictRaw.(map[string]interface{})
+			if !ok {
+				return currentPC, remainingGas, fmt.Errorf("expected a dictionary (map[string]interface{}), got %T", dictRaw)
+			}
+		
+			// Arg 1: mode (value: "keys", "values", or "dict")
+			modeRaw, err := getLookupValue(step.Args[1], stateDB)
+			if err != nil {
+				log.Printf("Error fetching mode: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch mode: %w", err)
+			}
+		
+			modeStr := strings.ToLower(fmt.Sprintf("%v", modeRaw))
+			var outputArray []interface{}
+		
+			switch modeStr {
+			case "keys", "dict":
+				for k := range dict {
+					outputArray = append(outputArray, k)
+				}
+			case "values":
+				for _, v := range dict {
+					outputArray = append(outputArray, v)
+				}
+			default:
+				return currentPC, remainingGas, fmt.Errorf("invalid toArray mode: %s (expected 'keys', 'values', or 'dict')", modeStr)
+			}
+		
+			log.Printf("toArray (%s) result: %v", modeStr, outputArray)
+		
+			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], outputArray); err != nil {
+				log.Printf("Error storing toArray result: %v", err)
+				return currentPC, remainingGas, err
+			}
+		
+			log.Printf("Successfully stored toArray result to key: %s", step.Output[0])
+			
+		case "forItems":
+			if len(step.Args) != 1 || len(step.Output) != 2 {
+				log.Printf("Error: forItems expects 1 argument and 2 outputs, got %d args and %d outputs", len(step.Args), len(step.Output))
+				return currentPC, remainingGas, fmt.Errorf("forItems requires 1 arg (dict) and 2 outputs (keys, values)")
+			}
+		
+			// Fetch the dictionary from lookup
+			dictRaw, err := getLookupValue(step.Args[0], stateDB)
+			if err != nil {
+				log.Printf("Error fetching dictionary for forItems: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch dictionary: %w", err)
+			}
+		
+			dict, ok := dictRaw.(map[string]interface{})
+			if !ok {
+				return currentPC, remainingGas, fmt.Errorf("expected a map[string]interface{}, got %T", dictRaw)
+			}
+		
+			var keys []interface{}
+			var values []interface{}
+		
+			for k, v := range dict {
+				keys = append(keys, k)
+				values = append(values, v)
+			}
+		
+			log.Printf("forItems: keys=%v, values=%v", keys, values)
+		
+			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], keys); err != nil {
+				log.Printf("Error storing keys output in forItems: %v", err)
+				return currentPC, remainingGas, err
+			}
+		
+			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[1], values); err != nil {
+				log.Printf("Error storing values output in forItems: %v", err)
+				return currentPC, remainingGas, err
+			}
+		
+			log.Printf("Successfully stored forItems results under keys: %s, %s", step.Output[0], step.Output[1])
+		
+	
 	}    
     return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
 }
