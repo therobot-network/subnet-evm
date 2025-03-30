@@ -115,7 +115,7 @@ describe("LLM Precompiled Contract", function () {
     await testContract.waitForDeployment();
   });
 
-  it("should test dictionary system primitives", async function () {
+  it("should test dictionary creation system primitives", async function () {
     const dictionaryPlan = JSON.stringify({
       plan: JSON.stringify(plans["withAssignDict"]),
     });
@@ -153,5 +153,49 @@ describe("LLM Precompiled Contract", function () {
     expect(questionEvents[1].args.answer).to.equal("Default Value");
     expect(questionEvents[2].args.question).to.equal("Karen's new balance is");
     expect(questionEvents[2].args.answer).to.equal("300");
+  });
+
+  it("should test dictionary manipulation system primitives", async function () {
+    const dictionaryPlan = JSON.stringify({
+      plan: JSON.stringify(plans["toArray"]),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(dictionaryPlan);
+    const receipt = await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => contractMethodParams.length === 0,
+      );
+
+    const questionEvents = receipt.logs
+      .map((log) => {
+        try {
+          return llmContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter((log) => log?.name === "QuestionAnswer");
+
+    expect(questionEvents.length).to.equal(5);
+    expect(questionEvents[0].args.question).to.equal("keysArray is");
+    expect(questionEvents[0].args.answer).to.equal("[adam bill]");
+    expect(questionEvents[1].args.question).to.equal("valuesArray is");
+    expect(questionEvents[1].args.answer).to.equal("[100 200]");
+    expect(questionEvents[2].args.question).to.equal("dictArray is");
+    expect(questionEvents[2].args.answer).to.equal("[adam bill]");
+    expect(questionEvents[3].args.question).to.equal("forItemsKeysArray is");
+    expect(questionEvents[3].args.answer).to.equal("[adam bill]");
+    expect(questionEvents[4].args.question).to.equal("forItemsValuesArray is");
+    expect(questionEvents[4].args.answer).to.equal("[100 200]");
   });
 });
