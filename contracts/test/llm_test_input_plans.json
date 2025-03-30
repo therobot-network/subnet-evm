@@ -1080,5 +1080,136 @@
       "Output": ["call_result_27"],
       "Primitive": "unknown"
     }
+  ],
+  "withAssignDict": [
+    {
+      "Args": [
+        {
+          "Value": "100"
+        }
+      ],
+      "Method": "assign",
+      "Output": ["balance1"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "200"
+        }
+      ],
+      "Method": "assign",
+      "Output": ["balance2"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "adam"
+        },
+        {
+          "Lookup": "balance1"
+        },
+        {
+          "Value": "bill"
+        },
+        {
+          "Lookup": "balance2"
+        }
+      ],
+      "Method": "assignDict",
+      "Output": ["dict_1"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "adam"
+        },
+        {
+          "Value": "default"
+        }
+      ],
+      "Method": "getDict",
+      "Output": ["adam_balance"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "karen"
+        },
+        {
+          "Value": "Default Value"
+        }
+      ],
+      "Method": "getDict",
+      "Output": ["karen_balance"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "Adam's balance is"
+        },
+        {
+          "Lookup": "adam_balance"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "Karen's balance is"
+        },
+        {
+          "Lookup": "karen_balance"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "karen"
+        },
+        {
+          "Value": "300"
+        }
+      ],
+      "Method": "setDict",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "dict_1"
+        },
+        {
+          "Value": "karen"
+        },
+        {
+          "Value": "default"
+        }
+      ],
+      "Method": "getDict",
+      "Output": ["karen_balance"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "Karen's new balance is"
+        },
+        {
+          "Lookup": "karen_balance"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }

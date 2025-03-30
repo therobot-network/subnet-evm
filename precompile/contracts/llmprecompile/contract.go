@@ -571,7 +571,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
-    for contractAddress.Hex() == "" {
+    for contractAddress == (common.Address{}) || contractAddress == common.HexToAddress("0x0000000000000000000000000000000000000000") {
         currentPC, remainingGas, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
             log.Printf("Error: Failed to do system primitive step. Error: %v", err)
@@ -580,8 +580,12 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
         if currentPC.Int64() >= int64(len(inputSteps)) {
             log.Printf("Evaluation completed. No more steps to process.")
             savePCToState(stateDB, addr, currentPC)
-            output := ContinueEvaluationOutput{EvaluationDone: true}
-            packedOutput, err := PackContinueEvaluationOutput(output)
+            // Construct the output
+            output := EvaluatePlanOutput{
+                PromptId:             currentPromptId,
+                ContractMethodParams: []ILLMContractMethodParams{},
+            }
+            packedOutput, err := PackEvaluatePlanOutput(output)
             if err != nil {
                 log.Printf("Error: Failed to pack final output. Error: %v", err)
                 return nil, remainingGas, err
