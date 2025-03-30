@@ -236,4 +236,40 @@ describe("LLM Precompiled Contract", function () {
     expect(questionEvents[1].args.question).to.equal("array length is");
     expect(questionEvents[1].args.answer).to.equal("3");
   });
+
+  it("should test index system primitives", async function () {
+    const dictionaryPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withIndex"]),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(dictionaryPlan);
+    const receipt = await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => contractMethodParams.length === 0,
+      );
+
+    const questionEvents = receipt.logs
+      .map((log) => {
+        try {
+          return llmContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter((log) => log?.name === "QuestionAnswer");
+
+    expect(questionEvents.length).to.equal(1);
+    expect(questionEvents[0].args.question).to.equal("index 1 is");
+    expect(questionEvents[0].args.answer).to.equal("a");
+  });
 });

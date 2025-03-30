@@ -1,10 +1,12 @@
 package llmprecompile
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -290,19 +292,14 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				return currentPC, remainingGas, fmt.Errorf("toArray requires 2 args and 1 output")
 			}
 		
-			// Arg 0: dict (lookup)
-			dictRaw, err := getLookupValue(step.Args[0], stateDB)
+			// Arg 0: input data (usually a dict or list)
+			inputRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching dict from lookup: %v", err)
-				return currentPC, remainingGas, fmt.Errorf("failed to fetch dictionary: %w", err)
+				log.Printf("Error fetching input from lookup: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch input: %w", err)
 			}
 		
-			dict, ok := dictRaw.(map[string]interface{})
-			if !ok {
-				return currentPC, remainingGas, fmt.Errorf("expected a dictionary (map[string]interface{}), got %T", dictRaw)
-			}
-		
-			// Arg 1: mode (value: "keys", "values", or "dict")
+			// Arg 1: mode (e.g., "keys", "values", "dict", "list", "tuple")
 			modeRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
 				log.Printf("Error fetching mode: %v", err)
@@ -314,15 +311,41 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		
 			switch modeStr {
 			case "keys", "dict":
+				dict, ok := inputRaw.(map[string]interface{})
+				if !ok {
+					return currentPC, remainingGas, fmt.Errorf("expected a dictionary (map[string]interface{}) for mode '%s', got %T", modeStr, inputRaw)
+				}
 				for k := range dict {
 					outputArray = append(outputArray, k)
 				}
+		
 			case "values":
+				dict, ok := inputRaw.(map[string]interface{})
+				if !ok {
+					return currentPC, remainingGas, fmt.Errorf("expected a dictionary (map[string]interface{}) for mode 'values', got %T", inputRaw)
+				}
 				for _, v := range dict {
 					outputArray = append(outputArray, v)
 				}
+		
+			case "list", "tuple":
+				list, ok := inputRaw.([]interface{})
+				if !ok {
+					// Handle raw slices from JSON as reflect.Value
+					rv := reflect.ValueOf(inputRaw)
+					if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+						for i := 0; i < rv.Len(); i++ {
+							outputArray = append(outputArray, rv.Index(i).Interface())
+						}
+					} else {
+						return currentPC, remainingGas, fmt.Errorf("expected a list or array for mode '%s', got %T", modeStr, inputRaw)
+					}
+				} else {
+					outputArray = list
+				}
+		
 			default:
-				return currentPC, remainingGas, fmt.Errorf("invalid toArray mode: %s (expected 'keys', 'values', or 'dict')", modeStr)
+				return currentPC, remainingGas, fmt.Errorf("invalid toArray mode: %s (expected 'keys', 'values', 'dict', 'list', or 'tuple')", modeStr)
 			}
 		
 			log.Printf("toArray (%s) result: %v", modeStr, outputArray)
@@ -333,7 +356,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			log.Printf("Successfully stored toArray result to key: %s", step.Output[0])
-
+		
 		case "forItems":
 			if len(step.Args) != 1 || len(step.Output) != 2 {
 				log.Printf("Error: forItems expects 1 argument and 2 outputs, got %d args and %d outputs", len(step.Args), len(step.Output))
@@ -411,6 +434,82 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		
 			log.Printf("Successfully stored len result (%d) under key: %s", length, step.Output[0])
 		
+		case "index":
+			if len(step.Args) != 2 || len(step.Output) != 1 {
+				log.Printf("Error: index expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				return currentPC, remainingGas, fmt.Errorf("index requires 2 args and 1 output")
+			}
+		
+			// Arg 0: the array
+			arrayRaw, err := getLookupValue(step.Args[0], stateDB)
+			if err != nil {
+				log.Printf("Error fetching array for index: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch array: %w", err)
+			}
+		
+			// Arg 1: the index
+			indexRaw, err := getLookupValue(step.Args[1], stateDB)
+			if err != nil {
+				log.Printf("Error fetching index value: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch index: %w", err)
+			}
+		
+			// Convert array
+			array, ok := arrayRaw.([]interface{})
+			if !ok {
+				// attempt via reflect for raw slices
+				val := reflect.ValueOf(arrayRaw)
+				if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+					array = make([]interface{}, val.Len())
+					for i := 0; i < val.Len(); i++ {
+						array[i] = val.Index(i).Interface()
+					}
+				} else {
+					return currentPC, remainingGas, fmt.Errorf("expected array/slice, got %T", arrayRaw)
+				}
+			}
+		
+			// Convert index to int
+			var index int
+			switch v := indexRaw.(type) {
+			case float64:
+				index = int(v)
+			case string:
+				parsed, err := strconv.Atoi(v)
+				if err != nil {
+					return currentPC, remainingGas, fmt.Errorf("invalid string index: %s", v)
+				}
+				index = parsed
+			case int:
+				index = v
+			case int64:
+				index = int(v)
+			case json.Number:
+				parsed, err := v.Int64()
+				if err != nil {
+					return currentPC, remainingGas, fmt.Errorf("invalid json.Number index: %v", err)
+				}
+				index = int(parsed)
+			default:
+				return currentPC, remainingGas, fmt.Errorf("unsupported index type: %T", indexRaw)
+			}
+		
+			// Validate bounds
+			if index < 0 || index >= len(array) {
+				log.Printf("Error: index %d out of range for array of length %d", index, len(array))
+				return currentPC, remainingGas, fmt.Errorf("index out of bounds: %d", index)
+			}
+		
+			val := array[index]
+			log.Printf("index: array[%d] = %v", index, val)
+		
+			// Store result
+			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], val); err != nil {
+				log.Printf("Error storing index result: %v", err)
+				return currentPC, remainingGas, err
+			}
+		
+			log.Printf("Successfully stored index result at key: %s", step.Output[0])
 		
 	
 	}    

@@ -1415,5 +1415,45 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "withIndex": [
+    {
+      "Args": [
+        {
+          "value": "a"
+        },
+        {
+          "value": "b"
+        },
+        {
+          "value": "c"
+        }
+      ],
+      "Method": "assignArray",
+      "Output": ["abcArray"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "abcArray"
+        },
+        {
+          "value": "0"
+        }
+      ],
+      "Method": "index",
+      "Output": ["oneAbcArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "index 1 is"
+        },
+        {
+          "Lookup": "oneAbcArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }
