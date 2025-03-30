@@ -1340,5 +1340,80 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "withLen": [
+    {
+      "Args": [
+        {
+          "Value": "adam"
+        },
+        {
+          "Value": "100"
+        },
+        {
+          "Value": "bill"
+        },
+        {
+          "Value": "200"
+        }
+      ],
+      "Method": "assignDict",
+      "Output": ["adamDict"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "adamDict"
+        }
+      ],
+      "Method": "len",
+      "Output": ["lenAdamDict"]
+    },
+    {
+      "Args": [
+        {
+          "value": "a"
+        },
+        {
+          "value": "b"
+        },
+        {
+          "value": "c"
+        }
+      ],
+      "Method": "assignArray",
+      "Output": ["abcArray"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "abcArray"
+        }
+      ],
+      "Method": "len",
+      "Output": ["lenAbcArray"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "dictionary length is"
+        },
+        {
+          "Lookup": "lenAdamDict"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "array length is"
+        },
+        {
+          "Lookup": "lenAbcArray"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }

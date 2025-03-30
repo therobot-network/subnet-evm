@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"reflect"
 	"strings"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -332,7 +333,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			log.Printf("Successfully stored toArray result to key: %s", step.Output[0])
-			
+
 		case "forItems":
 			if len(step.Args) != 1 || len(step.Output) != 2 {
 				log.Printf("Error: forItems expects 1 argument and 2 outputs, got %d args and %d outputs", len(step.Args), len(step.Output))
@@ -372,6 +373,44 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		
 			log.Printf("Successfully stored forItems results under keys: %s, %s", step.Output[0], step.Output[1])
+
+		case "len":
+			if len(step.Args) != 1 || len(step.Output) != 1 {
+				log.Printf("Error: len expects 1 argument and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				return currentPC, remainingGas, fmt.Errorf("len requires 1 arg and 1 output")
+			}
+		
+			rawValue, err := getLookupValue(step.Args[0], stateDB)
+			if err != nil {
+				log.Printf("Error fetching value for len: %v", err)
+				return currentPC, remainingGas, fmt.Errorf("failed to fetch input for len: %w", err)
+			}
+		
+			var length int
+		
+			switch v := rawValue.(type) {
+			case []interface{}:
+				length = len(v)
+			case map[string]interface{}:
+				length = len(v)
+			default:
+				val := reflect.ValueOf(rawValue)
+				if val.Kind() == reflect.Slice || val.Kind() == reflect.Array || val.Kind() == reflect.Map {
+					length = val.Len()
+				} else {
+					return currentPC, remainingGas, fmt.Errorf("len only supports arrays and maps, got %T", rawValue)
+				}
+			}
+		
+			log.Printf("len: computed length = %d for input type %T", length, rawValue)
+		
+			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], length); err != nil {
+				log.Printf("Error storing length result in len: %v", err)
+				return currentPC, remainingGas, err
+			}
+		
+			log.Printf("Successfully stored len result (%d) under key: %s", length, step.Output[0])
+		
 		
 	
 	}    

@@ -198,4 +198,42 @@ describe("LLM Precompiled Contract", function () {
     expect(questionEvents[4].args.question).to.equal("forItemsValuesArray is");
     expect(questionEvents[4].args.answer).to.equal("[100 200]");
   });
+
+  it("should test length system primitives", async function () {
+    const dictionaryPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withLen"]),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(dictionaryPlan);
+    const receipt = await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => contractMethodParams.length === 0,
+      );
+
+    const questionEvents = receipt.logs
+      .map((log) => {
+        try {
+          return llmContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter((log) => log?.name === "QuestionAnswer");
+
+    expect(questionEvents.length).to.equal(2);
+    expect(questionEvents[0].args.question).to.equal("dictionary length is");
+    expect(questionEvents[0].args.answer).to.equal("2");
+    expect(questionEvents[1].args.question).to.equal("array length is");
+    expect(questionEvents[1].args.answer).to.equal("3");
+  });
 });
