@@ -1321,7 +1321,7 @@ var primitiveABI = map[string]string{
       "type": "function"
     }
   ]`,
-  "PythonPrimitive": ` [
+  "PythonPrimitive": `[
     {
       "inputs": [
         {
@@ -1506,6 +1506,30 @@ var primitiveABI = map[string]string{
           "type": "uint256"
         }
       ],
+      "name": "equal",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
+          "type": "uint256"
+        }
+      ],
       "name": "greaterThan",
       "outputs": [
         {
@@ -1635,17 +1659,12 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
-          "name": "a",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "b",
-          "type": "uint256"
+          "internalType": "uint256[]",
+          "name": "arr",
+          "type": "uint256[]"
         }
       ],
-      "name": "min2",
+      "name": "min",
       "outputs": [
         {
           "internalType": "uint256",
@@ -1659,12 +1678,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256[]",
-          "name": "arr",
-          "type": "uint256[]"
+          "internalType": "uint256",
+          "name": "a",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "b",
+          "type": "uint256"
         }
       ],
-      "name": "min",
+      "name": "min2",
       "outputs": [
         {
           "internalType": "uint256",
