@@ -421,8 +421,8 @@ func updatePlanLocalState(stateDB contract.StateDB, addr common.Address, key str
     log.Printf("Updated plan-local JSON | Key=%s | Value=%v", key, storageData)
 
     snapshot := string(updated)
-    if len(snapshot) > 1000 {
-        snapshot = snapshot[:1000] + "...[truncated]"
+    if len(snapshot) > 5000 {
+        snapshot = snapshot[:5000] + "...[truncated]"
     }
     log.Printf("Current plan-local state snapshot (capped): %s", snapshot)
 

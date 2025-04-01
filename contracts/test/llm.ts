@@ -347,7 +347,7 @@ describe("LLM Precompiled Contract", function () {
     initData = generateFunctionCallData(
       "initialize",
       ["address", "string", "uint256", "string", "string"],
-      [ADMIN_ADDRESS, "USDC", ethers.parseEther("10000"), "USDC Token", ""],
+      [ADMIN_ADDRESS, "USDC", ethers.parseEther("100000"), "USDC Token", ""],
     );
 
     tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
@@ -372,7 +372,7 @@ describe("LLM Precompiled Contract", function () {
     initData = generateFunctionCallData(
       "initialize",
       ["address", "string", "uint256", "string", "string"],
-      [ADMIN_ADDRESS, "JIRI", ethers.parseEther("10000"), "JIRI Token", ""],
+      [ADMIN_ADDRESS, "JIRI", ethers.parseEther("100000"), "JIRI Token", ""],
     );
 
     tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
@@ -1781,46 +1781,6 @@ describe("LLM Precompiled Contract", function () {
     const adminBalanceStart = await jiriContract.balanceOf(ADMIN_ADDRESS);
     const userBalanceStart = await jiriContract.balanceOf(user1Address);
 
-    let tx = await testContract.evaluatePrompt(
-      JSON.stringify({
-        prompt: inputPrompt,
-        lookupTable: JSON.stringify({
-          JIRI: jiriContractAddress,
-          USDC: usdcContractAddress,
-          AMM_1: ammContract1Address,
-          AMM_2: ammContract2Address,
-          AMM_3: ammContract3Address,
-          calculator: mathContractAddress,
-          signer: ADMIN_ADDRESS,
-        }),
-      }),
-      { gasLimit: 5000000, timeout: 60000 },
-    );
-
-    await tx.wait();
-    let methodData: string;
-    let calleeContractAddress: string;
-    await expect(tx)
-      .to.emit(testContract, "EvaluatePromptEvent")
-      .withArgs(
-        (promptId) => {
-          promptIdRead = promptId;
-          return true;
-        },
-        (contractMethodParams) => {
-          calleeContractAddress = contractMethodParams[0].contractAddress;
-          methodData = contractMethodParams[0].methodData;
-          return true;
-        },
-      );
-
-    // Read balance
-    // let result = await owner.sendTransaction({
-    let resultTx = await owner.call({
-      to: calleeContractAddress,
-      data: methodData,
-    });
-
     let isActive = await ammContract1.isActive();
     if (!isActive) {
       await setupAmmLiquidity(
@@ -1880,6 +1840,46 @@ describe("LLM Precompiled Contract", function () {
     const endJiriBalanceExpected =
       startJiriBalance - sellJiriAmount + boughtJiri;
     const endUsdcBalanceExpected = startUsdcBalance; // Assuming no fees
+
+    let tx = await testContract.evaluatePrompt(
+      JSON.stringify({
+        prompt: inputPrompt,
+        lookupTable: JSON.stringify({
+          JIRI: jiriContractAddress,
+          USDC: usdcContractAddress,
+          AMM_1: ammContract1Address,
+          AMM_2: ammContract2Address,
+          AMM_3: ammContract3Address,
+          calculator: mathContractAddress,
+          signer: ADMIN_ADDRESS,
+        }),
+      }),
+      { gasLimit: 5000000, timeout: 60000 },
+    );
+
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePromptEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    // Read balance
+    // let result = await owner.sendTransaction({
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
 
     resultTx = await continueEvaluationAndCall(
       testContract,
@@ -1988,8 +1988,16 @@ describe("LLM Precompiled Contract", function () {
         () => true,
       );
 
-    // const endJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
-    // const endUsdcBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    const endJiriBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    const endUsdcBalance = await jiriContract.balanceOf(ADMIN_ADDRESS);
+    console.log(
+      `Start JIRI Balance: ${ethers.formatEther(startJiriBalance)}`,
+      `Start USDC Balance: ${ethers.formatEther(startUsdcBalance)}`,
+    );
+    console.log(
+      `End JIRI Balance: ${ethers.formatEther(endJiriBalance)}`,
+      `End USDC Balance: ${ethers.formatEther(endUsdcBalance)}`,
+    );
     // expect(endJiriBalance).to.equal(endJiriBalanceExpected);
     // expect(endUsdcBalance).to.equal(endUsdcBalanceExpected);
 

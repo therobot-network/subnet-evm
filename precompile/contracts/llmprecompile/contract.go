@@ -27,11 +27,11 @@ const (
 	// You should set a gas cost for each function in your contract.
 	// Generally, you should not set gas costs very low as this may cause your network to be vulnerable to DoS attacks.
 	// There are some predefined gas costs in contract/utils.go that you can use.
-	ContinueEvaluationGasCost     uint64 = 1 /* SET A GAS COST HERE */
-	EvaluatePlanGasCost           uint64 = 1 /* SET A GAS COST HERE */
-	EvaluatePromptGasCost         uint64 = 1 /* SET A GAS COST HERE */
-	PublishCustomPrimitiveGasCost uint64 = 1 /* SET A GAS COST HERE */
-	PublishPrimitiveGasCost       uint64 = 1 /* SET A GAS COST HERE */
+	ContinueEvaluationGasCost     uint64 = 3000 /* SET A GAS COST HERE */
+	EvaluatePlanGasCost           uint64 = 4000 /* SET A GAS COST HERE */
+	EvaluatePromptGasCost         uint64 = 200000 /* SET A GAS COST HERE */
+	PublishCustomPrimitiveGasCost uint64 = 1000 /* SET A GAS COST HERE */
+	PublishPrimitiveGasCost       uint64 = 1500 /* SET A GAS COST HERE */
 )
 
 // CUSTOM CODE STARTS HERE
@@ -265,13 +265,13 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
         log.Printf("Error: Failed to retrieve steps from state. Error: %v", err)
         return nil, remainingGas, err
     }
-    log.Printf("Encoded steps retrieved from state: %s", string(encodedSteps))
+    // log.Printf("Encoded steps retrieved from state: %s", string(encodedSteps))
 
     // Decode the steps
     var steps []Step
     // Remove null bytes from the encoded steps
     sanitizedEncodedSteps := bytes.ReplaceAll(encodedSteps, []byte("\x00"), []byte{})
-    log.Printf("Sanitized steps: %s", string(sanitizedEncodedSteps))
+    // log.Printf("Sanitized steps: %s", string(sanitizedEncodedSteps))
     if err := json.Unmarshal(sanitizedEncodedSteps, &steps); err != nil {
         log.Printf("Error: Failed to decode steps from state. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to decode steps: %w", err)
@@ -297,7 +297,10 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
     // Process the current step
     currentStep := steps[currentPC.Int64()]
-    log.Printf("Processing step %d: Method=%s, Contract=%s", currentPC.Int64(), currentStep.Method, currentStep.Contract)
+    stepJson, _ := json.MarshalIndent(currentStep, "", "  ")
+    log.Printf("Processing step %d: Method=%s, Contract=%s\nFull Step:\n%s",
+	currentPC.Int64(), currentStep.Method, currentStep.Contract, string(stepJson))
+
 
     contractAddress, err := getContractAddress(currentStep.Contract, stateDB)
     if err != nil {
