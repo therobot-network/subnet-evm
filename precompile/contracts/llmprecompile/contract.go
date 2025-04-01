@@ -696,11 +696,19 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     // Initialize primitiveMapping as a map
     primitiveMapping := make(map[string]string)
 
+    var txLogsId string
+
     // Iterate over lookupTable
     for key, value := range lookupTable {
         strVal, ok := value.(string)
         if !ok {
             log.Printf("Warning: Lookup value for key '%s' is not a string, skipping: %+v", key, value)
+            continue
+        }
+        // Special case: pass through txLogsId directly
+        if key == "txLogsId" {
+            txLogsId = strVal
+            log.Printf("txLogsId: %s", strVal)
             continue
         }
         contract, _ := getContractPrimitive(stateDB, addr, strVal) // Check if value is a contract
@@ -713,7 +721,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 	requestPayload := map[string]interface{}{
 		"user_prompt": prompt,
         "primitives": primitiveMapping,
-        // "txId": ...
+        "txLogsId": txLogsId,
 	}
 
 	// Call the HTTP API.

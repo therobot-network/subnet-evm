@@ -466,7 +466,6 @@ describe("LLM Precompiled Contract", function () {
 
   it("Prompt: Transfer 5 #USDC to @user1", async function () {
     const inputPrompt = `transfer 5 #USDC to @user1`;
-    // const inputPrompt = `Please transfer half my #USDC to @j`;
     let promptIdRead: string;
     const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
@@ -489,6 +488,7 @@ describe("LLM Precompiled Contract", function () {
           USDC: usdcContractAddress,
           user1: user1Address,
           signer: ADMIN_ADDRESS,
+          txLogsId: "0b6d013d1a577c1f",
         }),
       }),
     );
