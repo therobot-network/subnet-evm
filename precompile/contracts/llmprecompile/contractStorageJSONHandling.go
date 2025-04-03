@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+
+	// "log"
 	"math/big"
 	"reflect"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -34,31 +37,31 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
     // Load the full lookup JSON object from state
     lookupData, err := getLargeState(stateDB, ContractAddress, lookupStorageKey)
     if err != nil {
-        log.Printf("Error retrieving lookup state: %v", err)
+        log.Info("Error retrieving lookup state: %v", err)
         return nil, fmt.Errorf("failed to retrieve lookup storage: %w", err)
     }
 
     // If nothing is stored, return nil
     if len(lookupData) == 0 {
-        log.Printf("Lookup state is empty for key: %s", arg.Lookup)
+        log.Info("Lookup state is empty for key: %s", arg.Lookup)
         return nil, nil
     }
 
     // Parse JSON into a generic map
     var lookupMap map[string]interface{}
     if err := json.Unmarshal(lookupData, &lookupMap); err != nil {
-        log.Printf("Error decoding lookup JSON: %v", err)
+        log.Info("Error decoding lookup JSON: %v", err)
         return nil, fmt.Errorf("failed to decode lookup JSON: %w", err)
     }
 
     // Extract the specific value
     val, exists := lookupMap[arg.Lookup]
     if !exists {
-        log.Printf("Lookup key not found: %s", arg.Lookup)
+        log.Info("Lookup key not found: %s", arg.Lookup)
         return nil, nil
     }
 
-    log.Printf("Found lookup value | Key=%s | Value=%+v", arg.Lookup, val)
+    log.Info("Found lookup value | Key=%s | Value=%+v", arg.Lookup, val)
     return val, nil
 }
 
@@ -256,7 +259,7 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
         // Step 1: Load value from state or direct value
         argValue, err := getLookupValue(arg, stateDB)
         if err != nil {
-            log.Printf("Failed fetching argument value: %v", err)
+            log.Info("Failed fetching argument value: %v", err)
             return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
         }
 
@@ -272,7 +275,7 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
             return nil, fmt.Errorf("failed to convert value for argument %d: %w", i, err)
         }
 
-        log.Printf("Processed Arg[%d]: RawValue=%v, ConvertedValue=%v, ExpectedType=%s", i, argValue, convertedValue, input.Type.String())
+        log.Info("Processed Arg[%d]: RawValue=%v, ConvertedValue=%v, ExpectedType=%s", i, argValue, convertedValue, input.Type.String())
         packedArgs[i] = convertedValue
     }
 
@@ -283,19 +286,19 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
     // Retrieve contract address using ABI decoding
     addrValue, err := getLookupValue(contract, stateDB)
     if err != nil {
-        log.Printf("Failed fetching contract address: %v", err)
+        log.Info("Failed fetching contract address: %v", err)
         return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
     }
 
     // If getLookupValue returns nil, return the zero address
     if addrValue == nil {
-        log.Printf("Lookup value is nil, returning zero address.")
+        log.Info("Lookup value is nil, returning zero address.")
         return common.Address{}, nil
     }
 
     // If the value is already a common.Address, return it
     if addr, ok := addrValue.(common.Address); ok {
-        log.Printf("Successfully retrieved contract address: %s", addr.Hex())
+        log.Info("Successfully retrieved contract address: %s", addr.Hex())
         return addr, nil
     }
 
@@ -303,14 +306,14 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
     if addrStr, ok := addrValue.(string); ok {
         if common.IsHexAddress(addrStr) {
             addr := common.HexToAddress(addrStr)
-            log.Printf("Successfully converted string to contract address: %s", addr.Hex())
+            log.Info("Successfully converted string to contract address: %s", addr.Hex())
             return addr, nil
         }
-        log.Printf("Error: Retrieved string is not a valid Ethereum address: %s", addrStr)
+        log.Info("Error: Retrieved string is not a valid Ethereum address: %s", addrStr)
         return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
     }
 
-    log.Printf("Error: Retrieved value is not a valid Ethereum address: %v", addrValue)
+    log.Info("Error: Retrieved value is not a valid Ethereum address: %v", addrValue)
     return common.Address{}, fmt.Errorf("invalid contract address type: %T", addrValue)
 }
 
@@ -345,14 +348,14 @@ func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
 
 // Temporary function. Later we will use a DB
 func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address string) (contract string, primitive string) {
-    log.Printf("Fetching contract primitive for address: %s", address)
+    log.Info("Fetching contract primitive for address: %s", address)
 
     // Compute the key for retrieving the contract address
     parsedAddress := common.HexToAddress(address)
     addressHash := common.BytesToHash(parsedAddress.Bytes())
     fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
 
-    log.Printf(
+    log.Info(
         "Attempting to fetch primitive: Address=%s, AddrForStorage=%s, addressHash=%s, fullKey=%s",
         address,
         addr.Hex(),
@@ -364,25 +367,25 @@ func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address
     // Retrieve the contract from storage
     contractBytes, err := getLargeState(stateDB, addr, fullKey)
     if err != nil {
-        log.Printf("Error retrieving contract from state: %v", err)
+        log.Info("Error retrieving contract from state: %v", err)
         return "", ""
     }
     if len(contractBytes) == 0 {
-        log.Printf("No contract found for address: %s", address)
+        log.Info("No contract found for address: %s", address)
         return "", "" // Return empty values instead of an error
     }
 
     contract = string(contractBytes)
-    log.Printf("Found contract: %s for address: %s", contract, address)
+    log.Info("Found contract: %s for address: %s", contract, address)
 
     // Retrieve the primitive associated with this contract
     primitive, exists := primitiveABI[contract]
     if !exists {
-        log.Printf("No primitive found for contract: %s", contract)
+        log.Info("No primitive found for contract: %s", contract)
         return contract, "" // Return contract but empty primitive
     }
 
-    log.Printf("Found primitive: %.150s for contract: %s", primitive, contract)
+    log.Info("Found primitive: %.150s for contract: %s", primitive, contract)
     return contract, primitive
 }
 
@@ -418,41 +421,41 @@ func updatePlanLocalState(stateDB contract.StateDB, addr common.Address, key str
 
     // Step 5: Store in state
     setLargeState(stateDB, addr, lookupStorageKey, updated)
-    log.Printf("Updated plan-local JSON | Key=%s | Value=%v", key, storageData)
+    log.Info("Updated plan-local JSON | Key=%s | Value=%v", key, storageData)
 
     snapshot := string(updated)
     if len(snapshot) > 5000 {
         snapshot = snapshot[:5000] + "...[truncated]"
     }
-    log.Printf("Current plan-local state snapshot (capped): %s", snapshot)
+    log.Info("Current plan-local state snapshot (capped): %s", snapshot)
 
     return nil
 }
 
 // deletePlanFromState removes all chunks of data stored under the given key in the state.
 func deletePlanFromState(stateDB contract.StateDB, addr common.Address, key common.Hash) {
-    log.Printf("Deleting plan from state with key: %s", key.Hex())
+    log.Info("Deleting plan from state with key: %s", key.Hex())
 
     for i := 0; ; i++ {
         chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
         chunk := stateDB.GetState(addr, chunkKey)
         if chunk == (common.Hash{}) {
             // Stop if no more chunks are found
-            log.Printf("No more chunks found after index %d. Deletion complete.", i)
+            log.Info("No more chunks found after index %d. Deletion complete.", i)
             break
         }
 
         // Clear the chunk by setting it to an empty hash
         stateDB.SetState(addr, chunkKey, common.Hash{})
-        log.Printf("Deleted chunk %d with key: %s", i, chunkKey.Hex())
+        log.Info("Deleted chunk %d with key: %s", i, chunkKey.Hex())
     }
 
-    log.Printf("All chunks under key %s have been deleted.", key.Hex())
+    log.Info("All chunks under key %s have been deleted.", key.Hex())
 }
 
 func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) (map[string]interface{}, error) {
     if lookupJsonString == "" {
-        log.Printf("No lookup entries")
+        log.Info("No lookup entries")
         return map[string]interface{}{}, nil
     }
 
@@ -465,11 +468,11 @@ func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJso
     // Step 2: Iterate and store each key/value pair
     for key, val := range lookupMap {
         if err := updatePlanLocalState(stateDB, addr, key, val); err != nil {
-            log.Printf("Error: Failed to store lookup entry for key %s. Error: %v", key, err)
+            log.Info("Error: Failed to store lookup entry for key %s. Error: %v", key, err)
             return nil, fmt.Errorf("failed to store lookup entry for key %s: %w", key, err)
         }
 
-        log.Printf("Successfully stored lookup entry: Key=%s, Value=%v", key, val)
+        log.Info("Successfully stored lookup entry: Key=%s, Value=%v", key, val)
     }
 
     return lookupMap, nil

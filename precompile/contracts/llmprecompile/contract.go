@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
+
 	"math/big"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
@@ -86,7 +88,7 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
     if err != nil {
         return nil, fmt.Errorf("failed to marshal request body: %w", err)
     }
-    log.Printf("Sending HTTP POST to %s with JSON body: %s", url, string(reqBytes))
+    log.Info("Sending HTTP POST to %s with JSON body: %s", url, string(reqBytes))
 
     client := &http.Client{
         Timeout: 60 * time.Second,
@@ -106,7 +108,7 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
 
     if resp.StatusCode != http.StatusOK {
         body, _ := ioutil.ReadAll(resp.Body)
-        log.Printf("Non-200 response: %d, body: %s", resp.StatusCode, body)
+        log.Info("Non-200 response: %d, body: %s", resp.StatusCode, body)
         return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
     }
 
@@ -115,7 +117,7 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
         return nil, fmt.Errorf("failed to read HTTP response: %w", err)
     }
 
-    log.Printf("respBytes: %s", respBytes)
+    log.Info("respBytes: %s", respBytes)
     return respBytes, nil
 }
 
@@ -190,11 +192,11 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 
 // Utility function to prepare the next step's contract call
 func prepareNextStep(step Step, contractAddress common.Address, addr common.Address, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
-    log.Printf("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
+    log.Info("Preparing next step: Method=%s, Contract=%s", step.Method, step.Contract)
 
     _,contractAbi := getContractPrimitive(stateDB, addr, contractAddress.Hex())
     if contractAbi == "" {
-        log.Printf("Error: Failed to get contract primitive ABI.")
+        log.Info("Error: Failed to get contract primitive ABI.")
         return nil, fmt.Errorf("failed to get contract primitive abi")
     }
 
@@ -202,34 +204,34 @@ func prepareNextStep(step Step, contractAddress common.Address, addr common.Addr
     // TODO: handle assignment/jump if primitives in go
     parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
     if err != nil {
-        log.Printf("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        log.Info("Error: Failed to parse ABI for step Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
         return nil, fmt.Errorf("failed to parse ABI: %w", err)
     }
-    log.Printf("Successfully parsed ABI for Method=%s, Contract=%s", step.Method, step.Contract)
+    log.Info("Successfully parsed ABI for Method=%s, Contract=%s", step.Method, step.Contract)
 
     // Retrieve the method
     method, exists := parsedABI.Methods[step.Method]
     if !exists {
-        log.Printf("Error: Method=%s not found in ABI for Contract=%s", step.Method, step.Contract)
+        log.Info("Error: Method=%s not found in ABI for Contract=%s", step.Method, step.Contract)
         return nil, fmt.Errorf("method %s not found in ABI", step.Method)
     }
-    log.Printf("Successfully retrieved method %s from ABI for Contract=%s", step.Method, step.Contract)
+    log.Info("Successfully retrieved method %s from ABI for Contract=%s", step.Method, step.Contract)
 
     // Process arguments
     packedArgs, err := ProcessArguments(method.Inputs, step.Args, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to process arguments for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        log.Info("Error: Failed to process arguments for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
         return nil, fmt.Errorf("failed to process arguments: %w", err)
     }
-    log.Printf("Successfully processed arguments for Method=%s. Packed Arguments: %+v", step.Method, packedArgs)
+    log.Info("Successfully processed arguments for Method=%s. Packed Arguments: %+v", step.Method, packedArgs)
 
     // Pack method data
     methodData, err := method.Inputs.Pack(packedArgs...)
     if err != nil {
-        log.Printf("Error: Failed to pack method data for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
+        log.Info("Error: Failed to pack method data for Method=%s, Contract=%s. Error: %v", step.Method, step.Contract, err)
         return nil, fmt.Errorf("failed to pack method data: %w", err)
     }
-    log.Printf("Successfully packed method data for Method=%s. Method Data (hex): %x", step.Method, methodData)
+    log.Info("Successfully packed method data for Method=%s. Method Data (hex): %x", step.Method, methodData)
 
     // Return the prepared contract method parameters
     contractParams := []ILLMContractMethodParams{
@@ -238,22 +240,22 @@ func prepareNextStep(step Step, contractAddress common.Address, addr common.Addr
             MethodData:      append(method.ID, methodData...),
         },
     }
-    log.Printf("Prepared contract method parameters for Method=%s, Contract=%s: %+v", step.Method, step.Contract, contractParams)
+    log.Info("Prepared contract method parameters for Method=%s, Contract=%s: %+v", step.Method, step.Contract, contractParams)
 
     return contractParams, nil
 }
 
 func continueEvaluation(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-    log.Printf("Starting continueEvaluation function. Caller: %s, Contract Address: %s", caller.Hex(), addr.Hex())
+    log.Info("Starting continueEvaluation function. Caller: %s, Contract Address: %s", caller.Hex(), addr.Hex())
 
     // Deduct gas
     if remainingGas, err = contract.DeductGas(suppliedGas, ContinueEvaluationGasCost); err != nil {
-        log.Printf("Error: Insufficient gas supplied. Error: %v", err)
+        log.Info("Error: Insufficient gas supplied. Error: %v", err)
         return nil, 0, err
     }
 
     if readOnly {
-        log.Printf("Error: Write protection violation. Function is not allowed in read-only mode.")
+        log.Info("Error: Write protection violation. Function is not allowed in read-only mode.")
         return nil, remainingGas, vmerrs.ErrWriteProtection
     }
 
@@ -262,75 +264,75 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     // Retrieve steps from state using getLargeState
     encodedSteps, err := getLargeState(stateDB, addr, stepsKey)
     if err != nil {
-        log.Printf("Error: Failed to retrieve steps from state. Error: %v", err)
+        log.Info("Error: Failed to retrieve steps from state. Error: %v", err)
         return nil, remainingGas, err
     }
-    // log.Printf("Encoded steps retrieved from state: %s", string(encodedSteps))
+    // log.Info("Encoded steps retrieved from state: %s", string(encodedSteps))
 
     // Decode the steps
     var steps []Step
     // Remove null bytes from the encoded steps
     sanitizedEncodedSteps := bytes.ReplaceAll(encodedSteps, []byte("\x00"), []byte{})
-    // log.Printf("Sanitized steps: %s", string(sanitizedEncodedSteps))
+    // log.Info("Sanitized steps: %s", string(sanitizedEncodedSteps))
     if err := json.Unmarshal(sanitizedEncodedSteps, &steps); err != nil {
-        log.Printf("Error: Failed to decode steps from state. Error: %v", err)
+        log.Info("Error: Failed to decode steps from state. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to decode steps: %w", err)
     }
-    log.Printf("Successfully decoded %d steps from state.", len(steps))
+    log.Info("Successfully decoded %d steps from state.", len(steps))
 
     // Retrieve the program counter
     currentPC, err := getPCFromState(stateDB, addr)
     if err != nil {
-        log.Printf("Error: Failed to retrieve the program counter. Error: %v", err)
+        log.Info("Error: Failed to retrieve the program counter. Error: %v", err)
         return nil, remainingGas, err
     }
-    log.Printf("Current program counter: %d", currentPC.Int64())
+    log.Info("Current program counter: %d", currentPC.Int64())
 
     // unpacking input values
     inputStruct, err := UnpackContinueEvaluationInput(input)
 
     if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        log.Info("Error: Failed to unpack input. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to unpack input: %w", err)
     }
-    log.Printf("Decoded input. Prompt ID: %d, ContractMethodResults count: %d", inputStruct.PromptId, len(inputStruct.ContractMethodResults))
+    log.Info("Decoded input. Prompt ID: %d, ContractMethodResults count: %d", inputStruct.PromptId, len(inputStruct.ContractMethodResults))
 
     // Process the current step
     currentStep := steps[currentPC.Int64()]
     stepJson, _ := json.MarshalIndent(currentStep, "", "  ")
-    log.Printf("Processing step %d: Method=%s, Contract=%s\nFull Step:\n%s",
+    log.Info("Processing step %d: Method=%s, Contract=%s\nFull Step:\n%s",
 	currentPC.Int64(), currentStep.Method, currentStep.Contract, string(stepJson))
 
 
     contractAddress, err := getContractAddress(currentStep.Contract, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        log.Info("Error: Failed to parse contract address. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
     _, contractAbi := getContractPrimitive(stateDB, addr, contractAddress.Hex())
     if contractAbi == "" {
-        log.Printf("Error: Failed to get contract primitive ABI")
+        log.Info("Error: Failed to get contract primitive ABI")
         return nil, remainingGas, fmt.Errorf("failed to get contract primitive abi")
     }
 
     parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
     if err != nil {
-        log.Printf("Error: Failed to parse ABI for step %d. Error: %v", currentPC.Int64(), err)
+        log.Info("Error: Failed to parse ABI for step %d. Error: %v", currentPC.Int64(), err)
         return nil, remainingGas, fmt.Errorf("failed to parse ABI: %w", err)
     }
-    log.Printf("Successfully parsed ABI for step %d.", currentPC.Int64())
+    log.Info("Successfully parsed ABI for step %d.", currentPC.Int64())
 
     decodedResults, err := parsedABI.Methods[currentStep.Method].Outputs.Unpack(inputStruct.ContractMethodResults[0])
     if err != nil {
-        log.Printf("Error: Failed to decode results for step %d. Error: %v", currentPC.Int64(), err)
+        log.Info("Error: Failed to decode results for step %d. Error: %v", currentPC.Int64(), err)
         return nil, remainingGas, fmt.Errorf("failed to decode results: %w", err)
     }
-    log.Printf("Decoded results for step %d: %+v", currentPC.Int64(), decodedResults)
+    log.Info("Decoded results for step %d: %+v", currentPC.Int64(), decodedResults)
 
     // Ensure output length matches decodedResults length
     if len(currentStep.Output) != len(decodedResults) {
-        log.Printf("Warning: Mismatch between Output length (%d) and decodedResults length (%d) for step %d",
+        log.Info("Warning: Mismatch between Output length (%d) and decodedResults length (%d) for step %d",
             len(currentStep.Output), len(decodedResults), currentPC.Int64())
     }
 
@@ -338,11 +340,11 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     // for i := 0; i < len(decodedResults) && i < len(currentStep.Output); i++ {
     //     storageKey := currentStep.Output[i]
     //     if err := updatePlanLocalState(stateDB, addr, storageKey, decodedResults[i]); err != nil {
-    //         log.Printf("Error: Failed to update memory in state for step %d, Output[%d]=%s. Error: %v",
+    //         log.Info("Error: Failed to update memory in state for step %d, Output[%d]=%s. Error: %v",
     //             currentPC.Int64(), i, storageKey, err)
     //         return nil, remainingGas, err
     //     }
-    //     log.Printf("Successfully updated memory in state for step %d, Output[%d]=%s.",
+    //     log.Info("Successfully updated memory in state for step %d, Output[%d]=%s.",
     //         currentPC.Int64(), i, storageKey)
     // }
 
@@ -358,71 +360,71 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
             // JSON encode everything else (e.g. *big.Int, address, arrays, etc.)
             jsonValue, err := json.Marshal(v)
             if err != nil {
-                log.Printf("Error: Failed to JSON-encode result for Output[%d]=%s: %v", i, storageKey, err)
+                log.Info("Error: Failed to JSON-encode result for Output[%d]=%s: %v", i, storageKey, err)
                 return nil, remainingGas, fmt.Errorf("failed to encode result to JSON: %w", err)
             }
             strValue = string(jsonValue)
         }
     
         if err := updatePlanLocalState(stateDB, addr, storageKey, strValue); err != nil {
-            log.Printf("Error: Failed to update memory in state for step %d, Output[%d]=%s. Error: %v",
+            log.Info("Error: Failed to update memory in state for step %d, Output[%d]=%s. Error: %v",
                 currentPC.Int64(), i, storageKey, err)
             return nil, remainingGas, err
         }
     
-        log.Printf("Stored Output[%d]=%s as JSON string: %s", i, storageKey, strValue)
+        log.Info("Stored Output[%d]=%s as JSON string: %s", i, storageKey, strValue)
     }
 
     // Increment the program counter
     nextPC := currentPC.Add(currentPC, big.NewInt(1))
-    log.Printf("Updated program counter to %d.", nextPC.Int64())
+    log.Info("Updated program counter to %d.", nextPC.Int64())
 
     // Check if evaluation is done
     if nextPC.Int64() >= int64(len(steps)) {
-        log.Printf("Evaluation completed. No more steps to process.")
+        log.Info("Evaluation completed. No more steps to process.")
         savePCToState(stateDB, addr, nextPC)
         output := ContinueEvaluationOutput{EvaluationDone: true}
         packedOutput, err := PackContinueEvaluationOutput(output)
         if err != nil {
-            log.Printf("Error: Failed to pack final output. Error: %v", err)
+            log.Info("Error: Failed to pack final output. Error: %v", err)
             return nil, remainingGas, err
         }
-        log.Printf("Successfully packed final output. Returning.")
+        log.Info("Successfully packed final output. Returning.")
         return packedOutput, remainingGas, nil
     }
 
     // Prepare the next step
     nextStep := steps[nextPC.Int64()]
-    log.Printf("Preparing next step %d: Method=%s, Contract=%s", nextPC.Int64(), nextStep.Method, nextStep.Contract)
+    log.Info("Preparing next step %d: Method=%s, Contract=%s", nextPC.Int64(), nextStep.Method, nextStep.Contract)
 
     contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        log.Info("Error: Failed to parse contract address. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
     for contractAddress == (common.Address{}) {
         nextPC, remainingGas, err = systemPrimitiveStep(nextPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
-            log.Printf("Error: Failed to do system primitive step. Error: %v", err)
+            log.Info("Error: Failed to do system primitive step. Error: %v", err)
             return nil, remainingGas, err
         }
         if nextPC.Int64() >= int64(len(steps)) {
-            log.Printf("Evaluation completed. No more steps to process.")
+            log.Info("Evaluation completed. No more steps to process.")
             savePCToState(stateDB, addr, nextPC)
             output := ContinueEvaluationOutput{EvaluationDone: true}
             packedOutput, err := PackContinueEvaluationOutput(output)
             if err != nil {
-                log.Printf("Error: Failed to pack final output. Error: %v", err)
+                log.Info("Error: Failed to pack final output. Error: %v", err)
                 return nil, remainingGas, err
             }
-            log.Printf("Successfully packed final output. Returning.")
+            log.Info("Successfully packed final output. Returning.")
             return packedOutput, remainingGas, nil
         }
         nextStep = steps[nextPC.Int64()]
         contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
         if err != nil {
-            log.Printf("Error: Failed to parse contract address. Error: %v", err)
+            log.Info("Error: Failed to parse contract address. Error: %v", err)
             return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
         }
     }
@@ -431,10 +433,10 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
     
     contractMethodParams, err := prepareNextStep(nextStep, contractAddress, addr, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to prepare next step %d. Error: %v", nextPC.Int64(), err)
+        log.Info("Error: Failed to prepare next step %d. Error: %v", nextPC.Int64(), err)
         return nil, remainingGas, err
     }
-    log.Printf("Successfully prepared contract method params for next step %d.", nextPC.Int64())
+    log.Info("Successfully prepared contract method params for next step %d.", nextPC.Int64())
 
     // Pack the output for the next step
     output := ContinueEvaluationOutput{
@@ -444,11 +446,11 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
     packedOutput, err := PackContinueEvaluationOutput(output)
     if err != nil {
-        log.Printf("Error: Failed to pack output for next step %d. Error: %v", nextPC.Int64(), err)
+        log.Info("Error: Failed to pack output for next step %d. Error: %v", nextPC.Int64(), err)
         return nil, remainingGas, err
     }
 
-    log.Printf("Successfully packed output for next step %d. Returning.", nextPC.Int64())
+    log.Info("Successfully packed output for next step %d. Returning.", nextPC.Int64())
     return packedOutput, remainingGas, nil
 }
 
@@ -537,19 +539,19 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 
     // Increment and log the prompt counter
     currentPromptId := IncrementPromptCounter(stateDB)
-    log.Printf("Current Prompt ID: %v", currentPromptId)
+    log.Info("Current Prompt ID: %v", currentPromptId)
 
     // Encode the steps for storage
     encodedSteps, err := json.Marshal(inputSteps)
     if err != nil {
-        log.Printf("Error: Failed to encode steps: %v", err)
+        log.Info("Error: Failed to encode steps: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to encode steps: %w", err)
     }
-    log.Printf("Encoded steps before storing: %s", string(encodedSteps))
+    log.Info("Encoded steps before storing: %s", string(encodedSteps))
 
     sanitizedSteps, err := sanitizeSteps(encodedSteps)
     if err != nil {
-        log.Printf("Error: Failed to sanitize steps before storage. Error: %v", err)
+        log.Info("Error: Failed to sanitize steps before storage. Error: %v", err)
         return nil, remainingGas, err
     }
 
@@ -558,30 +560,30 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 
     // Store the encoded steps using setLargeState
     setLargeState(stateDB, addr, stepsKey, sanitizedSteps)
-    log.Printf("Steps stored successfully in state.")
+    log.Info("Steps stored successfully in state.")
 
     // Initialize the program counter to 0
     currentPC := big.NewInt(0)
-    log.Printf("Initialized program counter to: %v", currentPC)
+    log.Info("Initialized program counter to: %v", currentPC)
 
     // Prepare the first step
     nextStep := inputSteps[0]
-    log.Printf("Current step: %+v", nextStep)
+    log.Info("Current step: %+v", nextStep)
 
     contractAddress, err := getContractAddress(nextStep.Contract, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to parse contract address. Error: %v", err)
+        log.Info("Error: Failed to parse contract address. Error: %v", err)
         return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
     }
 
     for contractAddress == (common.Address{}) || contractAddress == common.HexToAddress("0x0000000000000000000000000000000000000000") {
         currentPC, remainingGas, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB, accessibleState, remainingGas)
         if err != nil {
-            log.Printf("Error: Failed to do system primitive step. Error: %v", err)
+            log.Info("Error: Failed to do system primitive step. Error: %v", err)
             return nil, remainingGas, err
         }
         if currentPC.Int64() >= int64(len(inputSteps)) {
-            log.Printf("Evaluation completed. No more steps to process.")
+            log.Info("Evaluation completed. No more steps to process.")
             savePCToState(stateDB, addr, currentPC)
             // Construct the output
             output := EvaluatePlanOutput{
@@ -590,16 +592,16 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
             }
             packedOutput, err := PackEvaluatePlanOutput(output)
             if err != nil {
-                log.Printf("Error: Failed to pack final output. Error: %v", err)
+                log.Info("Error: Failed to pack final output. Error: %v", err)
                 return nil, remainingGas, err
             }
-            log.Printf("Successfully packed final output. Returning.")
+            log.Info("Successfully packed final output. Returning.")
             return packedOutput, remainingGas, nil
         }
         nextStep = inputSteps[currentPC.Int64()]
         contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
         if err != nil {
-            log.Printf("Error: Failed to parse contract address. Error: %v", err)
+            log.Info("Error: Failed to parse contract address. Error: %v", err)
             return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
         }
     }
@@ -608,10 +610,10 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 
     contractMethodParams, err := prepareNextStep(nextStep, contractAddress, addr, stateDB)
     if err != nil {
-        log.Printf("Error: Failed to prepare next step. Error: %v", err)
+        log.Info("Error: Failed to prepare next step. Error: %v", err)
         return nil, remainingGas, err
     }
-    log.Printf("Contract Method Params: %+v", contractMethodParams)
+    log.Info("Contract Method Params: %+v", contractMethodParams)
 
     // Construct the output
     output := EvaluatePlanOutput{
@@ -622,11 +624,11 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
     // Pack the output for the next step
     packedOutput, err := PackEvaluatePlanOutput(output)
     if err != nil {
-        log.Printf("Error: Failed to pack output. Error: %v", err)
+        log.Info("Error: Failed to pack output. Error: %v", err)
         return nil, remainingGas, err
     }
 
-    log.Printf("evaluation completed successfully.")
+    log.Info("evaluation completed successfully.")
     return packedOutput, remainingGas, nil
 }
 
@@ -639,28 +641,28 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
     // Unpack the input to retrieve the string argument
     plan, lookupTable, err := UnpackEvaluatePlanInput(input)
     if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        log.Info("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
 
-    log.Printf("Plan: %s", plan)
-    log.Printf("LookupTable: %s", lookupTable)
+    log.Info("Plan: %s", plan)
+    log.Info("LookupTable: %s", lookupTable)
 
     stateDB := accessibleState.GetStateDB()
     // Store the lookup entries.
 	_, err = storeLookupEntries(stateDB, addr, lookupTable)
 	if err != nil {
-		log.Fatalf("Error storing lookup entries: %v", err)
-        return nil, suppliedGas, fmt.Errorf("Error storing lookup entries: %w", err)
+		log.Info("Error storing lookup entries: %v", err)
+        return nil, suppliedGas, fmt.Errorf("error storing lookup entries: %w", err)
 	}
     
     // Parse input into steps
     var inputSteps []Step
     if err := json.Unmarshal([]byte(plan), &inputSteps); err != nil {
-        log.Printf("Error: Failed to parse input string as steps. Error: %v", err)
+        log.Info("Error: Failed to parse input string as steps. Error: %v", err)
         return nil, suppliedGas, fmt.Errorf("invalid input format: %w", err)
     }
-    log.Printf("Parsed %d steps from input string.", len(inputSteps))
+    log.Info("Parsed %d steps from input string.", len(inputSteps))
 
     if len(inputSteps) == 0 {
         return nil, suppliedGas, fmt.Errorf("evaluatePlan: input steps are empty")
@@ -678,18 +680,18 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     // Unpack the input to retrieve the string argument
     prompt, lookupTableString, err := UnpackEvaluatePromptInput(input)
     if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        log.Info("Error: Failed to unpack input. Error: %v", err)
         return nil, suppliedGas, err
     }
-    log.Printf("Input string: %s", prompt)
-    log.Printf("LookupTable: %s", lookupTableString)
+    log.Info("Input string: %s", prompt)
+    log.Info("LookupTable: %s", lookupTableString)
 
     stateDB := accessibleState.GetStateDB()
 
 	// Store the lookup entries.
 	lookupTable , err := storeLookupEntries(stateDB, addr, lookupTableString)
 	if err != nil {
-		log.Printf("Error storing lookup entries: %v", err)
+		log.Info("Error storing lookup entries: %v", err)
 		return nil, suppliedGas, err
 	}
 
@@ -702,13 +704,13 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     for key, value := range lookupTable {
         strVal, ok := value.(string)
         if !ok {
-            log.Printf("Warning: Lookup value for key '%s' is not a string, skipping: %+v", key, value)
+            log.Info("Warning: Lookup value for key '%s' is not a string, skipping: %+v", key, value)
             continue
         }
         // Special case: pass through txLogsId directly
         if key == "txLogsId" {
             txLogsId = strVal
-            log.Printf("txLogsId: %s", strVal)
+            log.Info("txLogsId: %s", strVal)
             continue
         }
         contract, _ := getContractPrimitive(stateDB, addr, strVal) // Check if value is a contract
@@ -722,6 +724,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		"user_prompt": prompt,
         "primitives": primitiveMapping,
         "txLogsId": txLogsId,
+        "localModel":false,
 	}
 
 	// Call the HTTP API.
@@ -729,15 +732,14 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
     if err != nil {
         return nil, suppliedGas, fmt.Errorf("HTTP API call failed: %w", err)
     }
-
-    log.Printf("API returned result: %s\n", respBytes)
+    log.Info("API returned result: %s\n", respBytes)
 
     var inputSteps []Step
     if err := json.Unmarshal(respBytes, &inputSteps); err != nil {
-        log.Printf("Error: Failed to parse response string as steps. Error: %v", err)
+        log.Info("Error: Failed to parse response string as steps. Error: %v", err)
         return nil, suppliedGas, fmt.Errorf("invalid response format: %w", err)
     }
-    log.Printf("Parsed %d steps from input string.", len(inputSteps))
+    log.Info("Parsed %d steps from input string.", len(inputSteps))
 
     // Use pre-defined steps for evaluatePrompt
     if len(inputSteps) == 0 {
@@ -809,7 +811,7 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	// Unpack input values
 	inputStruct, err := UnpackPublishCustomPrimitiveInput(input)
 	if err != nil {
-		log.Printf("Error: Failed to unpack input. Error: %v", err)
+		log.Info("Error: Failed to unpack input. Error: %v", err)
 		return nil, remainingGas, err
 	}
 
@@ -825,12 +827,12 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	// Retrieve name from storage using the primitive address
 	storedName, err := getLargeState(stateDB, addr, fullKey)
 	if err != nil {
-		log.Printf("Error retrieving primitive name from state: %v", err)
+		log.Info("Error retrieving primitive name from state: %v", err)
 		return nil, remainingGas, err
 	}
 
 	if len(storedName) == 0 {
-		log.Printf("Error: No primitive name found for address: %s", primitiveAddress.Hex())
+		log.Info("Error: No primitive name found for address: %s", primitiveAddress.Hex())
 		return nil, remainingGas, fmt.Errorf("primitive name not found for address %s", primitiveAddress.Hex())
 	}
 
@@ -841,7 +843,7 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	// Store the retrieved name under contractAddress
 	setLargeState(stateDB, addr, fullKey, storedName)
 
-    log.Printf(
+    log.Info(
         "Stored primitive mapping: Name=%s, ContractAddress=%s, ContractAddressHash=%s, FullKey=%s, StorageAddr=%s",
         string(storedName),
         contractAddress.Hex(),
@@ -882,7 +884,7 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
     // Unpack input values
     inputStruct, err := UnpackPublishPrimitiveInput(input)
     if err != nil {
-        log.Printf("Error: Failed to unpack input. Error: %v", err)
+        log.Info("Error: Failed to unpack input. Error: %v", err)
         return nil, remainingGas, err
     }
 
@@ -891,11 +893,12 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
 
     // Store using ABI encoding (as an address)
     if err := updatePlanLocalState(stateDB, addr, metadata, contractAddress); err != nil {
-        log.Printf("Error: Failed to store permanent lookup entry for key %s. Error: %v", metadata, err)
+        log.Info("Error: Failed to store permanent lookup entry for key %s. Error: %v", metadata, err)
         return nil, remainingGas, fmt.Errorf("failed to permanent store lookup entry for key %s: %w", metadata, err)
     }
 
-    log.Printf("Successfully stored permanent lookup entry: Key=%s, Address=%s", metadata, contractAddress.Hex())
+    log.Info("yadda yadda yadda")
+    log.Info("Successfully stored permanent lookup entry: Key=%s, Address=%s", metadata, contractAddress.Hex())
 
     // Compute the metadata hash
     metadataHash := common.BytesToHash([]byte(metadata))
@@ -907,24 +910,24 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
     // Check if the metadata key already exists
     existingValue, err := getLargeState(stateDB, addr, fullKey)
     if err != nil {
-        log.Printf("Error retrieving metadata key from state: %v", err)
+        log.Info("Error retrieving metadata key from state: %v", err)
         return nil, remainingGas, err
     }
     if len(existingValue) > 0 {
-        log.Printf("Error: Metadata key already exists in state: %s", metadata)
+        log.Info("Error: Metadata key already exists in state: %s", metadata)
         return nil, remainingGas, fmt.Errorf("util name already registered")
     }
 
     // Store the mapping (metadata -> contractAddress)
     setLargeState(stateDB, addr, fullKey, contractAddress.Bytes())
-    log.Printf("Stored primitive mapping name -> address: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
+    log.Info("Stored primitive mapping name -> address: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
 
     addressHash := common.BytesToHash([]byte(contractAddress.Hex()))
     fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
     metadataBytes := []byte(metadata)  // Convert string to []byte
     setLargeState(stateDB, addr, fullKey, metadataBytes)
 
-    log.Printf("Stored primitive mapping address -> name: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
+    log.Info("Stored primitive mapping address -> name: Metadata=%s, ContractAddress=%s", metadata, contractAddress.Hex())
 
     contractAddressHash := common.BytesToHash(contractAddress.Bytes())
 	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
@@ -932,7 +935,7 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
 	// Store the retrieved name under contractAddress
 	setLargeState(stateDB, addr, fullKey, metadataBytes)
 
-    log.Printf(
+    log.Info(
         "Stored primitive mapping: Name=%s, ContractAddress=%s, ContractAddressHash=%s, FullKey=%s, StorageAddr=%s",
         string(metadataBytes),
         contractAddress.Hex(),

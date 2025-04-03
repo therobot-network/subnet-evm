@@ -3,11 +3,14 @@ package llmprecompile
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
+	// "log"
 	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,12 +23,12 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		// Fetch `question` and `answer` only once
 			questionRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching question: %v", err)
+				log.Info("Error fetching question: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch question: %w", err)
 			}
 			answerRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error fetching answer: %v", err)
+				log.Info("Error fetching answer: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch answer: %w", err)
 			}
 
@@ -57,15 +60,15 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		case "assign":
 			arg, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching arg: %v", err)
+				log.Info("Error fetching arg: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch arg: %w", err)
 			}
 			// if err := updateMemoryInState(stateDB, llmAddr, step.Output[0], arg, step.Args[0].AbiType); err != nil {
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], arg); err != nil {
-				log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
+				log.Info("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
 				return currentPC, remainingGas, err
 			}
-			log.Printf("Successfully updated memory in state for assign step under key: %s.",  step.Output)
+			log.Info("Successfully updated memory in state for assign step under key: %s.",  step.Output)
 		
 		case "JumpIfNot":
 			jumpTarget := new(big.Int)
@@ -73,7 +76,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			// Ensure correct ABI type for jumpTarget
 			jumpTargetStr, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching jumpTarget: %v", err)
+				log.Info("Error fetching jumpTarget: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch jumpTarget: %w", err)
 			}
 		
@@ -87,7 +90,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			// Ensure correct ABI type for condition
 			conditionStr, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error fetching condition: %v", err)
+				log.Info("Error fetching condition: %v", err)
 				return nil, 0, fmt.Errorf("failed to fetch condition: %w", err)
 			}
 
@@ -98,11 +101,11 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			case bool:
 				condition = v
 			default:
-				log.Printf("Unexpected type for conditionStr: %T", v)
+				log.Info("Unexpected type for conditionStr: %T", v)
 				return nil, 0, fmt.Errorf("invalid type for conditionStr: expected string or bool, got %T", v)
 			}
 
-			log.Printf("JumpIfNot: Parsed Condition=%s as bool=%t", conditionStr, condition)
+			log.Info("JumpIfNot: Parsed Condition=%s as bool=%t", conditionStr, condition)
 		
 			// Perform jump if condition is false
 			if !condition {
@@ -115,28 +118,28 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			for i, arg := range step.Args {
 				value, err := getLookupValue(arg, stateDB)
 				if err != nil {
-					log.Printf("Error fetching arg[%d]: %v", i, err)
+					log.Info("Error fetching arg[%d]: %v", i, err)
 					return currentPC, remainingGas, fmt.Errorf("failed to fetch arg[%d]: %w", i, err)
 				}
 				rawArrayValues[i] = value
 			}
 
-			log.Printf("Collected raw array values: %+v", rawArrayValues)
+			log.Info("Collected raw array values: %+v", rawArrayValues)
 
 			// Log each element and its type
 			for i, v := range rawArrayValues {
-				log.Printf("rawArrayValues[%d]: Value=%v, Type=%T", i, v, v)
+				log.Info("rawArrayValues[%d]: Value=%v, Type=%T", i, v, v)
 			}
 
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], rawArrayValues); err != nil {
-				log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
+				log.Info("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
 				return currentPC, remainingGas, err
 			}
-			log.Printf("Successfully updated memory in state for assignArray step under key: %s.",  step.Output)
+			log.Info("Successfully updated memory in state for assignArray step under key: %s.",  step.Output)
 	
 		case "assignDict":
 			if len(step.Args)%2 != 0 {
-				log.Printf("Error: assignDict requires an even number of args, got %d", len(step.Args))
+				log.Info("Error: assignDict requires an even number of args, got %d", len(step.Args))
 				return currentPC, remainingGas, fmt.Errorf("assignDict expects an even number of arguments (key-value pairs)")
 			}
 		
@@ -148,13 +151,13 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		
 				keyRaw, err := getLookupValue(keyArg, stateDB)
 				if err != nil {
-					log.Printf("Error fetching key arg[%d]: %v", i, err)
+					log.Info("Error fetching key arg[%d]: %v", i, err)
 					return currentPC, remainingGas, fmt.Errorf("failed to fetch key arg[%d]: %w", i, err)
 				}
 		
 				valueRaw, err := getLookupValue(valueArg, stateDB)
 				if err != nil {
-					log.Printf("Error fetching value arg[%d]: %v", i+1, err)
+					log.Info("Error fetching value arg[%d]: %v", i+1, err)
 					return currentPC, remainingGas, fmt.Errorf("failed to fetch value arg[%d]: %w", i+1, err)
 				}
 		
@@ -162,44 +165,44 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				keyStr, ok := keyRaw.(string)
 				if !ok {
 					keyStr = fmt.Sprintf("%v", keyRaw)
-					log.Printf("Warning: key arg[%d] was not a string, converted to: %s", i, keyStr)
+					log.Info("Warning: key arg[%d] was not a string, converted to: %s", i, keyStr)
 				}
 		
 				dict[keyStr] = valueRaw
-				log.Printf("assignDict pair: key=%s, value=%v (type=%T)", keyStr, valueRaw, valueRaw)
+				log.Info("assignDict pair: key=%s, value=%v (type=%T)", keyStr, valueRaw, valueRaw)
 			}
 		
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], dict); err != nil {
-				log.Printf("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
+				log.Info("Error: Failed to update memory in state for step %d. Error: %v", currentPC.Int64(), err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully updated memory in state for assignDict step under key: %s", step.Output[0])
+			log.Info("Successfully updated memory in state for assignDict step under key: %s", step.Output[0])
 		
 		case "getDict":
 			if len(step.Args) < 2 {
-				log.Printf("Error: getDict expects 3 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				log.Info("Error: getDict expects 3 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("getDict requires exactly 3 args and 1 output")
 			}
 		
 			// Arg 0: name of dict (lookup key)
 			dictRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error: failed to fetch dict for getDict: %v", err)
+				log.Info("Error: failed to fetch dict for getDict: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch dict: %w", err)
 			}
 		
 			// Ensure it's a map
 			dict, ok := dictRaw.(map[string]interface{})
 			if !ok {
-				log.Printf("Error: value at dict key is not a map[string]interface{}: %T", dictRaw)
+				log.Info("Error: value at dict key is not a map[string]interface{}: %T", dictRaw)
 				return currentPC, remainingGas, fmt.Errorf("expected dict to be map[string]interface{}, got %T", dictRaw)
 			}
 		
 			// Arg 1: key to look up
 			keyRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error: failed to fetch key for getDict: %v", err)
+				log.Info("Error: failed to fetch key for getDict: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch dict lookup key: %w", err)
 			}
 		
@@ -213,26 +216,26 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			if !exists {
 				defaultValue, err := getLookupValue(step.Args[2], stateDB)
 				if err != nil {
-					log.Printf("Error: failed to fetch default value for getDict: %v", err)
+					log.Info("Error: failed to fetch default value for getDict: %v", err)
 					return currentPC, remainingGas, fmt.Errorf("failed to fetch default value: %w", err)
 				}
-				log.Printf("Key not found in dict: %s — using default value: %v", keyStr, defaultValue)
+				log.Info("Key not found in dict: %s — using default value: %v", keyStr, defaultValue)
 				val = defaultValue
 			} else {
-				log.Printf("Found key in dict: %s => %v", keyStr, val)
+				log.Info("Found key in dict: %s => %v", keyStr, val)
 			}
 		
 			// Store result
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], val); err != nil {
-				log.Printf("Error: Failed to store getDict result. OutputKey=%s. Error: %v", step.Output[0], err)
+				log.Info("Error: Failed to store getDict result. OutputKey=%s. Error: %v", step.Output[0], err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored getDict result under key: %s | Value: %v", step.Output[0], val)		
+			log.Info("Successfully stored getDict result under key: %s | Value: %v", step.Output[0], val)		
 		
 		case "setDict":
 			if len(step.Args) != 3 {
-				log.Printf("Error: setDict expects exactly 3 arguments, got %d", len(step.Args))
+				log.Info("Error: setDict expects exactly 3 arguments, got %d", len(step.Args))
 				return currentPC, remainingGas, fmt.Errorf("setDict requires exactly 3 arguments")
 			}
 		
@@ -243,14 +246,14 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			// Load existing dictionary
 			dictRaw, err := getLookupValue(dictNameArg, stateDB)
 			if err != nil {
-				log.Printf("Error: failed to load dictionary %s: %v", dictKey, err)
+				log.Info("Error: failed to load dictionary %s: %v", dictKey, err)
 				return currentPC, remainingGas, fmt.Errorf("failed to load dictionary: %w", err)
 			}
 		
 			var dict map[string]interface{}
 			if dictRaw == nil {
 				dict = make(map[string]interface{})
-				log.Printf("Initialized new dict under key: %s", dictKey)
+				log.Info("Initialized new dict under key: %s", dictKey)
 			} else {
 				var ok bool
 				dict, ok = dictRaw.(map[string]interface{})
@@ -262,7 +265,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			// Arg 1: key
 			keyRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error fetching dict key arg: %v", err)
+				log.Info("Error fetching dict key arg: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch dict key: %w", err)
 			}
 			keyStr := fmt.Sprintf("%v", keyRaw)
@@ -270,39 +273,39 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			// Arg 2: value
 			value, err := getLookupValue(step.Args[2], stateDB)
 			if err != nil {
-				log.Printf("Error fetching dict value arg: %v", err)
+				log.Info("Error fetching dict value arg: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch dict value: %w", err)
 			}
 		
 			// Set the key/value
 			dict[keyStr] = value
-			log.Printf("Updated dict[%s] = %v", keyStr, value)
+			log.Info("Updated dict[%s] = %v", keyStr, value)
 		
 			// Store the updated dict back
 			if err := updatePlanLocalState(stateDB, llmAddr, dictKey, dict); err != nil {
-				log.Printf("Error: Failed to update state with updated dict %s: %v", dictKey, err)
+				log.Info("Error: Failed to update state with updated dict %s: %v", dictKey, err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully updated dict under key: %s", dictKey)
+			log.Info("Successfully updated dict under key: %s", dictKey)
 
 		case "toArray":
 			if len(step.Args) != 2 || len(step.Output) != 1 {
-				log.Printf("Error: toArray expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				log.Info("Error: toArray expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("toArray requires 2 args and 1 output")
 			}
 		
 			// Arg 0: input data (usually a dict or list)
 			inputRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching input from lookup: %v", err)
+				log.Info("Error fetching input from lookup: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch input: %w", err)
 			}
 		
 			// Arg 1: mode (e.g., "keys", "values", "dict", "list", "tuple")
 			modeRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error fetching mode: %v", err)
+				log.Info("Error fetching mode: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch mode: %w", err)
 			}
 		
@@ -348,25 +351,25 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				return currentPC, remainingGas, fmt.Errorf("invalid toArray mode: %s (expected 'keys', 'values', 'dict', 'list', or 'tuple')", modeStr)
 			}
 		
-			log.Printf("toArray (%s) result: %v", modeStr, outputArray)
+			log.Info("toArray (%s) result: %v", modeStr, outputArray)
 		
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], outputArray); err != nil {
-				log.Printf("Error storing toArray result: %v", err)
+				log.Info("Error storing toArray result: %v", err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored toArray result to key: %s", step.Output[0])
+			log.Info("Successfully stored toArray result to key: %s", step.Output[0])
 		
 		case "forItems":
 			if len(step.Args) != 1 || len(step.Output) != 2 {
-				log.Printf("Error: forItems expects 1 argument and 2 outputs, got %d args and %d outputs", len(step.Args), len(step.Output))
+				log.Info("Error: forItems expects 1 argument and 2 outputs, got %d args and %d outputs", len(step.Args), len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("forItems requires 1 arg (dict) and 2 outputs (keys, values)")
 			}
 		
 			// Fetch the dictionary from lookup
 			dictRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching dictionary for forItems: %v", err)
+				log.Info("Error fetching dictionary for forItems: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch dictionary: %w", err)
 			}
 		
@@ -383,29 +386,29 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				values = append(values, v)
 			}
 		
-			log.Printf("forItems: keys=%v, values=%v", keys, values)
+			log.Info("forItems: keys=%v, values=%v", keys, values)
 		
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], keys); err != nil {
-				log.Printf("Error storing keys output in forItems: %v", err)
+				log.Info("Error storing keys output in forItems: %v", err)
 				return currentPC, remainingGas, err
 			}
 		
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[1], values); err != nil {
-				log.Printf("Error storing values output in forItems: %v", err)
+				log.Info("Error storing values output in forItems: %v", err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored forItems results under keys: %s, %s", step.Output[0], step.Output[1])
+			log.Info("Successfully stored forItems results under keys: %s, %s", step.Output[0], step.Output[1])
 
 		case "len":
 			if len(step.Args) != 1 || len(step.Output) != 1 {
-				log.Printf("Error: len expects 1 argument and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				log.Info("Error: len expects 1 argument and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("len requires 1 arg and 1 output")
 			}
 		
 			rawValue, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching value for len: %v", err)
+				log.Info("Error fetching value for len: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch input for len: %w", err)
 			}
 		
@@ -425,32 +428,32 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 				}
 			}
 		
-			log.Printf("len: computed length = %d for input type %T", length, rawValue)
+			log.Info("len: computed length = %d for input type %T", length, rawValue)
 		
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], length); err != nil {
-				log.Printf("Error storing length result in len: %v", err)
+				log.Info("Error storing length result in len: %v", err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored len result (%d) under key: %s", length, step.Output[0])
+			log.Info("Successfully stored len result (%d) under key: %s", length, step.Output[0])
 		
 		case "index":
 			if len(step.Args) != 2 || len(step.Output) != 1 {
-				log.Printf("Error: index expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
+				log.Info("Error: index expects exactly 2 arguments and 1 output, got %d args and %d outputs", len(step.Args), len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("index requires 2 args and 1 output")
 			}
 		
 			// Arg 0: the array
 			arrayRaw, err := getLookupValue(step.Args[0], stateDB)
 			if err != nil {
-				log.Printf("Error fetching array for index: %v", err)
+				log.Info("Error fetching array for index: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch array: %w", err)
 			}
 		
 			// Arg 1: the index
 			indexRaw, err := getLookupValue(step.Args[1], stateDB)
 			if err != nil {
-				log.Printf("Error fetching index value: %v", err)
+				log.Info("Error fetching index value: %v", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch index: %w", err)
 			}
 		
@@ -496,20 +499,20 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		
 			// Validate bounds
 			if index < 0 || index >= len(array) {
-				log.Printf("Error: index %d out of range for array of length %d", index, len(array))
+				log.Info("Error: index %d out of range for array of length %d", index, len(array))
 				return currentPC, remainingGas, fmt.Errorf("index out of bounds: %d", index)
 			}
 		
 			val := array[index]
-			log.Printf("index: array[%d] = %v", index, val)
+			log.Info("index: array[%d] = %v", index, val)
 		
 			// Store result
 			if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], val); err != nil {
-				log.Printf("Error storing index result: %v", err)
+				log.Info("Error storing index result: %v", err)
 				return currentPC, remainingGas, err
 			}
 		
-			log.Printf("Successfully stored index result at key: %s", step.Output[0])
+			log.Info("Successfully stored index result at key: %s", step.Output[0])
 		
 	
 	}    
