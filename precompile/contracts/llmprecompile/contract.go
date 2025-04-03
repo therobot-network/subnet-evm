@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 
 	"math/big"
 	"net/http"
@@ -94,32 +95,48 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
         Timeout: 60 * time.Second,
     }
 
-    req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBytes))
-    if err != nil {
-        return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-    }
-    req.Header.Set("Content-Type", "application/json")
+    var respBytes []byte
+    maxRetries := 3
 
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("HTTP request failed: %w", err)
-    }
-    defer resp.Body.Close()
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBytes))
+        if err != nil {
+            return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+        }
+        req.Header.Set("Content-Type", "application/json")
 
-    if resp.StatusCode != http.StatusOK {
-        body, _ := ioutil.ReadAll(resp.Body)
-        log.Info("Non-200 response: %d, body: %s", resp.StatusCode, body)
-        return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
+        resp, err := client.Do(req)
+        if err != nil {
+            if osErr, ok := err.(net.Error); ok && osErr.Timeout() {
+                log.Warn("HTTP request timed out on attempt %d/%d. Retrying...", attempt, maxRetries)
+                if attempt == maxRetries {
+                    return nil, fmt.Errorf("HTTP request failed after %d attempts: %w", maxRetries, err)
+                }
+                continue
+            }
+            return nil, fmt.Errorf("HTTP request failed: %w", err)
+        }
+
+        defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK {
+            body, _ := ioutil.ReadAll(resp.Body)
+            log.Info("Non-200 response: %d, body: %s", resp.StatusCode, body)
+            return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
+        }
+
+        respBytes, err = ioutil.ReadAll(resp.Body)
+        if err != nil {
+            return nil, fmt.Errorf("failed to read HTTP response: %w", err)
+        }
+
+        log.Info("respBytes: %s", respBytes)
+        return respBytes, nil
     }
 
-    respBytes, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read HTTP response: %w", err)
-    }
-
-    log.Info("respBytes: %s", respBytes)
-    return respBytes, nil
+    return nil, fmt.Errorf("unexpected failure after retries")
 }
+
 
 // ILLMContractMethodParams is an auto generated low-level Go binding around an user-defined struct.
 type ILLMContractMethodParams struct {
@@ -897,7 +914,6 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
         return nil, remainingGas, fmt.Errorf("failed to permanent store lookup entry for key %s: %w", metadata, err)
     }
 
-    log.Info("yadda yadda yadda")
     log.Info("Successfully stored permanent lookup entry: Key=%s, Address=%s", metadata, contractAddress.Hex())
 
     // Compute the metadata hash
