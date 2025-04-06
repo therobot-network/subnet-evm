@@ -221,10 +221,15 @@ describe("LLM Precompiled Contract", function () {
     const Executor = await ethers.getContractFactory("Executor");
     const executor = await Executor.deploy(LLM_ADDRESS);
     await executor.waitForDeployment();
+    const executorAddr = await executor.getAddress();
 
     try {
       const ERC20Primitive = await ethers.getContractFactory("ERC20Primitive");
-      const erc20Primitive = await ERC20Primitive.deploy(LLM_ADDRESS, "erc20");
+      const erc20Primitive = await ERC20Primitive.deploy(
+        LLM_ADDRESS,
+        "",
+        executorAddr,
+      );
       await erc20Primitive.waitForDeployment();
       const erc20PrimitiveAddr = await erc20Primitive.getAddress();
       console.log("ERC20Primitive deployed at:", erc20PrimitiveAddr);
@@ -233,7 +238,11 @@ describe("LLM Precompiled Contract", function () {
     }
     try {
       const AmmPrimitive = await ethers.getContractFactory("AmmPrimitive");
-      const ammPrimitive = await AmmPrimitive.deploy(LLM_ADDRESS, "amm");
+      const ammPrimitive = await AmmPrimitive.deploy(
+        LLM_ADDRESS,
+        "",
+        executorAddr,
+      );
       await ammPrimitive.waitForDeployment();
       const ammPrimitiveAddr = await ammPrimitive.getAddress();
       console.log("AmmPrimitive deployed at:", ammPrimitiveAddr);
@@ -245,7 +254,8 @@ describe("LLM Precompiled Contract", function () {
         await ethers.getContractFactory("CounterPrimitive");
       const counterPrimitive = await CounterPrimitive.deploy(
         LLM_ADDRESS,
-        "counter",
+        "",
+        executorAddr,
       );
       await counterPrimitive.waitForDeployment();
       const counterPrimitiveAddr = await counterPrimitive.getAddress();
@@ -255,7 +265,11 @@ describe("LLM Precompiled Contract", function () {
     }
     try {
       const MathPrimitive = await ethers.getContractFactory("MathPrimitive");
-      const mathPrimitive = await MathPrimitive.deploy(LLM_ADDRESS, "math");
+      const mathPrimitive = await MathPrimitive.deploy(
+        LLM_ADDRESS,
+        "",
+        executorAddr,
+      );
       await mathPrimitive.waitForDeployment();
       const mathPrimitiveAddr = await mathPrimitive.getAddress();
       console.log("mathPrimitive deployed at:", mathPrimitiveAddr);
@@ -279,20 +293,17 @@ describe("LLM Precompiled Contract", function () {
       [ADMIN_ADDRESS, "calculator", ""],
     );
 
-    let tx = await executor.deployCustomPrimitive(
-      mathPrimitiveAddress,
-      initData,
-    );
+    let tx = await executor.deployRobotContract("math", initData);
     let receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "calculator",
         (cloneAddr) => {
           mathContractAddress = cloneAddr;
           return true;
         },
-        mathPrimitiveAddress,
+        "math",
       );
 
     initData = generateFunctionCallData(
@@ -300,20 +311,17 @@ describe("LLM Precompiled Contract", function () {
       ["address", "string", "string"],
       [ADMIN_ADDRESS, "xCounter", ""],
     );
-    tx = await executor.deployCustomPrimitive(
-      counterPrimitiveAddress,
-      initData,
-    );
+    tx = await executor.deployRobotContract("counter", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "xCounter",
         (cloneAddr) => {
           counterAContractAddress = cloneAddr;
           return true;
         },
-        counterPrimitiveAddress,
+        "counter",
       );
 
     counterAContract = await ethers.getContractAt(
@@ -322,20 +330,17 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployCustomPrimitive(
-      counterPrimitiveAddress,
-      initData,
-    );
+    tx = await executor.deployRobotContract("counter", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "xCounter",
         (cloneAddr) => {
           counterBContractAddress = cloneAddr;
           return true;
         },
-        counterPrimitiveAddress,
+        "counter",
       );
 
     counterBContract = await ethers.getContractAt(
@@ -350,17 +355,17 @@ describe("LLM Precompiled Contract", function () {
       [ADMIN_ADDRESS, "USDC", ethers.parseEther("100000"), "USDC Token", ""],
     );
 
-    tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
+    tx = await executor.deployRobotContract("erc20", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "USDC Token",
         (cloneAddr) => {
           usdcContractAddress = cloneAddr;
           return true;
         },
-        erc20PrimitiveAddress,
+        "erc20",
       );
 
     usdcContract = await ethers.getContractAt(
@@ -375,17 +380,17 @@ describe("LLM Precompiled Contract", function () {
       [ADMIN_ADDRESS, "JIRI", ethers.parseEther("100000"), "JIRI Token", ""],
     );
 
-    tx = await executor.deployCustomPrimitive(erc20PrimitiveAddress, initData);
+    tx = await executor.deployRobotContract("erc20", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "JIRI Token",
         (cloneAddr) => {
           jiriContractAddress = cloneAddr;
           return true;
         },
-        erc20PrimitiveAddress,
+        "erc20",
       );
 
     jiriContract = await ethers.getContractAt(
@@ -406,17 +411,17 @@ describe("LLM Precompiled Contract", function () {
       ],
     );
 
-    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    tx = await executor.deployRobotContract("amm", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "AMM USDC-JIRI",
         (cloneAddr) => {
           ammContract1Address = cloneAddr;
           return true;
         },
-        ammPrimitiveAddress,
+        "amm",
       );
 
     ammContract1 = await ethers.getContractAt(
@@ -425,17 +430,17 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    tx = await executor.deployRobotContract("amm", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "AMM USDC-JIRI",
         (cloneAddr) => {
           ammContract2Address = cloneAddr;
           return true;
         },
-        ammPrimitiveAddress,
+        "amm",
       );
 
     ammContract2 = await ethers.getContractAt(
@@ -444,17 +449,17 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployCustomPrimitive(ammPrimitiveAddress, initData);
+    tx = await executor.deployRobotContract("amm", initData);
     receipt = await tx.wait();
     await expect(receipt)
-      .to.emit(executor, "CustomPrimitiveDeployed")
+      .to.emit(executor, "RobotContractDeployed")
       .withArgs(
         "AMM USDC-JIRI",
         (cloneAddr) => {
           ammContract3Address = cloneAddr;
           return true;
         },
-        ammPrimitiveAddress,
+        "amm",
       );
 
     ammContract3 = await ethers.getContractAt(

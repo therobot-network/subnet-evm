@@ -156,21 +156,29 @@ type ContinueEvaluationOutput struct {
 
 type EvaluatePlanOutput struct {
 	PromptId             *big.Int
+	EvaluationDone       bool
 	ContractMethodParams []ILLMContractMethodParams
 }
 
 type EvaluatePromptOutput struct {
 	PromptId             *big.Int
+	EvaluationDone       bool
 	ContractMethodParams []ILLMContractMethodParams
-}
-
-type PublishCustomPrimitiveInput struct {
-	ContractAddress  common.Address
-	PrimitiveAddress common.Address
 }
 
 type PublishPrimitiveInput struct {
 	ContractAddress common.Address
+	PrimitiveName   string
+}
+
+type PublishRobotContractInput struct {
+	ContractAddress  common.Address
+	PrimitiveAddress common.Address
+}
+
+type PublishSystemPrimitiveInput struct {
+	ContractAddress common.Address
+	Name            string
 	Metadata        string
 }
 
@@ -486,6 +494,7 @@ func PackEvaluatePlan(plan string) ([]byte, error) {
 func PackEvaluatePlanOutput(outputStruct EvaluatePlanOutput) ([]byte, error) {
 	return LLMPrecompileABI.PackOutput("evaluatePlan",
 		outputStruct.PromptId,
+		outputStruct.EvaluationDone,
 		outputStruct.ContractMethodParams,
 	)
 }
@@ -561,6 +570,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 			savePCToState(stateDB, addr, currentPC)
 			output := EvaluatePlanOutput{
 				PromptId:             currentPromptId,
+				EvaluationDone:       true,
 				ContractMethodParams: []ILLMContractMethodParams{},
 			}
 			packedOutput, err := PackEvaluatePlanOutput(output)
@@ -589,6 +599,7 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 
 	output := EvaluatePlanOutput{
 		PromptId:             currentPromptId,
+		EvaluationDone:       false,
 		ContractMethodParams: contractMethodParams,
 	}
 
@@ -731,6 +742,7 @@ func PackEvaluatePrompt(prompt string) ([]byte, error) {
 func PackEvaluatePromptOutput(outputStruct EvaluatePromptOutput) ([]byte, error) {
 	return LLMPrecompileABI.PackOutput("evaluatePrompt",
 		outputStruct.PromptId,
+		outputStruct.EvaluationDone,
 		outputStruct.ContractMethodParams,
 	)
 }
@@ -744,21 +756,102 @@ func UnpackEvaluatePromptOutput(output []byte) (EvaluatePromptOutput, error) {
 	return outputStruct, err
 }
 
-// UnpackPublishCustomPrimitiveInput attempts to unpack [input] as PublishCustomPrimitiveInput
+
+// UnpackPublishPrimitiveInput attempts to unpack [input] as PublishPrimitiveInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackPublishCustomPrimitiveInput(input []byte) (PublishCustomPrimitiveInput, error) {
-	inputStruct := PublishCustomPrimitiveInput{}
-	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishCustomPrimitive", input, false)
+func UnpackPublishPrimitiveInput(input []byte) (PublishPrimitiveInput, error) {
+	inputStruct := PublishPrimitiveInput{}
+	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishPrimitive", input, false)
 
 	return inputStruct, err
 }
 
-// PackPublishCustomPrimitive packs [inputStruct] of type PublishCustomPrimitiveInput into the appropriate arguments for publishCustomPrimitive.
-func PackPublishCustomPrimitive(inputStruct PublishCustomPrimitiveInput) ([]byte, error) {
-	return LLMPrecompileABI.Pack("publishCustomPrimitive", inputStruct.ContractAddress, inputStruct.PrimitiveAddress)
+// PackPublishPrimitive packs [inputStruct] of type PublishPrimitiveInput into the appropriate arguments for publishPrimitive.
+func PackPublishPrimitive(inputStruct PublishPrimitiveInput) ([]byte, error) {
+	return LLMPrecompileABI.Pack("publishPrimitive", inputStruct.ContractAddress, inputStruct.PrimitiveName)
 }
 
-func publishCustomPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func publishPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
+		return nil, 0, err
+	}
+	if readOnly {
+		return nil, remainingGas, vmerrs.ErrWriteProtection
+	}
+
+	stateDB := accessibleState.GetStateDB()
+
+	inputStruct, err := UnpackPublishPrimitiveInput(input)
+	if err != nil {
+		log.Info("Failed to unpack publishPrimitive input", "Error", err)
+		return nil, remainingGas, err
+	}
+
+	contractAddress := inputStruct.ContractAddress
+	metadata := inputStruct.PrimitiveName
+
+	if err := updatePlanLocalState(stateDB, addr, metadata, contractAddress); err != nil {
+		log.Info("Failed to store permanent lookup entry", "Key", metadata, "Error", err)
+		return nil, remainingGas, fmt.Errorf("failed to permanent store lookup entry for key %s: %w", metadata, err)
+	}
+
+	log.Info("Stored permanent lookup entry", "Key", metadata, "Address", contractAddress.Hex())
+
+	metadataHash := common.BytesToHash([]byte(metadata))
+	fullKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), metadataHash.Bytes()...))
+
+	existingValue, err := getLargeState(stateDB, addr, fullKey)
+	if err != nil {
+		log.Info("Failed to retrieve metadata key from state", "Error", err)
+		return nil, remainingGas, err
+	}
+	if len(existingValue) > 0 {
+		log.Info("Metadata key already exists in state", "Metadata", metadata)
+		return nil, remainingGas, fmt.Errorf("util name already registered")
+	}
+
+	setLargeState(stateDB, addr, fullKey, contractAddress.Bytes())
+	log.Info("Stored mapping metadata -> address", "Metadata", metadata, "ContractAddress", contractAddress.Hex())
+
+	addressHash := common.BytesToHash([]byte(contractAddress.Hex()))
+	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
+	metadataBytes := []byte(metadata)
+	setLargeState(stateDB, addr, fullKey, metadataBytes)
+
+	log.Info("Stored mapping address -> metadata", "Metadata", metadata, "ContractAddress", contractAddress.Hex())
+
+	contractAddressHash := common.BytesToHash(contractAddress.Bytes())
+	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
+	setLargeState(stateDB, addr, fullKey, metadataBytes)
+
+	log.Info("Stored primitive mapping",
+		"Name", string(metadataBytes),
+		"ContractAddress", contractAddress.Hex(),
+		"ContractAddressHash", contractAddressHash.Hex(),
+		"FullKey", fullKey.Hex(),
+		"StorageAddr", addr.Hex(),
+	)
+
+	return []byte{}, remainingGas, nil
+}
+
+// UnpackPublishRobotContractInput attempts to unpack [input] as PublishRobotContractInput
+// assumes that [input] does not include selector (omits first 4 func signature bytes)
+func UnpackPublishRobotContractInput(input []byte) (PublishRobotContractInput, error) {
+	inputStruct := PublishRobotContractInput{}
+	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishRobotContract", input, false)
+
+	return inputStruct, err
+}
+
+// PackPublishRobotContract packs [inputStruct] of type PublishRobotContractInput into the appropriate arguments for publishRobotContract.
+func PackPublishRobotContract(inputStruct PublishRobotContractInput) ([]byte, error) {
+	return LLMPrecompileABI.Pack("publishRobotContract", inputStruct.ContractAddress, inputStruct.PrimitiveAddress)
+}
+
+func publishRobotContract(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	// log.Info("Made it to publishRobotContract function", "Caller", caller.Hex(), "ContractAddress", addr.Hex())
+
 	if remainingGas, err = contract.DeductGas(suppliedGas, PublishCustomPrimitiveGasCost); err != nil {
 		return nil, 0, err
 	}
@@ -766,9 +859,9 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 		return nil, remainingGas, vmerrs.ErrWriteProtection
 	}
 
-	inputStruct, err := UnpackPublishCustomPrimitiveInput(input)
+	inputStruct, err := UnpackPublishRobotContractInput(input)
 	if err != nil {
-		log.Info("Failed to unpack publishCustomPrimitive input", "Error", err)
+		log.Info("Failed to unpack PublishRobotContractInput input", "Error", err)
 		return nil, remainingGas, err
 	}
 
@@ -807,23 +900,21 @@ func publishCustomPrimitive(accessibleState contract.AccessibleState, caller com
 	return []byte{}, remainingGas, nil
 }
 
-
-
-// UnpackPublishPrimitiveInput attempts to unpack [input] as PublishPrimitiveInput
+// UnpackPublishSystemPrimitiveInput attempts to unpack [input] as PublishSystemPrimitiveInput
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackPublishPrimitiveInput(input []byte) (PublishPrimitiveInput, error) {
-	inputStruct := PublishPrimitiveInput{}
-	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishPrimitive", input, false)
+func UnpackPublishSystemPrimitiveInput(input []byte) (PublishSystemPrimitiveInput, error) {
+	inputStruct := PublishSystemPrimitiveInput{}
+	err := LLMPrecompileABI.UnpackInputIntoInterface(&inputStruct, "publishSystemPrimitive", input, false)
 
 	return inputStruct, err
 }
 
-// PackPublishPrimitive packs [inputStruct] of type PublishPrimitiveInput into the appropriate arguments for publishPrimitive.
-func PackPublishPrimitive(inputStruct PublishPrimitiveInput) ([]byte, error) {
-	return LLMPrecompileABI.Pack("publishPrimitive", inputStruct.ContractAddress, inputStruct.Metadata)
+// PackPublishSystemPrimitive packs [inputStruct] of type PublishSystemPrimitiveInput into the appropriate arguments for publishSystemPrimitive.
+func PackPublishSystemPrimitive(inputStruct PublishSystemPrimitiveInput) ([]byte, error) {
+	return LLMPrecompileABI.Pack("publishSystemPrimitive", inputStruct.ContractAddress, inputStruct.Name, inputStruct.Metadata)
 }
 
-func publishPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func publishSystemPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
 		return nil, 0, err
 	}
@@ -833,14 +924,14 @@ func publishPrimitive(accessibleState contract.AccessibleState, caller common.Ad
 
 	stateDB := accessibleState.GetStateDB()
 
-	inputStruct, err := UnpackPublishPrimitiveInput(input)
+	inputStruct, err := UnpackPublishSystemPrimitiveInput(input)
 	if err != nil {
 		log.Info("Failed to unpack publishPrimitive input", "Error", err)
 		return nil, remainingGas, err
 	}
 
 	contractAddress := inputStruct.ContractAddress
-	metadata := inputStruct.Metadata
+	metadata := inputStruct.Name
 
 	if err := updatePlanLocalState(stateDB, addr, metadata, contractAddress); err != nil {
 		log.Info("Failed to store permanent lookup entry", "Key", metadata, "Error", err)
@@ -897,8 +988,9 @@ func createLLMPrecompilePrecompile() contract.StatefulPrecompiledContract {
 		"continueEvaluation":     continueEvaluation,
 		"evaluatePlan":           evaluatePlan,
 		"evaluatePrompt":         evaluatePrompt,
-		"publishCustomPrimitive": publishCustomPrimitive,
 		"publishPrimitive":       publishPrimitive,
+		"publishRobotContract":   publishRobotContract,
+		"publishSystemPrimitive": publishSystemPrimitive,
 	}
 
 	for name, function := range abiFunctionMap {
