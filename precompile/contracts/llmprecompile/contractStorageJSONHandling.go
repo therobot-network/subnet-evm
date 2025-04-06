@@ -23,470 +23,403 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// getLookupValue retrieves a value from the lookup table or directly from the Arg.
 func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
-    // If Value is provided directly, use it
-    if arg.Value != "" {
-        return arg.Value, nil
-    }
+	if arg.Value != "" {
+		return arg.Value, nil
+	}
+	if arg.Lookup == "" {
+		return nil, nil
+	}
 
-    // If there's no lookup key, return nil
-    if arg.Lookup == "" {
-        return nil, nil
-    }
+	lookupData, err := getLargeState(stateDB, ContractAddress, lookupStorageKey)
+	if err != nil {
+		log.Info("Failed to retrieve lookup state", "Error", err)
+		return nil, fmt.Errorf("failed to retrieve lookup storage: %w", err)
+	}
 
-    // Load the full lookup JSON object from state
-    lookupData, err := getLargeState(stateDB, ContractAddress, lookupStorageKey)
-    if err != nil {
-        log.Info("Error retrieving lookup state: %v", err)
-        return nil, fmt.Errorf("failed to retrieve lookup storage: %w", err)
-    }
+	if len(lookupData) == 0 {
+		log.Info("Lookup state is empty", "LookupKey", arg.Lookup)
+		return nil, nil
+	}
 
-    // If nothing is stored, return nil
-    if len(lookupData) == 0 {
-        log.Info("Lookup state is empty for key: %s", arg.Lookup)
-        return nil, nil
-    }
+	var lookupMap map[string]interface{}
+	if err := json.Unmarshal(lookupData, &lookupMap); err != nil {
+		log.Info("Failed to decode lookup JSON", "Error", err)
+		return nil, fmt.Errorf("failed to decode lookup JSON: %w", err)
+	}
 
-    // Parse JSON into a generic map
-    var lookupMap map[string]interface{}
-    if err := json.Unmarshal(lookupData, &lookupMap); err != nil {
-        log.Info("Error decoding lookup JSON: %v", err)
-        return nil, fmt.Errorf("failed to decode lookup JSON: %w", err)
-    }
+	val, exists := lookupMap[arg.Lookup]
+	if !exists {
+		log.Info("Lookup key not found", "LookupKey", arg.Lookup)
+		return nil, nil
+	}
 
-    // Extract the specific value
-    val, exists := lookupMap[arg.Lookup]
-    if !exists {
-        log.Info("Lookup key not found: %s", arg.Lookup)
-        return nil, nil
-    }
-
-    log.Info("Found lookup value | Key=%s | Value=%+v", arg.Lookup, val)
-    return val, nil
+	log.Info("Found lookup value", "LookupKey", arg.Lookup, "Value", val)
+	return val, nil
 }
 
-// Dynamically converts a string value to the expected ABI type
+// convertToABIType dynamically converts a value into the expected ABI type.
 func convertToABIType(value interface{}, abiType abi.Type) (interface{}, error) {
-    switch abiType.T {
-    case abi.AddressTy:
-        strValue, ok := value.(string)
-        if !ok {
-            return nil, fmt.Errorf("expected string for address, got %T", value)
-        }
-        if !common.IsHexAddress(strValue) {
-            return nil, fmt.Errorf("invalid address format: %s", strValue)
-        }
-        return common.HexToAddress(strValue), nil
+	switch abiType.T {
+	case abi.AddressTy:
+		strValue, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string for address, got %T", value)
+		}
+		if !common.IsHexAddress(strValue) {
+			return nil, fmt.Errorf("invalid address format: %s", strValue)
+		}
+		return common.HexToAddress(strValue), nil
 
-    case abi.UintTy, abi.IntTy:
-        switch v := value.(type) {
-        case *big.Int:
-            return v, nil
-        case float64:
-            return big.NewInt(int64(v)), nil
-        case string:
-            bigIntValue, success := new(big.Int).SetString(v, 10)
-            if !success {
-                return nil, fmt.Errorf("invalid integer string: %s", v)
-            }
-            return bigIntValue, nil
-        default:
-            return nil, fmt.Errorf("unsupported integer input type: %T", value)
-        }
+	case abi.UintTy, abi.IntTy:
+		switch v := value.(type) {
+		case *big.Int:
+			return v, nil
+		case float64:
+			return big.NewInt(int64(v)), nil
+		case string:
+			bigIntValue, success := new(big.Int).SetString(v, 10)
+			if !success {
+				return nil, fmt.Errorf("invalid integer string: %s", v)
+			}
+			return bigIntValue, nil
+		default:
+			return nil, fmt.Errorf("unsupported integer input type: %T", value)
+		}
 
-    case abi.BoolTy:
-        switch v := value.(type) {
-        case bool:
-            return v, nil
-        case string:
-            if v == "true" {
-                return true, nil
-            } else if v == "false" {
-                return false, nil
-            }
-            return nil, fmt.Errorf("invalid boolean string: %s", v)
-        default:
-            return nil, fmt.Errorf("unsupported boolean input type: %T", value)
-        }
+	case abi.BoolTy:
+		switch v := value.(type) {
+		case bool:
+			return v, nil
+		case string:
+			if v == "true" {
+				return true, nil
+			} else if v == "false" {
+				return false, nil
+			}
+			return nil, fmt.Errorf("invalid boolean string: %s", v)
+		default:
+			return nil, fmt.Errorf("unsupported boolean input type: %T", value)
+		}
 
-    case abi.StringTy:
-        strValue, ok := value.(string)
-        if !ok {
-            return nil, fmt.Errorf("expected string, got %T", value)
-        }
-        return strValue, nil
+	case abi.StringTy:
+		strValue, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string, got %T", value)
+		}
+		return strValue, nil
 
-    case abi.BytesTy:
-        // dynamic bytes
-        switch v := value.(type) {
-        case string:
-            return hex.DecodeString(strings.TrimPrefix(v, "0x"))
-        case []byte:
-            return v, nil
-        default:
-            return nil, fmt.Errorf("unsupported bytes input type: %T", value)
-        }
+	case abi.BytesTy:
+		switch v := value.(type) {
+		case string:
+			return hex.DecodeString(strings.TrimPrefix(v, "0x"))
+		case []byte:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("unsupported bytes input type: %T", value)
+		}
 
-    case abi.FixedBytesTy:
-        switch v := value.(type) {
-        case string:
-            b, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
-            if err != nil {
-                return nil, fmt.Errorf("failed to decode hex string: %w", err)
-            }
-            if len(b) != abiType.Size {
-                return nil, fmt.Errorf("expected fixed bytes length %d, got %d", abiType.Size, len(b))
-            }
-            return b, nil
-        case []byte:
-            if len(v) != abiType.Size {
-                return nil, fmt.Errorf("expected fixed bytes length %d, got %d", abiType.Size, len(v))
-            }
-            return v, nil
-        default:
-            return nil, fmt.Errorf("unsupported fixed bytes input type: %T", value)
-        }
+	case abi.FixedBytesTy:
+		switch v := value.(type) {
+		case string:
+			b, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode hex string: %w", err)
+			}
+			if len(b) != abiType.Size {
+				return nil, fmt.Errorf("expected fixed bytes length %d, got %d", abiType.Size, len(b))
+			}
+			return b, nil
+		case []byte:
+			if len(v) != abiType.Size {
+				return nil, fmt.Errorf("expected fixed bytes length %d, got %d", abiType.Size, len(v))
+			}
+			return v, nil
+		default:
+			return nil, fmt.Errorf("unsupported fixed bytes input type: %T", value)
+		}
 
-    case abi.SliceTy, abi.ArrayTy:
-        valueVal := reflect.ValueOf(value)
-        if valueVal.Kind() != reflect.Slice {
-            return nil, fmt.Errorf("expected slice for array type, got %T", value)
-        }
+	case abi.SliceTy, abi.ArrayTy:
+		valueVal := reflect.ValueOf(value)
+		if valueVal.Kind() != reflect.Slice {
+			return nil, fmt.Errorf("expected slice for array type, got %T", value)
+		}
 
-        var rawElems []interface{}
-        for i := 0; i < valueVal.Len(); i++ {
-            rawElems = append(rawElems, valueVal.Index(i).Interface())
-        }
+		var rawElems []interface{}
+		for i := 0; i < valueVal.Len(); i++ {
+			rawElems = append(rawElems, valueVal.Index(i).Interface())
+		}
 
-        var result []interface{}
-        for i, elem := range rawElems {
-            convertedElem, err := convertToABIType(elem, *abiType.Elem)
-            if err != nil {
-                return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
-            }
-            result = append(result, convertedElem)
-        }
+		var result []interface{}
+		for i, elem := range rawElems {
+			convertedElem, err := convertToABIType(elem, *abiType.Elem)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert array element %d: %w", i, err)
+			}
+			result = append(result, convertedElem)
+		}
 
-        // Reconstruct properly typed slice
-        switch abiType.Elem.T {
-        case abi.UintTy, abi.IntTy:
-            typed := make([]*big.Int, len(result))
-            for i, v := range result {
-                typed[i] = v.(*big.Int)
-            }
-            return typed, nil
-        case abi.BoolTy:
-            typed := make([]bool, len(result))
-            for i, v := range result {
-                typed[i] = v.(bool)
-            }
-            return typed, nil
-        case abi.AddressTy:
-            typed := make([]common.Address, len(result))
-            for i, v := range result {
-                typed[i] = v.(common.Address)
-            }
-            return typed, nil
-        case abi.StringTy:
-            typed := make([]string, len(result))
-            for i, v := range result {
-                typed[i] = v.(string)
-            }
-            return typed, nil
-        case abi.BytesTy, abi.FixedBytesTy:
-            typed := make([][]byte, len(result))
-            for i, v := range result {
-                typed[i] = v.([]byte)
-            }
-            return typed, nil
-        case abi.TupleTy:
-            return result, nil // For tuple[], pass as []interface{}
-        default:
-            return result, nil // Generic fallback
-        }
+		switch abiType.Elem.T {
+		case abi.UintTy, abi.IntTy:
+			typed := make([]*big.Int, len(result))
+			for i, v := range result {
+				typed[i] = v.(*big.Int)
+			}
+			return typed, nil
+		case abi.BoolTy:
+			typed := make([]bool, len(result))
+			for i, v := range result {
+				typed[i] = v.(bool)
+			}
+			return typed, nil
+		case abi.AddressTy:
+			typed := make([]common.Address, len(result))
+			for i, v := range result {
+				typed[i] = v.(common.Address)
+			}
+			return typed, nil
+		case abi.StringTy:
+			typed := make([]string, len(result))
+			for i, v := range result {
+				typed[i] = v.(string)
+			}
+			return typed, nil
+		case abi.BytesTy, abi.FixedBytesTy:
+			typed := make([][]byte, len(result))
+			for i, v := range result {
+				typed[i] = v.([]byte)
+			}
+			return typed, nil
+		case abi.TupleTy:
+			return result, nil
+		default:
+			return result, nil
+		}
 
-    // case abi.TupleTy:
-    //     if valueMap, ok := value.(map[string]interface{}); ok {
-    //         // Tuple from map[string]interface{} (e.g., JSON decoding)
-    //         result := make([]interface{}, len(abiType.TupleElems))
-    //         for i, elem := range abiType.TupleElems {
-    //             val, exists := valueMap[elem.Name]
-    //             if !exists {
-    //                 return nil, fmt.Errorf("tuple field %q missing", elem.Name)
-    //             }
-    //             converted, err := convertToABIType(val, *elem)
-    //             if err != nil {
-    //                 return nil, fmt.Errorf("failed to convert tuple field %q: %w", elem.Name, err)
-    //             }
-    //             result[i] = converted
-    //         }
-    //         return result, nil
-    //     }
-
-    //     if valueSlice, ok := value.([]interface{}); ok {
-    //         if len(valueSlice) != len(abiType.TupleElems) {
-    //             return nil, fmt.Errorf("tuple length mismatch: expected %d, got %d", len(abiType.TupleElems), len(valueSlice))
-    //         }
-
-    //         result := make([]interface{}, len(valueSlice))
-    //         for i := range valueSlice {
-    //             converted, err := convertToABIType(valueSlice[i], *abiType.TupleElems[i])
-    //             if err != nil {
-    //                 return nil, fmt.Errorf("failed to convert tuple element %d: %w", i, err)
-    //             }
-    //             result[i] = converted
-    //         }
-    //         return result, nil
-    //     }
-
-    //     return nil, fmt.Errorf("unsupported tuple format: %T", value)
-
-    default:
-        return nil, fmt.Errorf("unsupported ABI type: %s", abiType.String())
-    }
+	default:
+		return nil, fmt.Errorf("unsupported ABI type: %s", abiType.String())
+	}
 }
+
 
 
 func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
-    if len(inputs) != len(args) {
-        return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
-    }
+	if len(inputs) != len(args) {
+		return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
+	}
 
-    packedArgs := make([]interface{}, len(args))
-    for i, input := range inputs {
-        arg := args[i]
+	packedArgs := make([]interface{}, len(args))
+	for i, input := range inputs {
+		arg := args[i]
 
-        // Step 1: Load value from state or direct value
-        argValue, err := getLookupValue(arg, stateDB)
-        if err != nil {
-            log.Info("Failed fetching argument value: %v", err)
-            return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
-        }
+		// Step 1: Load value from state or direct value
+		argValue, err := getLookupValue(arg, stateDB)
+		if err != nil {
+			log.Info("Failed fetching argument value", "ArgIndex", i, "Error", err)
+			return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
+		}
 
-        // Step 2: Get the ABI type
-        abiType, err := abi.NewType(input.Type.String(), "", nil)
-        if err != nil {
-            return nil, fmt.Errorf("failed to create ABI type: %w", err)
-        }
+		// Step 2: Get the ABI type
+		abiType, err := abi.NewType(input.Type.String(), "", nil)
+		if err != nil {
+			log.Info("Failed creating ABI type", "ArgIndex", i, "Type", input.Type.String(), "Error", err)
+			return nil, fmt.Errorf("failed to create ABI type: %w", err)
+		}
 
-        // Step 3: Convert to ABI-compatible value
-        convertedValue, err := convertToABIType(argValue, abiType)
-        if err != nil {
-            return nil, fmt.Errorf("failed to convert value for argument %d: %w", i, err)
-        }
+		// Step 3: Convert to ABI-compatible value
+		convertedValue, err := convertToABIType(argValue, abiType)
+		if err != nil {
+			log.Info("Failed converting value to ABI type", "ArgIndex", i, "RawValue", argValue, "ExpectedType", abiType.String(), "Error", err)
+			return nil, fmt.Errorf("failed to convert value for argument %d: %w", i, err)
+		}
 
-        log.Info("Processed Arg[%d]: RawValue=%v, ConvertedValue=%v, ExpectedType=%s", i, argValue, convertedValue, input.Type.String())
-        packedArgs[i] = convertedValue
-    }
+		log.Info("Processed argument", "ArgIndex", i, "RawValue", argValue, "ConvertedValue", convertedValue, "ExpectedType", input.Type.String())
+		packedArgs[i] = convertedValue
+	}
 
-    return packedArgs, nil
+	return packedArgs, nil
 }
 
 func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
-    // Retrieve contract address using ABI decoding
-    addrValue, err := getLookupValue(contract, stateDB)
-    if err != nil {
-        log.Info("Failed fetching contract address: %v", err)
-        return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
-    }
+	addrValue, err := getLookupValue(contract, stateDB)
+	if err != nil {
+		log.Info("Failed fetching contract address", "error", err)
+		return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
+	}
 
-    // If getLookupValue returns nil, return the zero address
-    if addrValue == nil {
-        log.Info("Lookup value is nil, returning zero address.")
-        return common.Address{}, nil
-    }
+	if addrValue == nil {
+		log.Info("Lookup value is nil, returning zero address")
+		return common.Address{}, nil
+	}
 
-    // If the value is already a common.Address, return it
-    if addr, ok := addrValue.(common.Address); ok {
-        log.Info("Successfully retrieved contract address: %s", addr.Hex())
-        return addr, nil
-    }
+	if addr, ok := addrValue.(common.Address); ok {
+		log.Info("Retrieved contract address", "address", addr.Hex())
+		return addr, nil
+	}
 
-    // If the value is a string, attempt to convert it to common.Address
-    if addrStr, ok := addrValue.(string); ok {
-        if common.IsHexAddress(addrStr) {
-            addr := common.HexToAddress(addrStr)
-            log.Info("Successfully converted string to contract address: %s", addr.Hex())
-            return addr, nil
-        }
-        log.Info("Error: Retrieved string is not a valid Ethereum address: %s", addrStr)
-        return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
-    }
+	if addrStr, ok := addrValue.(string); ok {
+		if common.IsHexAddress(addrStr) {
+			addr := common.HexToAddress(addrStr)
+			log.Info("Converted string to contract address", "address", addr.Hex())
+			return addr, nil
+		}
+		log.Info("Invalid Ethereum address string", "input", addrStr)
+		return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
+	}
 
-    log.Info("Error: Retrieved value is not a valid Ethereum address: %v", addrValue)
-    return common.Address{}, fmt.Errorf("invalid contract address type: %T", addrValue)
+	log.Info("Invalid contract address type", "value", addrValue)
+	return common.Address{}, fmt.Errorf("invalid contract address type: %T", addrValue)
 }
 
-// Utility function to retrieve the program counter
 func getPCFromState(stateDB contract.StateDB, addr common.Address) (*big.Int, error) {
-    currentPCBytes := stateDB.GetState(addr, pcKey)
-    if currentPCBytes == (common.Hash{}) {
-        return nil, errors.New("program counter not initialized")
-    }
+	currentPCBytes := stateDB.GetState(addr, pcKey)
+	if currentPCBytes == (common.Hash{}) {
+		return nil, errors.New("program counter not initialized")
+	}
 
-    // Converting value from 1 to 0
-    // savePCToState stores 1 when pc value is 0
-    if currentPCBytes == (common.Hash{1}) {
-        return big.NewInt(0), nil
-    }
+	if currentPCBytes == (common.Hash{1}) {
+		return big.NewInt(0), nil
+	}
 
-    currentPC := new(big.Int).SetBytes(currentPCBytes.Bytes())
-    return currentPC, nil
+	currentPC := new(big.Int).SetBytes(currentPCBytes.Bytes())
+	log.Info("Retrieved program counter from state", "address", addr.Hex(), "pc", currentPC.String())
+	return currentPC, nil
 }
 
-// Utility function to save the program counter to state
 func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
-    // Convert the big.Int value to a padded byte array
-    valueToSave := common.BytesToHash(pc.Bytes())
-    // using 1 if counter value is 0, getPCFromState throws "program counter not initialized"
-    // error when value is 0
-    if pc.Sign() == 0 { // Check if pc == 0
-        valueToSave = common.Hash{1} // Use a unique marker for 0
-    }
-    stateDB.SetState(addr, pcKey, valueToSave)
+	valueToSave := common.BytesToHash(pc.Bytes())
+	if pc.Sign() == 0 {
+		valueToSave = common.Hash{1}
+	}
+	stateDB.SetState(addr, pcKey, valueToSave)
+	log.Info("Saved program counter to state", "address", addr.Hex(), "pc", pc.String())
 }
 
 // Temporary function. Later we will use a DB
 func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address string) (contract string, primitive string) {
-    log.Info("Fetching contract primitive for address: %s", address)
+	log.Info("Fetching contract primitive", "target_address", address)
 
-    // Compute the key for retrieving the contract address
-    parsedAddress := common.HexToAddress(address)
-    addressHash := common.BytesToHash(parsedAddress.Bytes())
-    fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
+	parsedAddress := common.HexToAddress(address)
+	addressHash := common.BytesToHash(parsedAddress.Bytes())
+	fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
 
-    log.Info(
-        "Attempting to fetch primitive: Address=%s, AddrForStorage=%s, addressHash=%s, fullKey=%s",
-        address,
-        addr.Hex(),
-        addressHash.Hex(),
-        fullKey.Hex(),
-    )
-    
+	log.Info("Looking up primitive mapping", "lookup_address", addr.Hex(), "hashed_target", addressHash.Hex(), "full_key", fullKey.Hex())
 
-    // Retrieve the contract from storage
-    contractBytes, err := getLargeState(stateDB, addr, fullKey)
-    if err != nil {
-        log.Info("Error retrieving contract from state: %v", err)
-        return "", ""
-    }
-    if len(contractBytes) == 0 {
-        log.Info("No contract found for address: %s", address)
-        return "", "" // Return empty values instead of an error
-    }
+	contractBytes, err := getLargeState(stateDB, addr, fullKey)
+	if err != nil {
+		log.Info("Error retrieving contract from state", "error", err)
+		return "", ""
+	}
+	if len(contractBytes) == 0 {
+		log.Info("No contract found for address", "address", address)
+		return "", ""
+	}
 
-    contract = string(contractBytes)
-    log.Info("Found contract: %s for address: %s", contract, address)
+	contract = string(contractBytes)
+	log.Info("Found contract", "address", address, "contract", contract)
 
-    // Retrieve the primitive associated with this contract
-    primitive, exists := primitiveABI[contract]
-    if !exists {
-        log.Info("No primitive found for contract: %s", contract)
-        return contract, "" // Return contract but empty primitive
-    }
+	primitive, exists := primitiveABI[contract]
+	if !exists {
+		log.Info("No primitive found for contract", "contract", contract)
+		return contract, ""
+	}
 
-    log.Info("Found primitive: %.150s for contract: %s", primitive, contract)
-    return contract, primitive
+	log.Info("Found primitive for contract", "contract", contract, "primitive", primitive)
+	return contract, primitive
 }
 
 func updatePlanLocalState(stateDB contract.StateDB, addr common.Address, key string, storageData interface{}) error {
-    if key == "" {
-        return nil
-    }
+	if key == "" {
+		return nil
+	}
 
-    // Step 1: Retrieve the current JSON map from storage
-    raw, err := getLargeState(stateDB, addr, lookupStorageKey)
-    if err != nil {
-        return fmt.Errorf("failed to get existing state: %w", err)
-    }
+	raw, err := getLargeState(stateDB, addr, lookupStorageKey)
+	if err != nil {
+		return fmt.Errorf("failed to get existing state: %w", err)
+	}
 
-    // Step 2: Decode JSON into a map[string]interface{}
-    var jsonMap map[string]interface{}
-    if len(raw) > 0 {
-        if err := json.Unmarshal(raw, &jsonMap); err != nil {
-            return fmt.Errorf("failed to parse existing JSON state: %w", err)
-        }
-    } else {
-        jsonMap = make(map[string]interface{})
-    }
+	var jsonMap map[string]interface{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &jsonMap); err != nil {
+			return fmt.Errorf("failed to parse existing JSON state: %w", err)
+		}
+	} else {
+		jsonMap = make(map[string]interface{})
+	}
 
-    // Step 3: Insert or update the value
-    jsonMap[key] = storageData
+	jsonMap[key] = storageData
 
-    // Step 4: Encode back to JSON
-    updated, err := json.Marshal(jsonMap)
-    if err != nil {
-        return fmt.Errorf("failed to marshal updated JSON: %w", err)
-    }
+	updated, err := json.Marshal(jsonMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated JSON: %w", err)
+	}
 
-    // Step 5: Store in state
-    setLargeState(stateDB, addr, lookupStorageKey, updated)
-    log.Info("Updated plan-local JSON | Key=%s | Value=%v", key, storageData)
+	setLargeState(stateDB, addr, lookupStorageKey, updated)
+	log.Info("Updated plan-local state", "key", key, "value", storageData)
 
-    snapshot := string(updated)
-    if len(snapshot) > 5000 {
-        snapshot = snapshot[:5000] + "...[truncated]"
-    }
-    log.Info("Current plan-local state snapshot (capped): %s", snapshot)
+	snapshot := string(updated)
+	if len(snapshot) > 5000 {
+		snapshot = snapshot[:5000] + "...[truncated]"
+	}
+	log.Info("Plan-local state snapshot (capped)", "snapshot", snapshot)
 
-    return nil
+	return nil
 }
 
 // deletePlanFromState removes all chunks of data stored under the given key in the state.
 func deletePlanFromState(stateDB contract.StateDB, addr common.Address, key common.Hash) {
-    log.Info("Deleting plan from state with key: %s", key.Hex())
+	log.Info("Deleting plan from state", "key", key.Hex())
 
-    for i := 0; ; i++ {
-        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
-        chunk := stateDB.GetState(addr, chunkKey)
-        if chunk == (common.Hash{}) {
-            // Stop if no more chunks are found
-            log.Info("No more chunks found after index %d. Deletion complete.", i)
-            break
-        }
+	for i := 0; ; i++ {
+		chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+		chunk := stateDB.GetState(addr, chunkKey)
+		if chunk == (common.Hash{}) {
+			log.Info("No more chunks found during deletion", "lastIndex", i)
+			break
+		}
 
-        // Clear the chunk by setting it to an empty hash
-        stateDB.SetState(addr, chunkKey, common.Hash{})
-        log.Info("Deleted chunk %d with key: %s", i, chunkKey.Hex())
-    }
+		stateDB.SetState(addr, chunkKey, common.Hash{})
+		log.Info("Deleted chunk", "index", i, "chunkKey", chunkKey.Hex())
+	}
 
-    log.Info("All chunks under key %s have been deleted.", key.Hex())
+	log.Info("Completed deletion of all chunks", "key", key.Hex())
 }
 
 func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) (map[string]interface{}, error) {
-    if lookupJsonString == "" {
-        log.Info("No lookup entries")
-        return map[string]interface{}{}, nil
-    }
+	if lookupJsonString == "" {
+		log.Info("No lookup entries to store")
+		return map[string]interface{}{}, nil
+	}
 
-    // Step 1: Unmarshal the JSON into a generic map
-    var lookupMap map[string]interface{}
-    if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
-        return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
-    }
+	var lookupMap map[string]interface{}
+	if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
+		log.Info("Failed to parse lookup JSON", "error", err)
+		return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
+	}
 
-    // Step 2: Iterate and store each key/value pair
-    for key, val := range lookupMap {
-        if err := updatePlanLocalState(stateDB, addr, key, val); err != nil {
-            log.Info("Error: Failed to store lookup entry for key %s. Error: %v", key, err)
-            return nil, fmt.Errorf("failed to store lookup entry for key %s: %w", key, err)
-        }
+	for key, val := range lookupMap {
+		if err := updatePlanLocalState(stateDB, addr, key, val); err != nil {
+			log.Info("Failed to store lookup entry", "key", key, "error", err)
+			return nil, fmt.Errorf("failed to store lookup entry for key %s: %w", key, err)
+		}
+		log.Info("Stored lookup entry", "key", key, "value", val)
+	}
 
-        log.Info("Successfully stored lookup entry: Key=%s, Value=%v", key, val)
-    }
-
-    return lookupMap, nil
+	return lookupMap, nil
 }
 
-// GetPromptCounter retrieves the current value of the promptCounter from the StateDB.
 func GetPromptCounter(stateDB contract.StateDB) *big.Int {
 	value := stateDB.GetState(ContractAddress, promptCounterKey)
 	if value == (common.Hash{}) {
-		// If not found, initialize to 1
+		log.Info("Prompt counter not found in state, initializing to 0")
 		return big.NewInt(0)
 	}
-	return new(big.Int).SetBytes(value.Bytes())
+	counter := new(big.Int).SetBytes(value.Bytes())
+	log.Info("Retrieved prompt counter", "counter", counter.String())
+	return counter
 }
+
 
 // IncrementPromptCounter increments the value of promptCounter in the StateDB by 1.
 func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
