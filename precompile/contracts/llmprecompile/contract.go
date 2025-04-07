@@ -33,8 +33,9 @@ const (
 	ContinueEvaluationGasCost     uint64 = 3000 /* SET A GAS COST HERE */
 	EvaluatePlanGasCost           uint64 = 4000 /* SET A GAS COST HERE */
 	EvaluatePromptGasCost         uint64 = 200000 /* SET A GAS COST HERE */
-	PublishCustomPrimitiveGasCost uint64 = 1000 /* SET A GAS COST HERE */
+	PublishRobotContractGasCost uint64 = 1000 /* SET A GAS COST HERE */
 	PublishPrimitiveGasCost       uint64 = 1500 /* SET A GAS COST HERE */
+	PublishSystemPrimitiveGasCost uint64 = 1500 /* SET A GAS COST HERE */
 )
 
 // CUSTOM CODE STARTS HERE
@@ -852,7 +853,7 @@ func PackPublishRobotContract(inputStruct PublishRobotContractInput) ([]byte, er
 func publishRobotContract(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// log.Info("Made it to publishRobotContract function", "Caller", caller.Hex(), "ContractAddress", addr.Hex())
 
-	if remainingGas, err = contract.DeductGas(suppliedGas, PublishCustomPrimitiveGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, PublishRobotContractGasCost); err != nil {
 		return nil, 0, err
 	}
 	if readOnly {
