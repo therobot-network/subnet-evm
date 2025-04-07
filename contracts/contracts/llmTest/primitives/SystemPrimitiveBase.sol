@@ -17,10 +17,10 @@ abstract contract SystemPrimitiveBase is Ownable {
    * @param llmPrecompile LLM precompile address (TODO: hardcode address)
    * @param metadata ipfs hash
    */
-  constructor(address llmPrecompile, string memory metadata) Ownable(msg.sender) {
+  constructor(address llmPrecompile, string memory name, string memory metadata) Ownable(msg.sender) {
     LLM_PRECOMPILE = ILLM(llmPrecompile);
 
     // publish system primitive to PCC
-    LLM_PRECOMPILE.publishPrimitive(address(this), metadata);
+    LLM_PRECOMPILE.publishSystemPrimitive(address(this), name, metadata);
   }
 }

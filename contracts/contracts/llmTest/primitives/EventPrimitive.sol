@@ -7,7 +7,11 @@ import {PrimitiveBase} from "./PrimitiveBase.sol";
 contract EventPrimitive is PrimitiveBase {
   event uintArrayEvent(uint256[] uintArray);
 
-  constructor(address llmPrecompile, string memory metadata) PrimitiveBase(llmPrecompile, metadata) {}
+  constructor(
+    address llmPrecompile,
+    string memory metadata,
+    address primitiveStorageAddress
+  ) PrimitiveBase(llmPrecompile, "events", metadata, primitiveStorageAddress) {}
 
   function emitUintArrayEvent(uint256[] calldata uintArray) external {
     emit uintArrayEvent(uintArray);

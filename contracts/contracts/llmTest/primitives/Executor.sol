@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
+// import "hardhat/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {ILLM} from "../../interfaces/ILLM.sol";
 import {IExecutor} from "./interfaces/IExecutor.sol";
-import {CustomPrimitive} from "./CustomPrimitive.sol";
+import {RobotContract} from "./RobotContract.sol";
 
-interface ICustomPrimitive {
-  function getInfo() external view returns (string memory name, string memory customRules);
+interface IRobotContract {
+  function getInfo()
+    external
+    view
+    returns (string memory contractName, string memory customRules, string memory primitiveName);
 }
 
 contract Executor is Ownable, ReentrancyGuard, IExecutor {
@@ -21,8 +25,16 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
   }
 
   struct DeployedContract {
-    string name;
+    string contractName;
     address contractAddress;
+    string primitiveName;
+    address primitiveAddress;
+  }
+
+  struct PrimitiveInfo {
+    bool exists;
+    address implementation;
+    string metadata;
   }
 
   // LLM precompile contract address
@@ -34,13 +46,26 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
   // list of all deployed custom primitive contracts
   DeployedContract[] public deployedContracts;
 
-  event CustomPrimitiveDeployed(string name, address indexed contractAddress, address indexed primitiveContract);
+  // Mapping to track published primitives by name
+  mapping(string => PrimitiveInfo) public primitives;
+
+  // Event to be emitted when a primitive is published
+  event PrimitivePublished(
+    address indexed publisher,
+    address implementationAddress,
+    string primitiveName,
+    string metadata
+  );
+
+  event RobotContractDeployed(string contractName, address indexed contractAddress, string primitiveName);
   event PromptCompleted(string prompt);
   event PlanCompleted(string plan);
   event Plan(uint promptId, ILLM.ContractMethodParams[] plan);
   event ActionFailed(uint256 step, bytes data);
 
   error InvalidPrecompileAddress();
+  error InvalidImplementationAddress();
+  error PrimitiveAlreadyPublished(string name);
 
   constructor(address llmPrecompile) Ownable(msg.sender) {
     if (llmPrecompile == address(0)) revert InvalidPrecompileAddress();
@@ -50,23 +75,47 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
   /**
    * @dev Deploys a new custom primitive contract for the given primitive address.
    * A new custom proxy contract is deployed using primitive address as implementation.
-   * @param primitiveAddress primitive contract address
+   * @param primitiveName primitive contract name
    * @param initData bytes calldata for initializing the proxy contract
    */
-  function deployCustomPrimitive(
-    address primitiveAddress,
+  function deployRobotContract(
+    string calldata primitiveName,
     bytes calldata initData
   ) external nonReentrant returns (address customPrimitive) {
     /// @dev deploys a new custom primitive proxy contract
     /// with primitive address as implementation
-    CustomPrimitive customPrimitiveContract = new CustomPrimitive(primitiveAddress, initData);
+    RobotContract customPrimitiveContract = new RobotContract(primitives[primitiveName].implementation, initData);
 
     customPrimitive = address(customPrimitiveContract);
 
     // slither-disable-next-line unused-return
-    (string memory name, ) = ICustomPrimitive(customPrimitive).getInfo();
+    (string memory name, , ) = IRobotContract(customPrimitive).getInfo();
     // slither-disable-next-line reentrancy-benign
-    _newCustomContract(name, primitiveAddress, customPrimitive);
+    _newCustomContract(name, customPrimitive, primitiveName);
+  }
+
+  /**
+   * @dev Publishes a primitive to the Executor.
+   * @param implementationAddress address of the primitive implementation
+   * @param name name of the primitive
+   * @param metadata metadata of the primitive
+   */
+  function publishPrimitive(
+    address implementationAddress,
+    string memory name,
+    string memory metadata
+  ) external nonReentrant {
+    if (implementationAddress == address(0)) {
+      revert InvalidImplementationAddress();
+    }
+
+    if (primitives[name].exists) {
+      revert PrimitiveAlreadyPublished(name);
+    }
+
+    primitives[name] = PrimitiveInfo({implementation: implementationAddress, metadata: metadata, exists: true});
+
+    emit PrimitivePublished(msg.sender, implementationAddress, name, metadata);
   }
 
   /**
@@ -87,19 +136,6 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
     emit PlanCompleted(plan);
   }
 
-  // /**
-  //  * @dev Executes given plan json by sending it LLM and executing them.
-  //  * @param plan string plan object
-  //  */
-  // function evalFunction(
-  //     string calldata plan,
-  //     string[] calldata types,
-  //     bytes[] calldata lookupValues
-  // ) external nonReentrant {
-  //     _eval(plan, true);
-  //     emit PlanCompleted(plan);
-  // }
-
   /**
    * @dev Gets the msg signer from the storage.
    * @return msgSigner message signer address
@@ -112,12 +148,13 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
     return deployedContracts;
   }
 
-  function _newCustomContract(string memory name, address primitive, address contract_) private {
+  function _newCustomContract(string memory contractName, address contract_, string memory primitiveName) private {
     DeployedContract storage deployed = deployedContracts.push();
-    deployed.name = name;
+    deployed.contractName = contractName;
     deployed.contractAddress = contract_;
+    deployed.primitiveName = primitiveName;
 
-    emit CustomPrimitiveDeployed(name, contract_, primitive);
+    emit RobotContractDeployed(contractName, contract_, primitiveName);
   }
 
   /**
@@ -125,29 +162,30 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
    * @param request plan/prompt string
    * @param isPlan bool flag indicating if string is plan or prompt
    */
-  function _eval(
-    string calldata request,
-    bool isPlan // returns (bytes memory)
-  ) private {
+  function _eval(string calldata request, bool isPlan) private {
     // save msg signer in storage
     _msgSigner = msg.sender;
 
     ILLM.ContractMethodParams[] memory plan;
     uint promptId;
+    bool isEvaluationDone;
     // call LLM precompile to get the plan
-    (promptId, plan) = isPlan ? LLM.evaluatePlan(request) : LLM.evaluatePrompt(request);
+    (promptId, isEvaluationDone, plan) = isPlan ? LLM.evaluatePlan(request) : LLM.evaluatePrompt(request);
 
-    bool isEvaluationDone = false;
     // execute plan and call LLM's continueEvaluation
     while (!isEvaluationDone) {
       emit Plan(promptId, plan);
+
+      if (plan.length == 0) {
+        break;
+      }
+
       bytes[] memory results = _executePlan(plan);
 
       // send results back to LLM
       // slither-disable-next-line calls-loop
       (isEvaluationDone, plan) = LLM.continueEvaluation(promptId, results);
     }
-    // return plan[0].methodData;
   }
 
   /**

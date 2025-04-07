@@ -2,11 +2,12 @@
 
 pragma solidity ^0.8.20;
 
+// import "hardhat/console.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {ILLM} from "../../interfaces/ILLM.sol";
-// import {IExecutor} from "../interfaces/IExecutor.sol";
+import {IExecutor, IRobotStorage} from "./interfaces/IExecutor.sol";
 
 abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   // llm precompile contract address for publishing new primitive
@@ -23,8 +24,9 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   address private _proxy;
 
   // variables for defining custom primitives
-  string private _name;
+  string private _contractName;
   string private _customRules;
+  string private _primitiveName;
 
   // solhint-disable-next-line private-vars-leading-underscore
   bytes32 internal constant EXECUTOR_SLOT = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
@@ -41,15 +43,16 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
    * @param llmPrecompile LLM precompile address (TODO: hardcode address)
    * @param metadata ipfs hash
    */
-  constructor(address llmPrecompile, string memory metadata) {
+  constructor(address llmPrecompile, string memory name, string memory metadata, address primitiveStorageContract) {
     _initImplementation(msg.sender);
     LLM_PRECOMPILE = ILLM(llmPrecompile);
     _metadata = metadata;
 
     _IMPLEMENTATION_ADDRESS = address(this);
 
+    IRobotStorage(primitiveStorageContract).publishPrimitive(_IMPLEMENTATION_ADDRESS, name, metadata);
     // publish new primitive to llm
-    LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, metadata);
+    LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, name);
   }
 
   /**
@@ -77,17 +80,17 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
     _proxy = address(this);
     __Ownable_init(owner);
 
-    _name = name_;
+    _contractName = name_;
     _customRules = customRules;
 
-    _publishCustomPrimitive();
+    _publishRobotContract();
   }
 
   /**
    * @dev Publishes new custom primitive to LLM precompile.
    */
-  function _publishCustomPrimitive() private {
-    LLM_PRECOMPILE.publishCustomPrimitive(address(this), _IMPLEMENTATION_ADDRESS);
+  function _publishRobotContract() private {
+    LLM_PRECOMPILE.publishRobotContract(address(this), _IMPLEMENTATION_ADDRESS);
   }
 
   /**
@@ -107,19 +110,23 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   /**
    * @dev Gets custom primitive name and rules.
    */
-  function getInfo() external view returns (string memory name, string memory customRules) {
-    return (_name, _customRules);
+  function getInfo()
+    external
+    view
+    returns (string memory contractName, string memory customRules, string memory primitiveName)
+  {
+    return (_contractName, _customRules, _primitiveName);
   }
 
-  //   /**
-  //    * @dev Override openzeppelin's _msgSender function to get transaction signer address from the Executor
-  //    * contract if transaction is called by executor else use the msg sender address.
-  //    */
-  //   function _msgSender() internal view virtual override returns (address) {
-  //     // modifying msg sender (Temp fix)
-  //     address executor = _getExecutor();
-  //     return executor == msg.sender ? IExecutor(executor).getMsgSigner() : msg.sender;
-  //   }
+  /**
+   * @dev Override openzeppelin's _msgSender function to get transaction signer address from the Executor
+   * contract if transaction is called by executor else use the msg sender address.
+   */
+  function _msgSender() internal view virtual override returns (address) {
+    // modifying msg sender (Temp fix)
+    address executor = _getExecutor();
+    return executor == msg.sender ? IExecutor(executor).getMsgSigner() : msg.sender;
+  }
 
   /**
    * @dev Returns the current implementation address.
