@@ -6,8 +6,8 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {ILLM} from "../../interfaces/ILLM.sol";
-import {IExecutor} from "./interfaces/IExecutor.sol";
+import {ILLM} from "../interfaces/ILLM.sol";
+import {IExecutor, IRobotStorage, IRobotStateEmitter} from "./interfaces/IExecutor.sol";
 import {RobotContract} from "./RobotContract.sol";
 
 interface IRobotContract {
@@ -15,9 +15,11 @@ interface IRobotContract {
     external
     view
     returns (string memory contractName, string memory customRules, string memory primitiveName);
+
+  function getRobotState() external view returns (IRobotStateEmitter.StateChangePayload memory);
 }
 
-contract Executor is Ownable, ReentrancyGuard, IExecutor {
+contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotStateEmitter {
   struct PlanResults {
     address contractAddress;
     bool success;
@@ -49,27 +51,44 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
   // Mapping to track published primitives by name
   mapping(string => PrimitiveInfo) public primitives;
 
+  // Mapping to track robot contracts by indeces in deployedContracts
+  mapping(address => uint256) public deployedContractIndexByAddress;
+
   // Event to be emitted when a primitive is published
   event PrimitivePublished(
     address indexed publisher,
     address implementationAddress,
     string primitiveName,
     string metadata
+    // uint256 publishedTimestamp
   );
 
-  event RobotContractDeployed(string contractName, address indexed contractAddress, string primitiveName);
+  event RobotContractDeployed(
+    string contractName,
+    address indexed contractAddress,
+    string primitiveName
+    // uint256 deploymentTimestamp
+  );
+
   event PromptCompleted(string prompt);
   event PlanCompleted(string plan);
   event Plan(uint promptId, ILLM.ContractMethodParams[] plan);
   event ActionFailed(uint256 step, bytes data);
+  event StateChange(address robotContract, string primitiveName, StateChangePayload stateChangePayload);
 
   error InvalidPrecompileAddress();
   error InvalidImplementationAddress();
   error PrimitiveAlreadyPublished(string name);
+  error PrimitiveNotPublished(string name);
+  error InvalidRobotContract();
 
   constructor(address llmPrecompile) Ownable(msg.sender) {
     if (llmPrecompile == address(0)) revert InvalidPrecompileAddress();
     LLM = ILLM(llmPrecompile);
+  }
+
+  function getLlm() external view returns (ILLM) {
+    return LLM;
   }
 
   /**
@@ -82,14 +101,19 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
     string calldata primitiveName,
     bytes calldata initData
   ) external nonReentrant returns (address customPrimitive) {
+    if (!primitives[primitiveName].exists) {
+      revert PrimitiveNotPublished(primitiveName);
+    }
     /// @dev deploys a new custom primitive proxy contract
     /// with primitive address as implementation
-    RobotContract customPrimitiveContract = new RobotContract(primitives[primitiveName].implementation, initData);
+    RobotContract customPrimitiveContract = new RobotContract(primitives[primitiveName].implementation, address(this));
+    customPrimitiveContract.robotInitialize(initData);
 
     customPrimitive = address(customPrimitiveContract);
 
     // slither-disable-next-line unused-return
     (string memory name, , ) = IRobotContract(customPrimitive).getInfo();
+
     // slither-disable-next-line reentrancy-benign
     _newCustomContract(name, customPrimitive, primitiveName);
   }
@@ -115,7 +139,13 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
 
     primitives[name] = PrimitiveInfo({implementation: implementationAddress, metadata: metadata, exists: true});
 
-    emit PrimitivePublished(msg.sender, implementationAddress, name, metadata);
+    emit PrimitivePublished(
+      msg.sender,
+      implementationAddress,
+      name,
+      metadata
+      // block.timestamp
+    );
   }
 
   /**
@@ -149,12 +179,24 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
   }
 
   function _newCustomContract(string memory contractName, address contract_, string memory primitiveName) private {
+    uint256 index = deployedContracts.length;
+
     DeployedContract storage deployed = deployedContracts.push();
     deployed.contractName = contractName;
     deployed.contractAddress = contract_;
     deployed.primitiveName = primitiveName;
+    deployed.primitiveAddress = primitives[primitiveName].implementation;
 
-    emit RobotContractDeployed(contractName, contract_, primitiveName);
+    deployedContractIndexByAddress[contract_] = index;
+
+    emit RobotContractDeployed(
+      contractName,
+      contract_,
+      primitiveName
+      // block.timestamp
+    );
+    IRobotStateEmitter.StateChangePayload memory iniitalState = IRobotContract(contract_).getRobotState();
+    emit StateChange(contract_, primitiveName, iniitalState);
   }
 
   /**
@@ -208,5 +250,17 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor {
       );
       if (!success) emit ActionFailed(i, results[i]);
     }
+  }
+
+  /**
+   * @dev Sends data regarding a state change in a contract.
+   */
+  function emitStateChange(StateChangePayload calldata stateChangePayload) external {
+    uint256 index = deployedContractIndexByAddress[msg.sender];
+    if (index >= deployedContracts.length || deployedContracts[index].contractAddress != msg.sender) {
+      revert InvalidRobotContract();
+    }
+
+    emit StateChange(msg.sender, deployedContracts[index].primitiveName, stateChangePayload);
   }
 }

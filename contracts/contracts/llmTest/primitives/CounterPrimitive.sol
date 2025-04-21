@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.20;
 
+// import "hardhat/console.sol";
+
 import {PrimitiveBase} from "./PrimitiveBase.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 

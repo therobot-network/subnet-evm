@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {ILLM} from "../../interfaces/ILLM.sol";
+import {ILLM} from "../../../interfaces/ILLM.sol";
 
 abstract contract SystemPrimitiveBase is Ownable {
   // llm precompile contract address for publishing new primitive
   // slither-disable-next-line naming-convention
-  ILLM public immutable LLM_PRECOMPILE;
+  ILLM public immutable LLM_PRECOMPILE_BASE;
   // implementation contract address used for restricting direct initialization
 
   /**
@@ -18,9 +18,9 @@ abstract contract SystemPrimitiveBase is Ownable {
    * @param metadata ipfs hash
    */
   constructor(address llmPrecompile, string memory name, string memory metadata) Ownable(msg.sender) {
-    LLM_PRECOMPILE = ILLM(llmPrecompile);
+    LLM_PRECOMPILE_BASE = ILLM(llmPrecompile);
 
     // publish system primitive to PCC
-    LLM_PRECOMPILE.publishSystemPrimitive(address(this), name, metadata);
+    LLM_PRECOMPILE_BASE.publishSystemPrimitive(address(this), name, metadata);
   }
 }
