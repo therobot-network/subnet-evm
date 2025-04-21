@@ -321,7 +321,7 @@ func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address
 
 	primitive, exists := primitiveABI[contract]
 	if !exists {
-		log.Info("No primitive found for contract", "contract", contract)
+		log.Info("No ABI found for contract", "contract", contract)
 		return contract, ""
 	}
 

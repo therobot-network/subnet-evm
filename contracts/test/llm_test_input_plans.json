@@ -1455,5 +1455,54 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "withRobotContractDeploy": [
+    {
+      "Args": [
+        {
+          "Lookup": "erc20"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["new_contract_address"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "sender"
+        },
+        {
+          "Value": "TST"
+        },
+        {
+          "Value": "1000000000000000000"
+        },
+        {
+          "Value": "Test Token"
+        },
+        {
+          "Value": "No Rules"
+        }
+      ],
+      "Contract": {
+        "Lookup": "new_contract_address"
+      },
+      "Method": "initialize",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Value": "TST address is:"
+        },
+        {
+          "Lookup": "new_contract_address"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }

@@ -351,6 +351,10 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 		switch v := result.(type) {
 		case string:
 			strValue = v
+		case common.Address:
+			strValue = v.Hex()
+		case *big.Int:
+			strValue = v.String()
 		default:
 			jsonValue, err := json.Marshal(v)
 			if err != nil {
@@ -359,6 +363,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 			}
 			strValue = string(jsonValue)
 		}
+		
 
 		if err := updatePlanLocalState(stateDB, addr, storageKey, strValue); err != nil {
 			log.Info("Failed to update state", "PC", currentPC.Int64(), "Index", i, "Key", storageKey, "Error", err)
