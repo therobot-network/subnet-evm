@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {ILLM} from "../interfaces/ILLM.sol";
+import {ILLM} from "./interfaces/ILLM.sol";
 import {IExecutor, IRobotStorage, IRobotStateEmitter} from "./interfaces/IExecutor.sol";
 import {RobotContract} from "./RobotContract.sol";
 
@@ -89,6 +89,14 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
 
   function getLlm() external view returns (ILLM) {
     return LLM;
+  }
+
+  function getPrimitive(string memory name) external view returns (address primitiveAddress, string memory metadata) {
+    PrimitiveInfo storage primitive = primitives[name];
+    if (!primitive.exists) {
+      revert PrimitiveNotPublished(name);
+    }
+    return (primitive.implementation, primitive.metadata);
   }
 
   /**

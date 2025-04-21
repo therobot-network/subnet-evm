@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ILLM} from "../../interfaces/ILLM.sol";
+import {ILLM} from "./ILLM.sol";
 
 interface IExecutor {
   /**
@@ -22,6 +22,8 @@ interface IRobotStorage {
    * @param metadata metadata of the primitive
    */
   function publishPrimitive(address implementationAddress, string memory name, string memory metadata) external;
+
+  function getPrimitive(string memory name) external view returns (address primitiveAddress, string memory metadata);
 }
 interface IRobotStateEmitter {
   struct NamedFloat {
