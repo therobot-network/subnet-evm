@@ -702,12 +702,16 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 
 		// Parse userPrimitivesString (must be a JSON list of strings)
 		var userPrimitives []string
-		if err := json.Unmarshal([]byte(userPrimitivesString), &userPrimitives); err != nil {
-			log.Info("Failed to unmarshal userPrimitives", "Error", err)
-			return nil, suppliedGas, fmt.Errorf("invalid userPrimitives format: %w", err)
+		if strings.TrimSpace(userPrimitivesString) == "" {
+			userPrimitives = []string{} // Default to empty slice if string is empty or whitespace
+		} else {
+			if err := json.Unmarshal([]byte(userPrimitivesString), &userPrimitives); err != nil {
+				log.Info("Failed to unmarshal userPrimitives", "Error", err)
+				return nil, suppliedGas, fmt.Errorf("invalid userPrimitives format: %w", err)
+			}
 		}
 	
-		var validPrimitives []string
+		validPrimitives := []string{}
 		for _, primitiveName := range userPrimitives {
 			primitiveNameHash := common.BytesToHash([]byte(primitiveName))
 			fullKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), primitiveNameHash.Bytes()...))
@@ -734,6 +738,10 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		"txLogsId": txLogsId,
 		"localModel": false,
 	}
+
+	// if txLogsId != "" {
+	// 	requestPayload["txLogsId"] = txLogsId
+	// }
 
 	respBytes, err := HTTPPostJSON(llmApiURL, requestPayload)
 	if err != nil {
