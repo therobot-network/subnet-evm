@@ -83,6 +83,7 @@ var (
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
     llmApiURL = "http://robotbrain-v2-loadbalancer-2026683595.eu-west-1.elb.amazonaws.com/eval_prompt"
+    // llmApiURL = "http://v22-brain-load-balancer-1585508737.eu-west-1.elb.amazonaws.com/eval_prompt"
 )
 
 func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
@@ -450,36 +451,40 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
 
 // Helper function to parse JSON and extract "prompt"/"plan" and "lookupTable"
-func parseEvalInputJSON(input string, expectedKey string) (string, string, error) {
+func parseEvalInputJSON(input string, expectedKey string) (string, string, string, error) {
 	var parsed map[string]string
 	err := json.Unmarshal([]byte(input), &parsed)
 	if err != nil {
 		log.Info("Failed to parse JSON", "Error", err)
-		return "", "", errors.New("failed to parse JSON: " + err.Error())
+		return "", "", "", errors.New("failed to parse JSON: " + err.Error())
 	}
 
 	evalData, ok := parsed[expectedKey]
 	if !ok {
 		log.Info("Missing expected key", "Key", expectedKey)
-		return "", "", fmt.Errorf("missing required key: '%s'", expectedKey)
+		return "", "", "", fmt.Errorf("missing required key: '%s'", expectedKey)
 	}
 
 	lookupTable, ok := parsed["lookupTable"]
 	if !ok {
 		lookupTable = ""
 	}
+	primitives, ok := parsed["primitives"]
+	if !ok {
+		primitives = ""
+	}
 
-	log.Info("Parsed eval input JSON", "EvalKey", expectedKey, "EvalData", evalData, "LookupTable", lookupTable)
-	return evalData, lookupTable, nil
+	log.Info("Parsed eval input JSON", "EvalKey", expectedKey, "EvalData", evalData, "LookupTable", lookupTable, "Primitives", primitives)
+	return evalData, lookupTable, primitives, nil
 }
 
 // UnpackEvaluatePlanInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePlanInput(input []byte) (string, string, error) {
+func UnpackEvaluatePlanInput(input []byte) (string, string, string, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePlan", input, false)
 	if err != nil {
 		log.Info("Failed to unpack ABI input for evaluatePlan", "Error", err)
-		return "", "", err
+		return "", "", "", err
 	}
 
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
@@ -626,7 +631,7 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, suppliedGas, vmerrs.ErrWriteProtection
 	}
 
-	plan, lookupTable, err := UnpackEvaluatePlanInput(input)
+	plan, lookupTable, _, err := UnpackEvaluatePlanInput(input)
 	if err != nil {
 		log.Info("Failed to unpack evaluatePlan input", "Error", err)
 		return nil, suppliedGas, err
@@ -661,7 +666,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, suppliedGas, vmerrs.ErrWriteProtection
 	}
 
-	prompt, lookupTableString, err := UnpackEvaluatePromptInput(input)
+	prompt, lookupTableString, userPrimitivesString, err := UnpackEvaluatePromptInput(input)
 	if err != nil {
 		log.Info("Failed to unpack evaluatePrompt input", "Error", err)
 		return nil, suppliedGas, err
@@ -675,7 +680,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, suppliedGas, err
 	}
 
-	primitiveMapping := make(map[string]string)
+	contractToPrimitiveMapping := make(map[string]string)
 	var txLogsId string
 
 	for key, value := range lookupTable {
@@ -691,13 +696,41 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		}
 		contract, _ := getContractPrimitive(stateDB, addr, strVal)
 		if contract != "" {
-			primitiveMapping[key] = contract
+			contractToPrimitiveMapping[key] = contract
 		}
 	}
 
+		// Parse userPrimitivesString (must be a JSON list of strings)
+		var userPrimitives []string
+		if err := json.Unmarshal([]byte(userPrimitivesString), &userPrimitives); err != nil {
+			log.Info("Failed to unmarshal userPrimitives", "Error", err)
+			return nil, suppliedGas, fmt.Errorf("invalid userPrimitives format: %w", err)
+		}
+	
+		var validPrimitives []string
+		for _, primitiveName := range userPrimitives {
+			primitiveNameHash := common.BytesToHash([]byte(primitiveName))
+			fullKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), primitiveNameHash.Bytes()...))
+	
+			existingValue, err := getLargeState(stateDB, addr, fullKey)
+			if err != nil {
+				log.Info("Failed to check userPrimitive in state", "primitiveName", primitiveName, "Error", err)
+				return nil, suppliedGas, fmt.Errorf("failed to check userPrimitive in state: %w", err)
+			}
+			if len(existingValue) > 0 {
+				log.Info("Valid userPrimitive found", "primitiveName", primitiveName)
+				validPrimitives = append(validPrimitives, primitiveName)
+			} else {
+				log.Info("userPrimitive not found in state", "primitiveName", primitiveName)
+				return nil, suppliedGas, fmt.Errorf("userPrimitive not found in state: %w", err)
+			}
+		}
+	
+
 	requestPayload := map[string]interface{}{
 		"user_prompt": prompt,
-		"primitives": primitiveMapping,
+		"contracts": contractToPrimitiveMapping,
+		"primitives": validPrimitives,
 		"txLogsId": txLogsId,
 		"localModel": false,
 	}
@@ -727,10 +760,10 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePromptInput(input []byte) (string, string, error) {
+func UnpackEvaluatePromptInput(input []byte) (string, string, string, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePrompt", input, false)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
 	return parseEvalInputJSON(unpacked, "prompt")

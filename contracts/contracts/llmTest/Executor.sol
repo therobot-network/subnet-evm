@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {ILLM} from "./interfaces/ILLM.sol";
+import {ILLM} from "../interfaces/ILLM.sol";
 import {IExecutor, IRobotStorage, IRobotStateEmitter} from "./interfaces/IExecutor.sol";
 import {RobotContract} from "./RobotContract.sol";
 

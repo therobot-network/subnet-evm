@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ILLM} from "./ILLM.sol";
+import {ILLM} from "../../interfaces/ILLM.sol";
 
 interface IExecutor {
   /**

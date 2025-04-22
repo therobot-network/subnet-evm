@@ -69,22 +69,19 @@ describe("LLM Precompiled Contract", function () {
     return data;
   }
 
-  async function continueEvaluationAndCall(
+  async function handleContinueEvaluation(
     testContract: any,
-    owner: any,
     promptIdRead: string,
     contractMethodResult: string = boolenTrueHash,
-  ) {
-    // Call continueEvaluation with the provided result
-    let tx = await testContract.continueEvaluation(promptIdRead, [
+  ): Promise<{ to: string; data: string }> {
+    const tx = await testContract.continueEvaluation(promptIdRead, [
       contractMethodResult,
     ]);
     await tx.wait();
 
-    let calleeContractAddress: string;
-    let methodData: string;
+    let calleeContractAddress = "";
+    let methodData = "";
 
-    // Expect event to be emitted and extract data
     await expect(tx)
       .to.emit(testContract, "ContinueEvaluationEvent")
       .withArgs(
@@ -96,11 +93,21 @@ describe("LLM Precompiled Contract", function () {
         },
       );
 
-    // Call the next contract with retrieved data
-    return await owner.call({
-      to: calleeContractAddress,
-      data: methodData,
-    });
+    return { to: calleeContractAddress, data: methodData };
+  }
+
+  async function continueEvaluationAndCall(
+    testContract: any,
+    owner: any,
+    promptIdRead: string,
+    contractMethodResult: string = boolenTrueHash,
+  ) {
+    const { to, data } = await handleContinueEvaluation(
+      testContract,
+      promptIdRead,
+      contractMethodResult,
+    );
+    return await owner.call({ to, data });
   }
 
   async function continueEvaluationAndSend(
@@ -109,34 +116,29 @@ describe("LLM Precompiled Contract", function () {
     promptIdRead: string,
     contractMethodResult: string = boolenTrueHash,
   ) {
-    // Call continueEvaluation with the provided result
-    let tx = await testContract.continueEvaluation(promptIdRead, [
+    const { to, data } = await handleContinueEvaluation(
+      testContract,
+      promptIdRead,
       contractMethodResult,
-    ]);
-    await tx.wait();
-
-    let calleeContractAddress: string;
-    let methodData: string;
-
-    // Expect event to be emitted and extract data
-    await expect(tx)
-      .to.emit(testContract, "ContinueEvaluationEvent")
-      .withArgs(
-        (evaluationDone: boolean) => evaluationDone === false,
-        (contractMethodParams: any[]) => {
-          calleeContractAddress = contractMethodParams[0].contractAddress;
-          methodData = contractMethodParams[0].methodData;
-          return true;
-        },
-      );
-
-    // Call the next contract with retrieved data
-    const result = await owner.sendTransaction({
-      to: calleeContractAddress,
-      data: methodData,
-    });
-
+    );
+    const result = await owner.sendTransaction({ to, data });
     await result.wait();
+  }
+
+  async function continueEvaluationAndCallSend(
+    testContract: any,
+    owner: any,
+    promptIdRead: string,
+    contractMethodResult: string = boolenTrueHash,
+  ) {
+    const { to, data } = await handleContinueEvaluation(
+      testContract,
+      promptIdRead,
+      contractMethodResult,
+    );
+    const callResult = await owner.call({ to, data });
+    await owner.sendTransaction({ to, data });
+    return callResult;
   }
 
   function pause(duration: number = 1000): Promise<void> {
@@ -494,6 +496,40 @@ describe("LLM Precompiled Contract", function () {
       ammContract3Address,
       owner,
     );
+  });
+
+  it("Should recognize primitives sent in evaluatePrompt call", async function () {
+    const inputPrompt = `transfer 5 #USDC to @user1`;
+    const user1Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+
+    // should fail when prompt key is not passed
+    let isFailed = false;
+    await testContract
+      .evaluatePrompt(
+        JSON.stringify({
+          prompt: inputPrompt,
+          primitives: JSON.stringify(["invalidPrimitive"]),
+        }),
+      )
+      .catch((err) => {
+        isFailed = true;
+      });
+    expect(isFailed).to.be.true;
+
+    let tx = await testContract.evaluatePrompt(
+      JSON.stringify({
+        prompt: inputPrompt,
+        primitives: JSON.stringify(["amm", "erc20", "counter", "math"]),
+        lookupTable: JSON.stringify({
+          USDC: usdcContractAddress,
+          user1: user1Address,
+          signer: ADMIN_ADDRESS,
+          txLogsId: "0b6d013d1a577c1a",
+        }),
+      }),
+    );
+    await tx.wait();
+    await expect(tx).to.emit(testContract, "EvaluatePromptEvent");
   });
 
   it("Prompt: Transfer 5 #USDC to @user1", async function () {

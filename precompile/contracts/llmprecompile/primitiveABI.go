@@ -1906,17 +1906,27 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "address",
-          "name": "llmPrecompile",
+          "name": "_llmPrecompile",
           "type": "address"
         },
         {
           "internalType": "string",
           "name": "metadata",
           "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "_executor",
+          "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
       "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidExecutorAddress",
+      "type": "error"
     },
     {
       "inputs": [
@@ -1985,7 +1995,7 @@ var primitiveABI = map[string]string{
     },
     {
       "inputs": [],
-      "name": "LLM_PRECOMPILE",
+      "name": "LLM_PRECOMPILE_BASE",
       "outputs": [
         {
           "internalType": "contract ILLM",
@@ -1999,9 +2009,9 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "primitiveAddress",
-          "type": "address"
+          "internalType": "string",
+          "name": "primitiveName",
+          "type": "string"
         }
       ],
       "name": "deployRobotContract",
@@ -2013,6 +2023,19 @@ var primitiveABI = map[string]string{
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "executor",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
