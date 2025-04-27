@@ -1461,6 +1461,9 @@
       "Args": [
         {
           "Value": "erc20"
+        },
+        {
+          "Value": "NC"
         }
       ],
       "Contract": {
@@ -1475,16 +1478,13 @@
           "Lookup": "sender"
         },
         {
-          "Value": "TST"
+          "Value": "Test Token"
         },
         {
           "Value": "1000000000000000000"
         },
         {
-          "Value": "Test Token"
-        },
-        {
-          "Value": "No Rules"
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1510,6 +1510,9 @@
       "Args": [
         {
           "Value": "erc20"
+        },
+        {
+          "Value": "TKNA"
         }
       ],
       "Contract": {
@@ -1524,16 +1527,13 @@
           "Lookup": "sender"
         },
         {
-          "Value": "TSTA"
+          "Value": "Test Token A"
         },
         {
           "Value": "10000000000000000000000"
         },
         {
-          "Value": "Test Token A"
-        },
-        {
-          "Value": "No Rules"
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1546,6 +1546,9 @@
       "Args": [
         {
           "Value": "erc20"
+        },
+        {
+          "Value": "TKNB"
         }
       ],
       "Contract": {
@@ -1560,13 +1563,10 @@
           "Lookup": "sender"
         },
         {
-          "Value": "TSTB"
+          "Value": "Test Token B"
         },
         {
           "Value": "10000000000000000000000"
-        },
-        {
-          "Value": "Test Token B"
         },
         {
           "Value": "No Rules"
@@ -1582,6 +1582,9 @@
       "Args": [
         {
           "Lookup": "amm"
+        },
+        {
+          "Value": "AMMAB"
         }
       ],
       "Contract": {
@@ -1602,9 +1605,6 @@
           "Lookup": "tokenBAddress"
         },
         {
-          "Value": "AMM_TEST"
-        },
-        {
           "Value": "No Rules"
         }
       ],
@@ -1618,6 +1618,9 @@
       "Args": [
         {
           "Lookup": "amm"
+        },
+        {
+          "Value": "AMMAB"
         }
       ],
       "Contract": {

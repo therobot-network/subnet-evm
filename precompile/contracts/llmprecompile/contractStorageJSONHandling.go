@@ -25,12 +25,17 @@ import (
 
 // getLookupValue retrieves a value from the lookup table or directly from the Arg.
 func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
-	if arg.Value != "" {
-		return arg.Value, nil
+	// If Value is explicitly set (even to ""), use it
+	if arg.Value != nil {
+		return *arg.Value, nil
 	}
-	if arg.Lookup == "" {
+
+	// If Lookup is not set or is explicitly empty, stop here
+	if arg.Lookup == nil {
 		return nil, nil
 	}
+
+	lookupKey := *arg.Lookup // safely dereference once
 
 	lookupData, err := getLargeState(stateDB, ContractAddress, lookupStorageKey)
 	if err != nil {
@@ -39,7 +44,7 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
 	}
 
 	if len(lookupData) == 0 {
-		log.Info("Lookup state is empty", "LookupKey", arg.Lookup)
+		log.Info("Lookup state is empty", "LookupKey", lookupKey)
 		return nil, nil
 	}
 
@@ -49,13 +54,13 @@ func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
 		return nil, fmt.Errorf("failed to decode lookup JSON: %w", err)
 	}
 
-	val, exists := lookupMap[arg.Lookup]
+	val, exists := lookupMap[lookupKey]
 	if !exists {
-		log.Info("Lookup key not found", "LookupKey", arg.Lookup)
+		log.Info("Lookup key not found", "LookupKey", lookupKey)
 		return nil, nil
 	}
 
-	log.Info("Found lookup value", "LookupKey", arg.Lookup, "Value", val)
+	log.Info("Found lookup value", "LookupKey", lookupKey, "Value", val)
 	return val, nil
 }
 
@@ -248,6 +253,20 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
 		return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
 	}
 
+	if addrStr, ok := addrValue.(string); ok {
+		if addrStr == "" {
+			log.Info("Address string is empty, returning zero address")
+			return common.Address{}, nil
+		}
+		if common.IsHexAddress(addrStr) {
+			addr := common.HexToAddress(addrStr)
+			log.Info("Converted string to contract address", "address", addr.Hex())
+			return addr, nil
+		}
+		log.Info("Invalid Ethereum address string", "input", addrStr)
+		return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
+	}
+
 	if addrValue == nil {
 		log.Info("Lookup value is nil, returning zero address")
 		return common.Address{}, nil
@@ -256,16 +275,6 @@ func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address,
 	if addr, ok := addrValue.(common.Address); ok {
 		log.Info("Retrieved contract address", "address", addr.Hex())
 		return addr, nil
-	}
-
-	if addrStr, ok := addrValue.(string); ok {
-		if common.IsHexAddress(addrStr) {
-			addr := common.HexToAddress(addrStr)
-			log.Info("Converted string to contract address", "address", addr.Hex())
-			return addr, nil
-		}
-		log.Info("Invalid Ethereum address string", "input", addrStr)
-		return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
 	}
 
 	log.Info("Invalid contract address type", "value", addrValue)
@@ -325,7 +334,11 @@ func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address
 		return contract, ""
 	}
 
-	log.Info("Found primitive for contract", "contract", contract, "primitive", primitive)
+	if len(primitive) > 500 {
+		log.Info("Found primitive for contract", "contract", contract, "primitive", primitive[:500])
+	}else{
+		log.Info("Found primitive for contract", "contract", contract, "primitive", primitive)
+	}
 	return contract, primitive
 }
 

@@ -49,10 +49,15 @@ var (
 )
 
 
+// type Arg struct {
+// 	Value  string `json:"Value"`
+// 	Lookup string    `json:"Lookup"`
+//     // AbiType string `json:"AbiType"`
+// }
+
 type Arg struct {
-	Value  string `json:"Value"`
-	Lookup string    `json:"Lookup"`
-    // AbiType string `json:"AbiType"`
+	Value  *string `json:"Value"`
+	Lookup *string  `json:"Lookup"`
 }
 
 type Step struct {
@@ -570,12 +575,11 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 		return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
 	}
 
-	for contractAddress == (common.Address{}) || contractAddress == common.HexToAddress("0x0000000000000000000000000000000000000000") {
-		currentPC, remainingGas, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB, accessibleState, remainingGas)
-		if err != nil {
-			log.Info("System primitive step failed", "Error", err)
-			return nil, remainingGas, err
+	for {
+		if contractAddress != (common.Address{}) && contractAddress != common.HexToAddress("0x0000000000000000000000000000000000000000") {
+			break
 		}
+	
 		if currentPC.Int64() >= int64(len(inputSteps)) {
 			log.Info("All steps completed")
 			savePCToState(stateDB, addr, currentPC)
@@ -592,13 +596,21 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
 			log.Info("Returning packed output for completed plan")
 			return packedOutput, remainingGas, nil
 		}
+	
 		nextStep = inputSteps[currentPC.Int64()]
 		contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
 		if err != nil {
 			log.Info("Failed to get contract address", "Error", err)
 			return nil, remainingGas, fmt.Errorf("failed to parse contract address: %w", err)
 		}
+	
+		currentPC, remainingGas, err = systemPrimitiveStep(currentPC, nextStep, addr, stateDB, accessibleState, remainingGas)
+		if err != nil {
+			log.Info("System primitive step failed", "Error", err)
+			return nil, remainingGas, err
+		}
 	}
+	
 
 	savePCToState(stateDB, addr, currentPC)
 	contractMethodParams, err := prepareNextStep(nextStep, contractAddress, addr, stateDB)
@@ -671,7 +683,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		log.Info("Failed to unpack evaluatePrompt input", "Error", err)
 		return nil, suppliedGas, err
 	}
-	log.Info("Unpacked prompt input", "Prompt", prompt, "LookupTable", lookupTableString)
+	log.Info("Unpacked prompt input", "Prompt", prompt, "LookupTable", lookupTableString, "UserPrimitives", userPrimitivesString)	
 
 	stateDB := accessibleState.GetStateDB()
 	lookupTable, err := storeLookupEntries(stateDB, addr, lookupTableString)
