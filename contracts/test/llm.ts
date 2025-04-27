@@ -318,11 +318,11 @@ describe("LLM Precompiled Contract", function () {
 
     let initData = generateFunctionCallData(
       "initialize",
-      ["address", "string", "string"],
-      [ADMIN_ADDRESS, "calculator", ""],
+      ["address", "string"],
+      [ADMIN_ADDRESS, ""],
     );
 
-    let tx = await executor.deployRobotContract("math", initData);
+    let tx = await executor.deployRobotContract("math", "calculator", initData);
     let receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -337,10 +337,10 @@ describe("LLM Precompiled Contract", function () {
 
     initData = generateFunctionCallData(
       "initialize",
-      ["address", "string", "string"],
-      [ADMIN_ADDRESS, "xCounter", ""],
+      ["address", "string"],
+      [ADMIN_ADDRESS, ""],
     );
-    tx = await executor.deployRobotContract("counter", initData);
+    tx = await executor.deployRobotContract("counter", "xCounter", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -359,7 +359,7 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployRobotContract("counter", initData);
+    tx = await executor.deployRobotContract("counter", "xCounter", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -380,16 +380,16 @@ describe("LLM Precompiled Contract", function () {
 
     initData = generateFunctionCallData(
       "initialize",
-      ["address", "string", "uint256", "string", "string"],
-      [ADMIN_ADDRESS, "USDC", ethers.parseEther("100000"), "USDC Token", ""],
+      ["address", "string", "uint256", "string"],
+      [ADMIN_ADDRESS, "USDC Token", ethers.parseEther("100000"), ""],
     );
 
-    tx = await executor.deployRobotContract("erc20", initData);
+    tx = await executor.deployRobotContract("erc20", "USDC", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
       .withArgs(
-        "USDC Token",
+        "USDC",
         (cloneAddr) => {
           usdcContractAddress = cloneAddr;
           return true;
@@ -405,16 +405,16 @@ describe("LLM Precompiled Contract", function () {
 
     initData = generateFunctionCallData(
       "initialize",
-      ["address", "string", "uint256", "string", "string"],
-      [ADMIN_ADDRESS, "JIRI", ethers.parseEther("100000"), "JIRI Token", ""],
+      ["address", "string", "uint256", "string"],
+      [ADMIN_ADDRESS, "JIRI Token", ethers.parseEther("100000"), ""],
     );
 
-    tx = await executor.deployRobotContract("erc20", initData);
+    tx = await executor.deployRobotContract("erc20", "JIRI", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
       .withArgs(
-        "JIRI Token",
+        "JIRI",
         (cloneAddr) => {
           jiriContractAddress = cloneAddr;
           return true;
@@ -430,17 +430,11 @@ describe("LLM Precompiled Contract", function () {
 
     initData = generateFunctionCallData(
       "initialize",
-      ["address", "address", "address", "string", "string"],
-      [
-        ADMIN_ADDRESS,
-        usdcContractAddress,
-        jiriContractAddress,
-        "AMM USDC-JIRI",
-        "",
-      ],
+      ["address", "address", "address", "string"],
+      [ADMIN_ADDRESS, usdcContractAddress, jiriContractAddress, ""],
     );
 
-    tx = await executor.deployRobotContract("amm", initData);
+    tx = await executor.deployRobotContract("amm", "AMM USDC-JIRI", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -459,7 +453,7 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployRobotContract("amm", initData);
+    tx = await executor.deployRobotContract("amm", "AMM USDC-JIRI", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -478,7 +472,7 @@ describe("LLM Precompiled Contract", function () {
       owner,
     );
 
-    tx = await executor.deployRobotContract("amm", initData);
+    tx = await executor.deployRobotContract("amm", "AMM USDC-JIRI", initData);
     receipt = await tx.wait();
     await expect(receipt)
       .to.emit(executor, "RobotContractDeployed")
@@ -647,7 +641,7 @@ describe("LLM Precompiled Contract", function () {
           USDC: usdcContractAddress,
           alice: user1Address,
           signer: ADMIN_ADDRESS,
-          calculator: mathContractAddress,
+          txLogsId: "12345",
         }),
       }),
     );
@@ -1840,7 +1834,7 @@ describe("LLM Precompiled Contract", function () {
     // );
   });
 
-  it("should test evaluatePlan withRobotContractDeploy", async function () {
+  it("should test evaluatePlan with ERC20 Deploy", async function () {
     const withRobotContractDeployPlan = JSON.stringify({
       plan: JSON.stringify(plans["withRobotContractDeploy"]),
       lookupTable: JSON.stringify({
@@ -1915,6 +1909,80 @@ describe("LLM Precompiled Contract", function () {
     expect(tstCode).to.not.equal("0x");
   });
 
+  it("should test evaluatePlan with Amm Deploy", async function () {
+    const withAmmDeployPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withAmmDeploy"]),
+      lookupTable: JSON.stringify({
+        sender: ADMIN_ADDRESS,
+      }),
+    });
+
+    let promptIdRead: string;
+
+    let tx = await testContract.evaluatePlan(withAmmDeployPlan);
+    await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => {
+          calleeContractAddress = contractMethodParams[0].contractAddress;
+          methodData = contractMethodParams[0].methodData;
+          return true;
+        },
+      );
+
+    let resultTx = await owner.call({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    // Deploy Token
+    await owner.sendTransaction({
+      to: calleeContractAddress,
+      data: methodData,
+    });
+
+    // Store Token address and Init
+    await continueEvaluationAndSend(
+      testContract,
+      owner,
+      promptIdRead,
+      resultTx,
+    );
+    // Deploy Token
+    resultTx = await continueEvaluationAndCallSend(
+      testContract,
+      owner,
+      promptIdRead,
+    );
+    // Store Token address and Init
+    await continueEvaluationAndSend(
+      testContract,
+      owner,
+      promptIdRead,
+      resultTx,
+    );
+    // Deploy AMM
+    resultTx = await continueEvaluationAndCallSend(
+      testContract,
+      owner,
+      promptIdRead,
+    );
+    // Store AMM address and Init
+    await continueEvaluationAndSend(
+      testContract,
+      owner,
+      promptIdRead,
+      resultTx,
+    );
+  });
+
   it("Prompt: Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.", async function () {
     const inputPrompt =
       "Arbitrage: Please check the price of #JIRI in #USDC on 3 exchanges: #AMM_1, #AMM_2, #AMM_3. On the most expensive exchange, sell half of my #JIRI for #USDC. Then on the least expensive exchange, buy that much #JIRI back. make sure to approve the swap amount before executing the swap action.";
@@ -1984,6 +2052,9 @@ describe("LLM Precompiled Contract", function () {
       startJiriBalance - sellJiriAmount + boughtJiri;
     const endUsdcBalanceExpected = startUsdcBalance; // Assuming no fees
 
+    const timestamp = Date.now().toString();
+    const txLogsId = ethers.keccak256(ethers.toUtf8Bytes(timestamp));
+
     let tx = await testContract.evaluatePrompt(
       JSON.stringify({
         prompt: inputPrompt,
@@ -1993,8 +2064,8 @@ describe("LLM Precompiled Contract", function () {
           AMM_1: ammContract1Address,
           AMM_2: ammContract2Address,
           AMM_3: ammContract3Address,
-          calculator: mathContractAddress,
           signer: ADMIN_ADDRESS,
+          txLogsId: txLogsId,
         }),
       }),
       { gasLimit: 5000000, timeout: 60000 },
