@@ -117,34 +117,6 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
-		"readOnly publishCustomPrimitive should fail": {
-			Caller: common.Address{1},
-			InputFn: func(t testing.TB) []byte {
-				// CUSTOM CODE STARTS HERE
-				// populate test input here
-				testInput := PublishCustomPrimitiveInput{}
-				input, err := PackPublishCustomPrimitive(testInput)
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: PublishCustomPrimitiveGasCost,
-			ReadOnly:    true,
-			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
-		},
-		"insufficient gas for publishCustomPrimitive should fail": {
-			Caller: common.Address{1},
-			InputFn: func(t testing.TB) []byte {
-				// CUSTOM CODE STARTS HERE
-				// populate test input here
-				testInput := PublishCustomPrimitiveInput{}
-				input, err := PackPublishCustomPrimitive(testInput)
-				require.NoError(t, err)
-				return input
-			},
-			SuppliedGas: PublishCustomPrimitiveGasCost - 1,
-			ReadOnly:    false,
-			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
-		},
 		"readOnly publishPrimitive should fail": {
 			Caller: common.Address{1},
 			InputFn: func(t testing.TB) []byte {
@@ -170,6 +142,62 @@ var (
 				return input
 			},
 			SuppliedGas: PublishPrimitiveGasCost - 1,
+			ReadOnly:    false,
+			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+		},
+		"readOnly publishRobotContract should fail": {
+			Caller: common.Address{1},
+			InputFn: func(t testing.TB) []byte {
+				// CUSTOM CODE STARTS HERE
+				// populate test input here
+				testInput := PublishRobotContractInput{}
+				input, err := PackPublishRobotContract(testInput)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: PublishRobotContractGasCost,
+			ReadOnly:    true,
+			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+		},
+		"insufficient gas for publishRobotContract should fail": {
+			Caller: common.Address{1},
+			InputFn: func(t testing.TB) []byte {
+				// CUSTOM CODE STARTS HERE
+				// populate test input here
+				testInput := PublishRobotContractInput{}
+				input, err := PackPublishRobotContract(testInput)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: PublishRobotContractGasCost - 1,
+			ReadOnly:    false,
+			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
+		},
+		"readOnly publishSystemPrimitive should fail": {
+			Caller: common.Address{1},
+			InputFn: func(t testing.TB) []byte {
+				// CUSTOM CODE STARTS HERE
+				// populate test input here
+				testInput := PublishSystemPrimitiveInput{}
+				input, err := PackPublishSystemPrimitive(testInput)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: PublishSystemPrimitiveGasCost,
+			ReadOnly:    true,
+			ExpectedErr: vmerrs.ErrWriteProtection.Error(),
+		},
+		"insufficient gas for publishSystemPrimitive should fail": {
+			Caller: common.Address{1},
+			InputFn: func(t testing.TB) []byte {
+				// CUSTOM CODE STARTS HERE
+				// populate test input here
+				testInput := PublishSystemPrimitiveInput{}
+				input, err := PackPublishSystemPrimitive(testInput)
+				require.NoError(t, err)
+				return input
+			},
+			SuppliedGas: PublishSystemPrimitiveGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},

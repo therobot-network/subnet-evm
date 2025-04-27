@@ -1,27 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {SystemPrimitiveBase} from "./SystemPrimitiveBase.sol";
 
-import {PrimitiveBase} from "./PrimitiveBase.sol";
-
-contract MathPrimitive is Initializable, PrimitiveBase {
+contract PythonPrimitive is SystemPrimitiveBase {
     error DivisionByZero();
     error Overflow();
+    error ArrayCannotBeEmpty();
 
     constructor(
         address llmPrecompile,
-        string memory metadata,
-        address primitiveStorageAddress
-    ) PrimitiveBase(llmPrecompile, "math", metadata, primitiveStorageAddress) {}
+        string memory metadata
+    ) SystemPrimitiveBase(llmPrecompile, "PythonPrimitive", metadata) {}
 
-    function initialize(
-        address owner,
-        string calldata customRules_
-    ) external initializer {
-        __Primitive_init(owner, customRules_);
-    }
     // Add two numbers with overflow protection
     function add(uint256 a, uint256 b) public pure returns (uint256) {
         (bool success, uint256 sum) = Math.tryAdd(a, b);
@@ -55,6 +47,11 @@ contract MathPrimitive is Initializable, PrimitiveBase {
         (bool success, uint256 result) = Math.tryMod(a, b);
         if (!success) revert DivisionByZero();
         return result;
+    }
+
+    // Power function (equivalent to Python's pow)
+    function pow(uint256 base, uint256 exponent) public pure returns (uint256) {
+        return base ** exponent;
     }
 
     // check if number a is greater than number b
@@ -91,13 +88,38 @@ contract MathPrimitive is Initializable, PrimitiveBase {
     }
 
     // Find the maximum of two numbers
-    function max(uint256 a, uint256 b) public pure returns (uint256) {
+    function max2(uint256 a, uint256 b) public pure returns (uint256) {
         return Math.max(a, b);
     }
 
     // Find the minimum of two numbers
-    function min(uint256 a, uint256 b) public pure returns (uint256) {
+    function min2(uint256 a, uint256 b) public pure returns (uint256) {
         return Math.min(a, b);
+    }
+
+    // Find the maximum in an array
+    function max(uint256[] memory arr) public pure returns (uint256) {
+        if (arr.length == 0) revert ArrayCannotBeEmpty();
+        uint256 maxValue = arr[0];
+        for (uint256 i = 1; i < arr.length; i++) {
+            if (arr[i] > maxValue) maxValue = arr[i];
+        }
+        return maxValue;
+    }
+
+    // Find the minimum in an array
+    function min(uint256[] memory arr) public pure returns (uint256) {
+        if (arr.length == 0) revert ArrayCannotBeEmpty();
+        uint256 minValue = arr[0];
+        for (uint256 i = 1; i < arr.length; i++) {
+            if (arr[i] < minValue) minValue = arr[i];
+        }
+        return minValue;
+    }
+
+    // Absolute value
+    function abs(int256 x) public pure returns (uint256) {
+        return x < 0 ? uint256(-x) : uint256(x);
     }
 
     // Divide two numbers and round up

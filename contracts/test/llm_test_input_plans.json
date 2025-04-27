@@ -1455,5 +1455,291 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "withRobotContractDeploy": [
+    {
+      "Args": [
+        {
+          "Value": "erc20"
+        },
+        {
+          "Value": "NC"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["new_contract_address"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "sender"
+        },
+        {
+          "Value": "Test Token"
+        },
+        {
+          "Value": "1000000000000000000"
+        },
+        {
+          "Value": ""
+        }
+      ],
+      "Contract": {
+        "Lookup": "new_contract_address"
+      },
+      "Method": "initialize",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Value": "TST address is:"
+        },
+        {
+          "Lookup": "new_contract_address"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
+  ],
+  "withAmmDeploy": [
+    {
+      "Args": [
+        {
+          "Value": "erc20"
+        },
+        {
+          "Value": "TKNA"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["tokenAAddress"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "sender"
+        },
+        {
+          "Value": "Test Token A"
+        },
+        {
+          "Value": "10000000000000000000000"
+        },
+        {
+          "Value": ""
+        }
+      ],
+      "Contract": {
+        "Lookup": "tokenAAddress"
+      },
+      "Method": "initialize",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Value": "erc20"
+        },
+        {
+          "Value": "TKNB"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["tokenBAddress"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "sender"
+        },
+        {
+          "Value": "Test Token B"
+        },
+        {
+          "Value": "10000000000000000000000"
+        },
+        {
+          "Value": "No Rules"
+        }
+      ],
+      "Contract": {
+        "Lookup": "tokenBAddress"
+      },
+      "Method": "initialize",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "amm"
+        },
+        {
+          "Value": "AMMAB"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["new_contract_address"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "sender"
+        },
+        {
+          "Lookup": "tokenAAddress"
+        },
+        {
+          "Lookup": "tokenBAddress"
+        },
+        {
+          "Value": "No Rules"
+        }
+      ],
+      "Contract": {
+        "Lookup": "new_contract_address"
+      },
+      "Method": "initialize",
+      "Output": []
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "amm"
+        },
+        {
+          "Value": "AMMAB"
+        }
+      ],
+      "Contract": {
+        "Lookup": "SystemPrimitive"
+      },
+      "Method": "deployRobotContract",
+      "Output": ["ammAddress"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "ammAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        }
+      ],
+      "Contract": {
+        "Lookup": "tokenAAddress"
+      },
+      "Method": "approve",
+      "Output": [],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "ammAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        }
+      ],
+      "Contract": {
+        "Lookup": "tokenBAddress"
+      },
+      "Method": "approve",
+      "Output": [],
+      "Primitive": "erc20"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "tokenAAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        },
+        {
+          "Lookup": "tokenBAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        }
+      ],
+      "Contract": {
+        "Lookup": "ammAddress"
+      },
+      "Method": "addLiquidity",
+      "Output": [],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "tokenAAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        },
+        {
+          "Lookup": "tokenBAddress"
+        },
+        {
+          "Value": "100000000000000000000"
+        }
+      ],
+      "Contract": {
+        "Lookup": "ammAddress"
+      },
+      "Method": "addLiquidity",
+      "Output": [],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [],
+      "Contract": {
+        "Lookup": "ammAddress"
+      },
+      "Method": "activate",
+      "Output": [],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "tokenAAddress"
+        },
+        {
+          "Value": "50000000000000000000"
+        }
+      ],
+      "Contract": {
+        "Lookup": "ammAddress"
+      },
+      "Method": "swap",
+      "Output": [],
+      "Primitive": "amm"
+    },
+    {
+      "Args": [
+        {
+          "Value": "AMM address is:"
+        },
+        {
+          "Lookup": "ammAddress"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
 }

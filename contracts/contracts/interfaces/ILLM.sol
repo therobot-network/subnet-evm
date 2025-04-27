@@ -14,18 +14,20 @@ interface ILLM {
   // sayHello returns the stored greeting string
   function evaluatePrompt(
     string calldata prompt
-  ) external returns (uint promptId, ContractMethodParams[] calldata contractMethodParams);
+  ) external returns (uint promptId, bool evaluationDone, ContractMethodParams[] calldata contractMethodParams);
 
   function evaluatePlan(
-    string calldata plan
-  ) external returns (uint promptId, ContractMethodParams[] calldata contractMethodParams);
+    string calldata prompt
+  ) external returns (uint promptId, bool evaluationDone, ContractMethodParams[] calldata contractMethodParams);
 
   function continueEvaluation(
     uint promptId,
     bytes[] calldata contractMethodResults
   ) external returns (bool evaluationDone, ContractMethodParams[] calldata contractMethodParams);
 
-  function publishPrimitive(address contractAddress, string memory metadata) external;
+  function publishPrimitive(address contractAddress, string memory primitiveName) external;
 
-  function publishCustomPrimitive(address contractAddress, address primitiveAddress) external;
+  function publishRobotContract(address contractAddress, address primitiveAddress) external;
+
+  function publishSystemPrimitive(address contractAddress, string memory name, string memory metadata) external;
 }

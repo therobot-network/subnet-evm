@@ -2,13 +2,24 @@
 
 pragma solidity ^0.8.20;
 
+// import "hardhat/console.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+
+// import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {ILLM} from "../../interfaces/ILLM.sol";
-// import {IExecutor} from "../interfaces/IExecutor.sol";
+import {IExecutor, IRobotStorage, IRobotStateEmitter} from "../interfaces/IExecutor.sol";
 
 abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
+  /**
+   * @dev Storage slot with the name of the robot contract.
+   * This is the keccak-256 hash of "robotContractName" subtracted by 1.
+   */
+  // solhint-disable-next-line private-vars-leading-underscore
+  bytes32 internal constant CONTRACT_NAME_SLOT = 0x9f2cbf14d45099f51bf985adb3c53b5e52f3a7db48a42b9fe7e952864c20df65;
+
   // llm precompile contract address for publishing new primitive
   // slither-disable-next-line naming-convention
   ILLM public immutable LLM_PRECOMPILE;
@@ -23,8 +34,11 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   address private _proxy;
 
   // variables for defining custom primitives
-  string private _name;
   string private _customRules;
+  string private _primitiveName;
+
+  // state event emitter address
+  IRobotStateEmitter private _robotStateEmitter;
 
   // solhint-disable-next-line private-vars-leading-underscore
   bytes32 internal constant EXECUTOR_SLOT = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
@@ -41,15 +55,16 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
    * @param llmPrecompile LLM precompile address (TODO: hardcode address)
    * @param metadata ipfs hash
    */
-  constructor(address llmPrecompile, string memory metadata) {
+  constructor(address llmPrecompile, string memory name, string memory metadata, address primitiveStorageContract) {
     _initImplementation(msg.sender);
     LLM_PRECOMPILE = ILLM(llmPrecompile);
     _metadata = metadata;
 
     _IMPLEMENTATION_ADDRESS = address(this);
 
+    IRobotStorage(primitiveStorageContract).publishPrimitive(_IMPLEMENTATION_ADDRESS, name, metadata);
     // publish new primitive to llm
-    LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, metadata);
+    LLM_PRECOMPILE.publishPrimitive(_IMPLEMENTATION_ADDRESS, name);
   }
 
   /**
@@ -63,31 +78,28 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
    * @dev Initializes base contract data. Sets ownership to given address, name and custom rules
    * for custom primitives and proxy address.
    * @param owner custom primitive owner address
-   * @param name_ custom primitive name
    * @param customRules custom primitive rules
    */
   // slither-disable-next-line naming-convention
   function __Primitive_init(
     // solhint-disable-previous-line
     address owner,
-    string calldata name_,
     string calldata customRules
-  ) internal initializer {
+  ) internal onlyInitializing {
     if (address(this) == _IMPLEMENTATION_ADDRESS) revert OnlyProxy();
     _proxy = address(this);
     __Ownable_init(owner);
 
-    _name = name_;
     _customRules = customRules;
-
-    _publishCustomPrimitive();
+    _robotStateEmitter = IRobotStateEmitter(_getExecutor());
+    _robotStateEmitter.emitStateChange(getRobotState());
   }
 
   /**
-   * @dev Publishes new custom primitive to LLM precompile.
+   * @dev Sets the address for the robot state emitter. Only owner can call.
    */
-  function _publishCustomPrimitive() private {
-    LLM_PRECOMPILE.publishCustomPrimitive(address(this), _IMPLEMENTATION_ADDRESS);
+  function setRobotStateEmitter(address emitter) public onlyOwner {
+    _robotStateEmitter = IRobotStateEmitter(emitter);
   }
 
   /**
@@ -107,19 +119,27 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   /**
    * @dev Gets custom primitive name and rules.
    */
-  function getInfo() external view returns (string memory name, string memory customRules) {
-    return (_name, _customRules);
+  function getInfo()
+    external
+    view
+    returns (string memory contractName, string memory customRules, string memory primitiveName)
+  {
+    return (_getContractName(), _customRules, _primitiveName);
   }
 
-  //   /**
-  //    * @dev Override openzeppelin's _msgSender function to get transaction signer address from the Executor
-  //    * contract if transaction is called by executor else use the msg sender address.
-  //    */
-  //   function _msgSender() internal view virtual override returns (address) {
-  //     // modifying msg sender (Temp fix)
-  //     address executor = _getExecutor();
-  //     return executor == msg.sender ? IExecutor(executor).getMsgSigner() : msg.sender;
-  //   }
+  function _getContractName() internal view returns (string memory) {
+    return (StorageSlot.getStringSlot(CONTRACT_NAME_SLOT).value);
+  }
+
+  /**
+   * @dev Override openzeppelin's _msgSender function to get transaction signer address from the Executor
+   * contract if transaction is called by executor else use the msg sender address.
+   */
+  function _msgSender() internal view virtual override returns (address) {
+    // modifying msg sender (Temp fix)
+    address executor = _getExecutor();
+    return executor == msg.sender ? IExecutor(executor).getMsgSigner() : msg.sender;
+  }
 
   /**
    * @dev Returns the current implementation address.
@@ -130,5 +150,24 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
       // solhint-disable-previous-line
       impl := sload(EXECUTOR_SLOT)
     }
+  }
+
+  /**
+   * @dev Returns the robot state emitter instance.
+   */
+  function _getRobotStateEmitter() internal view returns (IRobotStateEmitter) {
+    return _robotStateEmitter;
+  }
+
+  function getRobotState() public view virtual returns (IRobotStateEmitter.StateChangePayload memory) {
+    // Return empty arrays for all payload fields
+    return
+      IRobotStateEmitter.StateChangePayload({
+        floats: new IRobotStateEmitter.NamedFloat[](0),
+        uints: new IRobotStateEmitter.NamedUint[](0),
+        strings: new IRobotStateEmitter.NamedString[](0),
+        addresses: new IRobotStateEmitter.NamedAddress[](0),
+        bools: new IRobotStateEmitter.NamedBool[](0)
+      });
   }
 }

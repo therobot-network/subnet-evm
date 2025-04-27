@@ -52,5 +52,10 @@
   "coinbase": "0x0000000000000000000000000000000000000000",
   "number": "0x0",
   "gasUsed": "0x0",
-  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "AsimovsThreeLawsOfRobotics": [
+    "A robot may not injure a human being, or, through inaction, allow a human being to come to harm.",
+    "A robot must obey the orders given it by human beings, except where such orders would conflict with the First Law.",
+    "A robot must protect its own existence as long as such protection does not conflict with the First or Second Law."
+  ]
 }

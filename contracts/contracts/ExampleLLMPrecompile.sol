@@ -13,18 +13,18 @@ contract ExampleLLMPrecompile {
 
   function evaluatePrompt(
     string calldata prompt
-  ) external returns (uint promptId, ILLM.ContractMethodParams[] memory contractMethodParams) {
-    (promptId, contractMethodParams) = llm.evaluatePrompt(prompt);
+  ) external returns (uint promptId, bool evaluationDone, ILLM.ContractMethodParams[] memory contractMethodParams) {
+    (promptId, evaluationDone, contractMethodParams) = llm.evaluatePrompt(prompt);
     emit EvaluatePromptEvent(promptId, contractMethodParams);
-    return (promptId, contractMethodParams);
+    return (promptId, evaluationDone, contractMethodParams);
   }
 
   function evaluatePlan(
     string calldata plan
-  ) external returns (uint promptId, ILLM.ContractMethodParams[] memory contractMethodParams) {
-    (promptId, contractMethodParams) = llm.evaluatePlan(plan);
+  ) external returns (uint promptId, bool evaluationDone, ILLM.ContractMethodParams[] memory contractMethodParams) {
+    (promptId, evaluationDone, contractMethodParams) = llm.evaluatePlan(plan);
     emit EvaluatePlanEvent(promptId, contractMethodParams);
-    return (promptId, contractMethodParams);
+    return (promptId, evaluationDone, contractMethodParams);
   }
 
   function continueEvaluation(
