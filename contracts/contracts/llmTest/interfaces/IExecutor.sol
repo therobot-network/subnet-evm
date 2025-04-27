@@ -23,7 +23,13 @@ interface IRobotStorage {
    */
   function publishPrimitive(address implementationAddress, string memory name, string memory metadata) external;
 
-  function getPrimitive(string memory name) external view returns (address primitiveAddress, string memory metadata);
+  function getPrimitiveImplementation(string memory name) external view returns (address primitiveAddress);
+
+  function publishRobotContract(
+    string memory contractName,
+    address robotContractAddress,
+    string memory primitiveName
+  ) external;
 }
 interface IRobotStateEmitter {
   struct NamedFloat {

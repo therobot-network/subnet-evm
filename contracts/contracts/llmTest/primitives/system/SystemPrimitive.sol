@@ -8,27 +8,44 @@ import {RobotContract} from "../../RobotContract.sol";
 import {IRobotStorage} from "../../interfaces/IExecutor.sol";
 
 contract SystemPrimitive is SystemPrimitiveBase, ReentrancyGuard {
-  address public immutable executor;
+    address public immutable executor;
 
-  event RobotContractDeployed(address indexed contractAddress, address indexed primitiveContract);
+    event RobotContractDeployed(
+        address indexed contractAddress,
+        address indexed primitiveContract
+    );
 
-  error InvalidExecutorAddress();
+    error InvalidExecutorAddress();
 
-  constructor(
-    address _llmPrecompile,
-    string memory metadata,
-    address _executor
-  ) SystemPrimitiveBase(_llmPrecompile, "SystemPrimitive", metadata) {
-    if (_executor == address(0)) revert InvalidExecutorAddress();
-    executor = _executor;
-  }
+    constructor(
+        address _llmPrecompile,
+        string memory metadata,
+        address _executor
+    ) SystemPrimitiveBase(_llmPrecompile, "SystemPrimitive", metadata) {
+        if (_executor == address(0)) revert InvalidExecutorAddress();
+        executor = _executor;
+    }
 
-  function deployRobotContract(string memory primitiveName) external nonReentrant returns (address customPrimitive) {
-    (address primitiveAddress, ) = IRobotStorage(executor).getPrimitive(primitiveName);
+    function deployRobotContract(
+        string memory primitiveName,
+        string memory contractName
+    ) external nonReentrant returns (address customPrimitive) {
+        address primitiveAddress = IRobotStorage(executor)
+            .getPrimitiveImplementation(primitiveName);
 
-    RobotContract customPrimitiveContract = new RobotContract(primitiveAddress, executor);
+        RobotContract customPrimitiveContract = new RobotContract(
+            primitiveAddress,
+            executor,
+            contractName
+        );
 
-    customPrimitive = address(customPrimitiveContract);
-    emit RobotContractDeployed(customPrimitive, primitiveAddress);
-  }
+        customPrimitive = address(customPrimitiveContract);
+
+        IRobotStorage(executor).publishRobotContract(
+            contractName,
+            customPrimitive,
+            primitiveName
+        );
+        // emit RobotContractDeployed(customPrimitive, primitiveAddress);
+    }
 }

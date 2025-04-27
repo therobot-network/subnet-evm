@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 
 import {Proxy} from "@openzeppelin/contracts/proxy/Proxy.sol";
 
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+
 import {ILLM} from "../interfaces/ILLM.sol";
 import {IExecutor} from "./interfaces/IExecutor.sol";
 
@@ -20,10 +22,18 @@ contract RobotContract is Proxy {
   // solhint-disable-next-line private-vars-leading-underscore
   bytes32 internal constant EXECUTOR_SLOT = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
+  /**
+   * @dev Storage slot with the name of the robot contract.
+   * This is the keccak-256 hash of "robotContractName" subtracted by 1.
+   */
+  // solhint-disable-next-line private-vars-leading-underscore
+  bytes32 internal constant CONTRACT_NAME_SLOT = 0x9f2cbf14d45099f51bf985adb3c53b5e52f3a7db48a42b9fe7e952864c20df65;
+
   error InvalidPrimitiveAddress(address primitive);
   error InitializationFailed();
   error FetchFailed();
   error InvalidExecutorAddress(address executor);
+  error InvalidContractName(string contractName);
 
   /**
    * @dev Sets implementation address and calls initialize function in implementation
@@ -31,11 +41,13 @@ contract RobotContract is Proxy {
    * @param _primitive primitive contract address
    * @param _executor executor contract address
    */
-  constructor(address _primitive, address _executor) {
+  constructor(address _primitive, address _executor, string memory contractName) {
     if (_primitive == address(0)) revert InvalidPrimitiveAddress(_primitive);
     if (_executor == address(0)) revert InvalidExecutorAddress(_executor);
+    if (bytes(contractName).length == 0) revert InvalidContractName(contractName);
     _setImplementation(_primitive);
     _setExecutor(_executor);
+    StorageSlot.getStringSlot(CONTRACT_NAME_SLOT).value = contractName;
 
     ILLM llmPrecompile = IExecutor(_executor).getLlm();
     llmPrecompile.publishRobotContract(address(this), _primitive);

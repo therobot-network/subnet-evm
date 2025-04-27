@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 // import "hardhat/console.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 
 // import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
@@ -12,6 +13,13 @@ import {ILLM} from "../../interfaces/ILLM.sol";
 import {IExecutor, IRobotStorage, IRobotStateEmitter} from "../interfaces/IExecutor.sol";
 
 abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
+  /**
+   * @dev Storage slot with the name of the robot contract.
+   * This is the keccak-256 hash of "robotContractName" subtracted by 1.
+   */
+  // solhint-disable-next-line private-vars-leading-underscore
+  bytes32 internal constant CONTRACT_NAME_SLOT = 0x9f2cbf14d45099f51bf985adb3c53b5e52f3a7db48a42b9fe7e952864c20df65;
+
   // llm precompile contract address for publishing new primitive
   // slither-disable-next-line naming-convention
   ILLM public immutable LLM_PRECOMPILE;
@@ -26,7 +34,6 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
   address private _proxy;
 
   // variables for defining custom primitives
-  string private _contractName;
   string private _customRules;
   string private _primitiveName;
 
@@ -71,23 +78,21 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
    * @dev Initializes base contract data. Sets ownership to given address, name and custom rules
    * for custom primitives and proxy address.
    * @param owner custom primitive owner address
-   * @param name_ custom primitive name
    * @param customRules custom primitive rules
    */
   // slither-disable-next-line naming-convention
   function __Primitive_init(
     // solhint-disable-previous-line
     address owner,
-    string calldata name_,
     string calldata customRules
   ) internal onlyInitializing {
     if (address(this) == _IMPLEMENTATION_ADDRESS) revert OnlyProxy();
     _proxy = address(this);
     __Ownable_init(owner);
 
-    _contractName = name_;
     _customRules = customRules;
     _robotStateEmitter = IRobotStateEmitter(_getExecutor());
+    _robotStateEmitter.emitStateChange(getRobotState());
   }
 
   /**
@@ -119,7 +124,11 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
     view
     returns (string memory contractName, string memory customRules, string memory primitiveName)
   {
-    return (_contractName, _customRules, _primitiveName);
+    return (_getContractName(), _customRules, _primitiveName);
+  }
+
+  function _getContractName() internal view returns (string memory) {
+    return (StorageSlot.getStringSlot(CONTRACT_NAME_SLOT).value);
   }
 
   /**
@@ -150,7 +159,7 @@ abstract contract PrimitiveBase is Initializable, OwnableUpgradeable {
     return _robotStateEmitter;
   }
 
-  function getRobotState() external view virtual returns (IRobotStateEmitter.StateChangePayload memory) {
+  function getRobotState() public view virtual returns (IRobotStateEmitter.StateChangePayload memory) {
     // Return empty arrays for all payload fields
     return
       IRobotStateEmitter.StateChangePayload({

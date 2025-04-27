@@ -18,10 +18,9 @@ contract MathPrimitive is Initializable, PrimitiveBase {
 
     function initialize(
         address owner,
-        string calldata name_,
         string calldata customRules_
     ) external initializer {
-        __Primitive_init(owner, name_, customRules_);
+        __Primitive_init(owner, customRules_);
     }
     // Add two numbers with overflow protection
     function add(uint256 a, uint256 b) public pure returns (uint256) {

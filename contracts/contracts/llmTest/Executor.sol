@@ -91,22 +91,24 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
     return LLM;
   }
 
-  function getPrimitive(string memory name) external view returns (address primitiveAddress, string memory metadata) {
+  function getPrimitiveImplementation(string memory name) external view returns (address primitiveAddress) {
     PrimitiveInfo storage primitive = primitives[name];
     if (!primitive.exists) {
       revert PrimitiveNotPublished(name);
     }
-    return (primitive.implementation, primitive.metadata);
+    return primitive.implementation;
   }
 
   /**
    * @dev Deploys a new custom primitive contract for the given primitive address.
    * A new custom proxy contract is deployed using primitive address as implementation.
    * @param primitiveName primitive contract name
+   * @param contractName name of the custom primitive contract
    * @param initData bytes calldata for initializing the proxy contract
    */
   function deployRobotContract(
     string calldata primitiveName,
+    string calldata contractName,
     bytes calldata initData
   ) external nonReentrant returns (address customPrimitive) {
     if (!primitives[primitiveName].exists) {
@@ -114,16 +116,15 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
     }
     /// @dev deploys a new custom primitive proxy contract
     /// with primitive address as implementation
-    RobotContract customPrimitiveContract = new RobotContract(primitives[primitiveName].implementation, address(this));
-    customPrimitiveContract.robotInitialize(initData);
-
+    RobotContract customPrimitiveContract = new RobotContract(
+      primitives[primitiveName].implementation,
+      address(this),
+      contractName
+    );
     customPrimitive = address(customPrimitiveContract);
-
-    // slither-disable-next-line unused-return
-    (string memory name, , ) = IRobotContract(customPrimitive).getInfo();
-
     // slither-disable-next-line reentrancy-benign
-    _newCustomContract(name, customPrimitive, primitiveName);
+    publishRobotContract(contractName, customPrimitive, primitiveName);
+    customPrimitiveContract.robotInitialize(initData);
   }
 
   /**
@@ -186,25 +187,30 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
     return deployedContracts;
   }
 
-  function _newCustomContract(string memory contractName, address contract_, string memory primitiveName) private {
+  /**
+   * @dev TODO: update the security here so that only this contract or SystemPrimitive may call it.
+   */
+  function publishRobotContract(
+    string memory contractName,
+    address robotContractAddress,
+    string memory primitiveName
+  ) public {
     uint256 index = deployedContracts.length;
 
     DeployedContract storage deployed = deployedContracts.push();
     deployed.contractName = contractName;
-    deployed.contractAddress = contract_;
+    deployed.contractAddress = robotContractAddress;
     deployed.primitiveName = primitiveName;
     deployed.primitiveAddress = primitives[primitiveName].implementation;
 
-    deployedContractIndexByAddress[contract_] = index;
+    deployedContractIndexByAddress[robotContractAddress] = index;
 
     emit RobotContractDeployed(
       contractName,
-      contract_,
+      robotContractAddress,
       primitiveName
       // block.timestamp
     );
-    IRobotStateEmitter.StateChangePayload memory iniitalState = IRobotContract(contract_).getRobotState();
-    emit StateChange(contract_, primitiveName, iniitalState);
   }
 
   /**
