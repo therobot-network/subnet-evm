@@ -735,6 +735,30 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        }
+      ],
+      "name": "allowanceFloat",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "spender",
           "type": "address"
         },
@@ -745,6 +769,30 @@ var primitiveABI = map[string]string{
         }
       ],
       "name": "approve",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "approveFloat",
       "outputs": [
         {
           "internalType": "bool",
@@ -777,12 +825,44 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "balanceOfFloat",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
         }
       ],
       "name": "burn",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "burnFloat",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -981,9 +1061,9 @@ var primitiveABI = map[string]string{
           "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "amount",
-          "type": "uint256"
+          "type": "string"
         },
         {
           "internalType": "string",
@@ -1005,6 +1085,19 @@ var primitiveABI = map[string]string{
         }
       ],
       "name": "mint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "mintFloat",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1082,6 +1175,19 @@ var primitiveABI = map[string]string{
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "totalSupplyFloat",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -1109,6 +1215,24 @@ var primitiveABI = map[string]string{
       "inputs": [
         {
           "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "transferFloat",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "from",
           "type": "address"
         },
@@ -1124,6 +1248,35 @@ var primitiveABI = map[string]string{
         }
       ],
       "name": "transferFrom",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "transferFromFloat",
       "outputs": [
         {
           "internalType": "bool",
@@ -1167,7 +1320,7 @@ var primitiveABI = map[string]string{
       "type": "function"
     }
   ]`,
-   "math": `[
+  "math": `[
     {
       "inputs": [
         {
@@ -1913,6 +2066,11 @@ var primitiveABI = map[string]string{
     },
     {
       "inputs": [],
+      "name": "EmptyInputString",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "FeeTooHigh",
       "type": "error"
     },
@@ -1932,6 +2090,17 @@ var primitiveABI = map[string]string{
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "InvalidString",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "InvalidToken",
       "type": "error"
@@ -1944,6 +2113,11 @@ var primitiveABI = map[string]string{
     {
       "inputs": [],
       "name": "LiquidityNotAdded",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "LiquidityNotZero",
       "type": "error"
     },
     {
@@ -2155,6 +2329,34 @@ var primitiveABI = map[string]string{
           "type": "address"
         },
         {
+          "internalType": "string",
+          "name": "amount1",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "token2",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "amount2",
+          "type": "string"
+        }
+      ],
+      "name": "addLiquidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token1",
+          "type": "address"
+        },
+        {
           "internalType": "uint256",
           "name": "amount1",
           "type": "uint256"
@@ -2170,7 +2372,7 @@ var primitiveABI = map[string]string{
           "type": "uint256"
         }
       ],
-      "name": "addLiquidity",
+      "name": "addLiquidityUint",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -2180,9 +2382,9 @@ var primitiveABI = map[string]string{
       "name": "getFee",
       "outputs": [
         {
-          "internalType": "uint256",
-          "name": "fee",
-          "type": "uint256"
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -2205,6 +2407,25 @@ var primitiveABI = map[string]string{
         {
           "internalType": "string",
           "name": "primitiveName",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getLiquidityShare",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
           "type": "string"
         }
       ],
@@ -2242,14 +2463,14 @@ var primitiveABI = map[string]string{
       "name": "getReserves",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -2356,6 +2577,19 @@ var primitiveABI = map[string]string{
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "getTotalLiquidityShares",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -2439,6 +2673,25 @@ var primitiveABI = map[string]string{
       "name": "price",
       "outputs": [
         {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "priceUint",
+      "outputs": [
+        {
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
@@ -2450,12 +2703,25 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
+          "internalType": "string",
+          "name": "amount",
+          "type": "string"
+        }
+      ],
+      "name": "removeLiquidity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
         }
       ],
-      "name": "removeLiquidity",
+      "name": "removeLiquidityUint",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -2470,12 +2736,25 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
+          "internalType": "string",
+          "name": "feeFloat",
+          "type": "string"
+        }
+      ],
+      "name": "setFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "newFee",
           "type": "uint256"
         }
       ],
-      "name": "setFee",
+      "name": "setFeeUint",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -2521,14 +2800,14 @@ var primitiveABI = map[string]string{
           "type": "address[2]"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "liquidity1",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "liquidity2",
-          "type": "uint256"
+          "type": "string"
         },
         {
           "internalType": "bool",
@@ -2536,12 +2815,30 @@ var primitiveABI = map[string]string{
           "type": "bool"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "fee",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "amountIn",
+          "type": "string"
+        }
+      ],
+      "name": "swap",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -2557,7 +2854,7 @@ var primitiveABI = map[string]string{
           "type": "uint256"
         }
       ],
-      "name": "swap",
+      "name": "swapUint",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
