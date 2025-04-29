@@ -505,9 +505,196 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 
 			log.Info("Successfully stored index result", "outputKey", step.Output[0], "value", val)
+	case "and", "or", "not", "is":
+		log.Info("in case and or not is")
 
+		return handleBoolOps(currentPC, step, llmAddr, stateDB, remainingGas)
+	
 	}    
     return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
 }
 
+
+func handleBoolOps(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
+	log.Info("in handleBoolOps")
+    switch step.Method {
+    case "and":
+		log.Info("in case and")
+
+        return boolAnd(currentPC, step, llmAddr, stateDB, remainingGas)
+    case "or":
+        return boolOr(currentPC, step, llmAddr, stateDB, remainingGas)
+    case "not":
+        return boolNot(currentPC, step, llmAddr, stateDB, remainingGas)
+    case "is":
+        return boolIs(currentPC, step, llmAddr, stateDB, remainingGas)
+    default:
+        log.Info("Unknown boolean method", "method", step.Method)
+        return currentPC, remainingGas, fmt.Errorf("unknown boolean method: %s", step.Method)
+    }
+}
+
+func parseBoolFromString(rawValue interface{}) (bool, error) {
+    strVal, ok := rawValue.(string)
+    if !ok {
+        return false, fmt.Errorf("expected string input, got %T", rawValue)
+    }
+
+    switch strVal {
+    case "true":
+        return true, nil
+    case "false":
+        return false, nil
+    default:
+        return false, fmt.Errorf("invalid boolean string value: %s", strVal)
+    }
+}
+
+
+func boolAnd(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
+	log.Info("in function boolAnd")
+    if len(step.Args) < 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for and", "args", len(step.Args), "outputs", len(step.Output))
+        return currentPC, remainingGas, fmt.Errorf("and requires at least two args and one output")
+    }
+
+    result := true
+    for _, arg := range step.Args {
+        rawValue, err := getLookupValue(arg, stateDB)
+        if err != nil {
+            log.Info("Failed to fetch input for and", "error", err)
+            return currentPC, remainingGas, fmt.Errorf("failed to fetch input for and: %w", err)
+        }
+
+        boolVal, err := parseBoolFromString(rawValue)
+        if err != nil {
+            log.Info("Unsupported input value for and", "value", rawValue, "error", err)
+            return currentPC, remainingGas, fmt.Errorf("and expects string 'true' or 'false', got %v", rawValue)
+        }
+
+        result = result && boolVal
+    }
+
+    log.Info("Computed and result", "result", result)
+
+    if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], result); err != nil {
+        log.Info("Failed to store and result", "error", err)
+        return currentPC, remainingGas, err
+    }
+
+    log.Info("Successfully stored and result", "outputKey", step.Output[0], "result", result)
+
+    return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
+}
+
+
+func boolIs(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
+    if len(step.Args) != 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for is", "args", len(step.Args), "outputs", len(step.Output))
+        return currentPC, remainingGas, fmt.Errorf("is requires exactly two args and one output")
+    }
+
+    rawValue1, err := getLookupValue(step.Args[0], stateDB)
+    log.Info("rawValue1 is result", "result", rawValue1)
+	if rawValue1 == "None" {
+		rawValue1 = nil
+	}
+	
+    if err != nil {
+        log.Info("Failed to fetch first input for is", "error", err)
+        return currentPC, remainingGas, fmt.Errorf("failed to fetch first input for is: %w", err)
+    }
+
+    rawValue2, err := getLookupValue(step.Args[1], stateDB)
+    log.Info("rawValue2 is result", "result", rawValue2)
+	if rawValue2 == "None" {
+		rawValue2 = nil
+	}
+
+    if err != nil {
+        log.Info("Failed to fetch second input for is", "error", err)
+        return currentPC, remainingGas, fmt.Errorf("failed to fetch second input for is: %w", err)
+    }
+
+    result := rawValue1 == rawValue2
+
+    log.Info("Computed is result", "result", result)
+
+    if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], result); err != nil {
+        log.Info("Failed to store is result", "error", err)
+        return currentPC, remainingGas, err
+    }
+
+    log.Info("Successfully stored is result", "outputKey", step.Output[0], "result", result)
+
+    return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
+}
+
+func boolNot(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
+    if len(step.Args) != 1 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for not", "args", len(step.Args), "outputs", len(step.Output))
+        return currentPC, remainingGas, fmt.Errorf("not requires exactly one arg and one output")
+    }
+
+    rawValue, err := getLookupValue(step.Args[0], stateDB)
+    if err != nil {
+        log.Info("Failed to fetch input for not", "error", err)
+        return currentPC, remainingGas, fmt.Errorf("failed to fetch input for not: %w", err)
+    }
+
+    boolVal, err := parseBoolFromString(rawValue)
+    if err != nil {
+        log.Info("Unsupported input value for not", "value", rawValue, "error", err)
+        return currentPC, remainingGas, fmt.Errorf("not expects string 'true' or 'false', got %v", rawValue)
+    }
+
+    result := !boolVal
+
+    log.Info("Computed not result", "result", result)
+
+    if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], result); err != nil {
+        log.Info("Failed to store not result", "error", err)
+        return currentPC, remainingGas, err
+    }
+
+    log.Info("Successfully stored not result", "outputKey", step.Output[0], "result", result)
+
+    return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
+}
+
+
+func boolOr(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
+    if len(step.Args) < 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for or", "args", len(step.Args), "outputs", len(step.Output))
+        return currentPC, remainingGas, fmt.Errorf("or requires at least two args and one output")
+    }
+
+    result := false
+    for _, arg := range step.Args {
+        rawValue, err := getLookupValue(arg, stateDB)
+        if err != nil {
+            log.Info("Failed to fetch input for or", "error", err)
+            return currentPC, remainingGas, fmt.Errorf("failed to fetch input for or: %w", err)
+        }
+
+        boolVal, err := parseBoolFromString(rawValue)
+        if err != nil {
+            log.Info("Unsupported input value for or", "value", rawValue, "error", err)
+            return currentPC, remainingGas, fmt.Errorf("or expects string 'true' or 'false', got %v", rawValue)
+        }
+
+        result = result || boolVal
+    }
+
+    log.Info("Computed or result", "result", result)
+
+    if err := updatePlanLocalState(stateDB, llmAddr, step.Output[0], result); err != nil {
+        log.Info("Failed to store or result", "error", err)
+        return currentPC, remainingGas, err
+    }
+
+    log.Info("Successfully stored or result", "outputKey", step.Output[0], "result", result)
+
+    return currentPC.Add(currentPC, big.NewInt(1)), remainingGas, nil
+}
 
