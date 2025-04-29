@@ -87,8 +87,7 @@ var (
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
-    llmApiURL = "http://robotbrain-v2-loadbalancer-2026683595.eu-west-1.elb.amazonaws.com/eval_prompt"
-    // llmApiURL = "http://v22-brain-load-balancer-1585508737.eu-west-1.elb.amazonaws.com/eval_prompt"
+    llmApiURL = "https://brain-sprint.therobot.network/eval_prompt"
 )
 
 func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
