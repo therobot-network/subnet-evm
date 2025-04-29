@@ -2915,6 +2915,22 @@ var primitiveABI = map[string]string{
     },
     {
       "inputs": [],
+      "name": "EmptyInputString",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "InvalidString",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "Overflow",
       "type": "error"
     },
@@ -2961,6 +2977,19 @@ var primitiveABI = map[string]string{
     },
     {
       "inputs": [],
+      "name": "DECIMALS",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "LLM_PRECOMPILE_BASE",
       "outputs": [
         {
@@ -2975,17 +3004,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "int256",
+          "internalType": "string",
           "name": "x",
-          "type": "int256"
+          "type": "string"
         }
       ],
       "name": "abs",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -2994,22 +3023,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "add",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3018,22 +3047,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "ceilDiv",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3042,22 +3071,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "divide",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3066,14 +3095,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "equal",
@@ -3090,14 +3119,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "greaterThan",
@@ -3114,14 +3143,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "greaterThanOrEqual",
@@ -3138,14 +3167,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "lessThan",
@@ -3162,14 +3191,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "lessThanOrEqual",
@@ -3186,17 +3215,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256[]",
+          "internalType": "string[]",
           "name": "arr",
-          "type": "uint256[]"
+          "type": "string[]"
         }
       ],
       "name": "max",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3205,22 +3234,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "max2",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3229,17 +3258,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256[]",
+          "internalType": "string[]",
           "name": "arr",
-          "type": "uint256[]"
+          "type": "string[]"
         }
       ],
       "name": "min",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3248,22 +3277,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "min2",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3272,22 +3301,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "mod",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3296,27 +3325,27 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "x",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "y",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "denominator",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "mulDiv",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3325,22 +3354,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "multiply",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3349,14 +3378,14 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "notEqual",
@@ -3386,22 +3415,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "base",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "exponent",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "pow",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3417,17 +3446,17 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "sqrt",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
@@ -3436,22 +3465,22 @@ var primitiveABI = map[string]string{
     {
       "inputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "a",
-          "type": "uint256"
+          "type": "string"
         },
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "b",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "name": "subtract",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "string",
           "name": "",
-          "type": "uint256"
+          "type": "string"
         }
       ],
       "stateMutability": "pure",
