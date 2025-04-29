@@ -272,4 +272,102 @@ describe("LLM Precompiled Contract", function () {
     expect(questionEvents[0].args.question).to.equal("index 1 is");
     expect(questionEvents[0].args.answer).to.equal("a");
   });
+
+  it("should test boolean system primitives (and, or, not, is)", async function () {
+    const withBoolOpsPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withBoolOps"]),
+      lookupTable: JSON.stringify({
+        bool1: "true",
+        bool2: "true"
+      }),
+    });
+  
+    let promptIdRead: string;
+  
+    let tx = await testContract.evaluatePlan(withBoolOpsPlan);
+    const receipt = await tx.wait();
+    let methodData: string;
+    let calleeContractAddress: string;
+  
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => contractMethodParams.length === 0,
+      );
+  
+    const questionEvents = receipt.logs
+      .map((log) => {
+        try {
+          return llmContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter((log) => log?.name === "QuestionAnswer");
+  
+    expect(questionEvents.length).to.equal(4);
+  
+    const expectedResults = [
+      { question: "Result of true and false", answer: "false" },
+      { question: "Result of true or false", answer: "true" },
+      { question: "Result of not true", answer: "false" },
+      { question: "Result of bool1 is bool2", answer: "true" }, // "true" == "true"
+    ];
+  
+    expectedResults.forEach((expected, index) => {
+      expect(questionEvents[index].args.question).to.equal(expected.question);
+      expect(questionEvents[index].args.answer).to.equal(expected.answer);
+    });
+  });
+
+
+  it.only("should test is", async function () {
+    const withBoolOpsPlan = JSON.stringify({
+      plan: JSON.stringify(plans["withIs"]),
+      lookupTable: JSON.stringify({
+        nilValue: null
+      }),
+    });
+  
+    let promptIdRead: string;
+  
+    let tx = await testContract.evaluatePlan(withBoolOpsPlan);
+    const receipt = await tx.wait();
+  
+    await expect(tx)
+      .to.emit(testContract, "EvaluatePlanEvent")
+      .withArgs(
+        (promptId) => {
+          promptIdRead = promptId;
+          return true;
+        },
+        (contractMethodParams) => contractMethodParams.length === 0,
+      );
+  
+    const questionEvents = receipt.logs
+      .map((log) => {
+        try {
+          return llmContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter((log) => log?.name === "QuestionAnswer");
+  
+    expect(questionEvents.length).to.equal(1);
+  
+    const expectedResults = [
+      { question: "null is nil:", answer: "true" },
+    ];
+  
+    expectedResults.forEach((expected, index) => {
+      expect(questionEvents[index].args.question).to.equal(expected.question);
+      expect(questionEvents[index].args.answer).to.equal(expected.answer);
+    });
+  });
+  
 });
