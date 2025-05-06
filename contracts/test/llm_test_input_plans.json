@@ -1741,5 +1741,122 @@
       ],
       "Method": "answerUserQuestion"
     }
+  ],
+  "withBoolOps":[
+    {
+      "Args": [
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "false"
+        }
+      ],
+      "Method": "and",
+      "Output": ["andResult"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "true"
+        },
+        {
+          "Value": "false"
+        }
+      ],
+      "Method": "or",
+      "Output": ["orResult"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "true"
+        }
+      ],
+      "Method": "not",
+      "Output": ["notResult"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "bool1"
+        },
+        {
+          "Lookup": "bool2"
+        }
+      ],
+      "Method": "is",
+      "Output": ["isResult"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "Result of true and false"
+        },
+        {
+          "Lookup": "andResult"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "Result of true or false"
+        },
+        {
+          "Lookup": "orResult"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "Result of not true"
+        },
+        {
+          "Lookup": "notResult"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    },
+    {
+      "Args": [
+        {
+          "Value": "Result of bool1 is bool2"
+        },
+        {
+          "Lookup": "isResult"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
+  ],
+  "withIs":[
+    {      
+      "Args": [
+      {
+        "Value": "None"
+      },
+      {
+        "Lookup": "nilValue"
+      }
+    ],
+    "Method": "is",
+    "Output": ["isValue"]
+    },
+    {
+      "Args": [
+        {
+          "Value": "null is nil:"
+        },
+        {
+          "Lookup": "isValue"
+        }
+      ],
+      "Method": "answerUserQuestion"
+    }
   ]
+  
 }
