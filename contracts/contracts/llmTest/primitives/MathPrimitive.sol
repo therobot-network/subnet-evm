@@ -16,12 +16,6 @@ contract MathPrimitive is Initializable, PrimitiveBase {
         address primitiveStorageAddress
     ) PrimitiveBase(llmPrecompile, "math", metadata, primitiveStorageAddress) {}
 
-    function initialize(
-        address owner,
-        string calldata customRules_
-    ) external initializer {
-        __Primitive_init(owner, customRules_);
-    }
     // Add two numbers with overflow protection
     function add(uint256 a, uint256 b) public pure returns (uint256) {
         (bool success, uint256 sum) = Math.tryAdd(a, b);

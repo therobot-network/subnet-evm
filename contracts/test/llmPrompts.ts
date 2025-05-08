@@ -141,10 +141,6 @@ describe("LLM Precompiled Contract", function () {
     return callResult;
   }
 
-  function pause(duration: number = 1000): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, duration));
-  }
-
   async function setupAmmLiquidity(
     ammContract: any,
     ammAddress: string,
@@ -182,29 +178,6 @@ describe("LLM Precompiled Contract", function () {
 
   before(async function () {
     owner = await ethers.getSigner(ADMIN_ADDRESS);
-
-    // const signers = await ethers.getSigners();
-    // user1 = signers[1];
-    // const user1Address = await user1.getAddress();
-
-    // // Get the current balance of the admin
-    // const adminBalance = await ethers.provider.getBalance(ADMIN_ADDRESS);
-    // const halfBalance = adminBalance / 2n; // Use BigInt division
-
-    // console.log(`Admin balance: ${ethers.formatEther(adminBalance)} ETH`);
-    // console.log(`Sending ${ethers.formatEther(halfBalance)} ETH to User1...`);
-
-    // // Send transaction
-    // const tx = await owner.sendTransaction({
-    //   to: user1Address,
-    //   value: halfBalance, // Send half of admin's balance
-    // });
-
-    // await tx.wait(); // Wait for the transaction to be mined
-
-    // console.log(
-    //   `Successfully transferred ${ethers.formatEther(halfBalance)} ETH to User1.`,
-    // );
 
     llmContract = (await ethers.getContractAt(
       "ILLM",

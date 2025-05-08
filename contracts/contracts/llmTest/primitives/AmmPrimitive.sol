@@ -16,12 +16,18 @@ import {IERC20Primitive} from "./interfaces/IERC20Primitive.sol";
 
 import {UserDecimalFormatting} from "../libraries/UserDecimalFormatting.sol";
 
-contract AmmPrimitive is Initializable, PrimitiveBase {
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
+contract AmmPrimitive is
+    Initializable,
+    PrimitiveBase,
+    ReentrancyGuardUpgradeable
+{
     //Constants
     string private constant _L_TOKEN1 = "token1Liquidity";
     string private constant _L_TOKEN2 = "token2Liquidity";
     string private constant _TOT_LIQ = "totalLiquidityShares";
-    uint8 private constant _FEE_DECIMALS = 4;
+    uint8 private constant _FEE_DECIMALS = 2;
 
     bool public isActive;
 
@@ -55,6 +61,7 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
     error AmmNotActive();
     error TokensNotSet();
     error LiquidityNotAdded();
+    error LiquidityNotZero();
     error TokenTransferFailed();
     error InsufficientLiquidityShare();
     error InvalidToken();
@@ -79,21 +86,40 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         address primitiveStorageAddress
     ) PrimitiveBase(llmPrecompile, "amm", metadata, primitiveStorageAddress) {}
 
-    function initialize(
-        address owner,
+    function configure(
         address token1Addr,
         address token2Addr,
-        string calldata customRules_
-    ) external initializer {
-        // set token pair
-        _setTokens(token1Addr, token2Addr);
+        string calldata feeFloat
+    ) external onlyOwner onlyWhenInactive nonReentrant {
+        // slither-disable-next-line reentrancy-benign
+        setTokens(token1Addr, token2Addr);
+        setFee(feeFloat);
+    }
 
-        __Primitive_init(owner, customRules_);
+    function getLiquidityShare(
+        address account
+    ) external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                liquidityShare[account],
+                IERC20Metadata(_token1).decimals()
+            );
+    }
+
+    function getTotalLiquidityShares() external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                totalLiquidityShares,
+                IERC20Metadata(_token1).decimals()
+            );
     }
 
     function _setTokens(address token1Addr, address token2Addr) private {
-        if (token1Addr == address(0) || token2Addr == address(0))
-            revert InvalidTokenAddress();
+        if (
+            token1Addr == address(0) ||
+            token2Addr == address(0) ||
+            token1Addr == token2Addr
+        ) revert InvalidTokenAddress();
 
         _token1 = token1Addr;
         _token2 = token2Addr;
@@ -101,7 +127,15 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         _tokenTwoPrimitive = IERC20Primitive(token2Addr);
     }
 
-    function setFee(uint256 newFee) external onlyOwner {
+    function setFee(string calldata feeFloat) public onlyOwner {
+        uint256 newFee = UserDecimalFormatting.userFormatToContractFormat(
+            feeFloat,
+            _FEE_DECIMALS
+        );
+        setFeeUint(newFee);
+    }
+
+    function setFeeUint(uint256 newFee) public onlyOwner {
         if (newFee > 1000) revert FeeTooHigh(); // Max 10% (1000 bps)
         _fee = newFee;
         emit FeeSet(newFee);
@@ -117,8 +151,12 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         _getRobotStateEmitter().emitStateChange(payload);
     }
 
-    function getFee() external view returns (uint256 fee) {
-        return _fee;
+    function getFee() external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                _fee,
+                _FEE_DECIMALS
+            );
     }
 
     function activate() external onlyOwner onlyWhenInactive {
@@ -137,6 +175,9 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         address token1Addr,
         address token2Addr
     ) public onlyOwner onlyWhenInactive {
+        if (_reserves1 != 0 || _reserves2 != 0) {
+            revert LiquidityNotZero();
+        }
         _setTokens(token1Addr, token2Addr);
         emit TokensSet(token1Addr, token2Addr);
         IRobotStateEmitter.StateChangePayload
@@ -163,10 +204,30 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
 
     function addLiquidity(
         address token1,
+        string calldata amount1,
+        address token2,
+        string calldata amount2
+    ) external {
+        if (!_areTokensSet()) revert TokensNotSet();
+        if (token1 == token2) revert InvalidToken();
+
+        uint256 _amount1 = UserDecimalFormatting.userFormatToContractFormat(
+            amount1,
+            IERC20Metadata(_token1).decimals()
+        );
+        uint256 _amount2 = UserDecimalFormatting.userFormatToContractFormat(
+            amount2,
+            IERC20Metadata(_token2).decimals()
+        );
+        addLiquidityUint(token1, _amount1, token2, _amount2);
+    }
+
+    function addLiquidityUint(
+        address token1,
         uint256 amount1,
         address token2,
         uint256 amount2
-    ) external {
+    ) public {
         if (!_areTokensSet()) revert TokensNotSet();
         if (token1 == token2) revert InvalidToken();
 
@@ -246,11 +307,32 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         _transferTokenIn(_token2, msgSender, _amount2);
     }
 
-    function getReserves() external view returns (uint256, uint256) {
-        return (_reserves1, _reserves2);
+    function getReserves()
+        external
+        view
+        returns (string memory, string memory)
+    {
+        return (
+            UserDecimalFormatting.contractFormatToUserFormat(
+                _reserves1,
+                IERC20Metadata(_token1).decimals()
+            ),
+            UserDecimalFormatting.contractFormatToUserFormat(
+                _reserves2,
+                IERC20Metadata(_token2).decimals()
+            )
+        );
     }
 
-    function removeLiquidity(uint256 amount) external {
+    function removeLiquidity(string calldata amount) external {
+        uint256 _amount = UserDecimalFormatting.userFormatToContractFormat(
+            amount,
+            IERC20Metadata(_token1).decimals()
+        );
+        removeLiquidityUint(_amount);
+    }
+
+    function removeLiquidityUint(uint256 amount) public {
         if (amount == 0) revert InvalidAmount();
         address msgSender = _msgSender();
         if (amount > liquidityShare[msgSender])
@@ -322,15 +404,25 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         return false;
     }
 
-    function swap(address token, uint256 amountIn) external onlyWhenActive {
-        if (amountIn == 0) revert InvalidAmount();
+    function swap(
+        address token,
+        string calldata amountIn
+    ) external onlyWhenActive {
+        uint256 _amountIn = UserDecimalFormatting.userFormatToContractFormat(
+            amountIn,
+            IERC20Metadata(token).decimals()
+        );
+        swapUint(token, _amountIn);
+    }
 
+    function swapUint(address token, uint256 amountIn) public onlyWhenActive {
         address inTokenAddr = _token1;
         address outTokenAddr = _token2;
         uint256 inReserve = _reserves1;
         uint256 outReserve = _reserves2;
         bool isToken1 = true;
 
+        if (amountIn == 0) revert InvalidAmount();
         if (token == _token2) {
             inTokenAddr = _token2;
             outTokenAddr = _token1;
@@ -388,7 +480,7 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         _transferTokenOut(outTokenAddr, msg.sender, amountOut);
     }
 
-    function price(address token) external view returns (uint256) {
+    function priceUint(address token) external view returns (uint256) {
         if (_reserves1 == 0 || _reserves2 == 0) revert LiquidityNotAdded();
 
         if (token == _token2) {
@@ -399,18 +491,53 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         return (_reserves1 * 1e18) / _reserves2;
     }
 
+    function price(address token) external view returns (string memory) {
+        if (_reserves1 == 0 || _reserves2 == 0) revert LiquidityNotAdded();
+
+        uint8 d1 = IERC20Metadata(_token1).decimals();
+        uint8 d2 = IERC20Metadata(_token2).decimals();
+
+        uint256 priceWad = 0;
+
+        if (token == _token2) {
+            // price of token2 in token1 → token1 / token2
+            priceWad =
+                (_reserves2 * (10 ** d1) * 1e18) /
+                (_reserves1 * (10 ** d2));
+        } else if (token == _token1) {
+            // price of token1 in token2 → token2 / token1
+            priceWad =
+                (_reserves1 * (10 ** d2) * 1e18) /
+                (_reserves2 * (10 ** d1));
+        } else {
+            revert InvalidToken();
+        }
+
+        // Format the WAD price to user-friendly string (18 decimal places)
+        return UserDecimalFormatting.contractFormatToUserFormat(priceWad, 18);
+    }
+
     function status()
         external
         view
         returns (
             address[2] memory tokens,
-            uint256 liquidity1,
-            uint256 liquidity2,
+            string memory liquidity1,
+            string memory liquidity2,
             bool active,
-            uint256 fee
+            string memory fee
         )
     {
-        return ([_token1, _token2], _reserves1, _reserves2, isActive, _fee);
+        return (
+            [_token1, _token2],
+            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1),
+            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2),
+            isActive,
+            UserDecimalFormatting.contractFormatToUserFormat(
+                _fee,
+                _FEE_DECIMALS
+            )
+        );
     }
 
     function _transferTokenIn(
@@ -445,6 +572,9 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
         override
         returns (IRobotStateEmitter.StateChangePayload memory)
     {
+        bool tokenOneSet = _token1 != address(0);
+        bool tokenTwoSet = _token2 != address(0);
+
         IRobotStateEmitter.StateChangePayload
             memory payload = _initStateChangePayload(2, 6, 2, 2, 1);
 
@@ -457,23 +587,39 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
 
         payload.floats[0] = IRobotStateEmitter.NamedFloat(
             "amount1Swapped",
-            _tokenOnePrimitive.contractFormatToUserFormat(_amountOneSwapped)
+            tokenOneSet
+                ? _tokenOnePrimitive.contractFormatToUserFormat(
+                    _amountOneSwapped
+                )
+                : "0"
         );
         payload.floats[1] = IRobotStateEmitter.NamedFloat(
             "amount2Swapped",
-            _tokenTwoPrimitive.contractFormatToUserFormat(_amountTwoSwapped)
+            tokenTwoSet
+                ? _tokenTwoPrimitive.contractFormatToUserFormat(
+                    _amountTwoSwapped
+                )
+                : "0"
         );
         payload.floats[2] = IRobotStateEmitter.NamedFloat(
             _TOT_LIQ,
-            _tokenOnePrimitive.contractFormatToUserFormat(totalLiquidityShares)
+            tokenOneSet
+                ? _tokenOnePrimitive.contractFormatToUserFormat(
+                    totalLiquidityShares
+                )
+                : "0"
         );
         payload.floats[3] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN1,
-            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
+            tokenOneSet
+                ? _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
+                : "0"
         );
         payload.floats[4] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN2,
-            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
+            tokenTwoSet
+                ? _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
+                : "0"
         );
         payload.floats[5] = IRobotStateEmitter.NamedFloat(
             "fee",
@@ -485,11 +631,11 @@ contract AmmPrimitive is Initializable, PrimitiveBase {
 
         payload.strings[0] = IRobotStateEmitter.NamedString(
             "token1Name",
-            IERC20Metadata(_token1).symbol()
+            tokenOneSet ? IERC20Metadata(_token1).symbol() : ""
         );
         payload.strings[1] = IRobotStateEmitter.NamedString(
             "token2Name",
-            IERC20Metadata(_token2).symbol()
+            tokenTwoSet ? IERC20Metadata(_token2).symbol() : ""
         );
 
         payload.addresses[0] = IRobotStateEmitter.NamedAddress(

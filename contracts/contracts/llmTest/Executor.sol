@@ -81,6 +81,7 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
   error PrimitiveAlreadyPublished(string name);
   error PrimitiveNotPublished(string name);
   error InvalidRobotContract();
+  error ConfigurationFailed();
 
   constructor(address llmPrecompile) Ownable(msg.sender) {
     if (llmPrecompile == address(0)) revert InvalidPrecompileAddress();
@@ -104,27 +105,40 @@ contract Executor is Ownable, ReentrancyGuard, IExecutor, IRobotStorage, IRobotS
    * A new custom proxy contract is deployed using primitive address as implementation.
    * @param primitiveName primitive contract name
    * @param contractName name of the custom primitive contract
-   * @param initData bytes calldata for initializing the proxy contract
+   * @param ownerAddress address of the owner of the custom primitive contract
+   * @param configData bytes calldata for configuring the proxy contract
    */
   function deployRobotContract(
     string calldata primitiveName,
     string calldata contractName,
-    bytes calldata initData
+    address ownerAddress,
+    string memory customRules,
+    bytes calldata configData
   ) external nonReentrant returns (address customPrimitive) {
     if (!primitives[primitiveName].exists) {
       revert PrimitiveNotPublished(primitiveName);
     }
+    _msgSigner = msg.sender;
     /// @dev deploys a new custom primitive proxy contract
     /// with primitive address as implementation
+    // slither-disable-next-line reentrancy-benign
     RobotContract customPrimitiveContract = new RobotContract(
       primitives[primitiveName].implementation,
       address(this),
       contractName
     );
     customPrimitive = address(customPrimitiveContract);
-    // slither-disable-next-line reentrancy-benign
     publishRobotContract(contractName, customPrimitive, primitiveName);
-    customPrimitiveContract.robotInitialize(initData);
+    // slither-disable-next-line reentrancy-benign
+    customPrimitiveContract.robotContractInit(ownerAddress, customRules);
+    // For extra configurations:
+    // slither-disable-start low-level-calls
+    if (configData.length > 0) {
+      // slither-disable-next-line missing-zero-check
+      (bool success, ) = customPrimitive.call(configData); // solhint-disable-line
+      if (!success) revert ConfigurationFailed();
+    }
+    // slither-disable-end low-level-calls
   }
 
   /**

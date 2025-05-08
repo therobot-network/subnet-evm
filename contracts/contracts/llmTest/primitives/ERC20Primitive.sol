@@ -19,6 +19,7 @@ contract ERC20Primitive is
     IERC20Primitive
 {
     uint256 public constant MINT_AMOUNT = 100 * 1e18; // 100 tokens
+    // uint256 public constant INITIAL_MINT_AMOUNT = 1000 * 1e18; // 1000 tokens
     uint256 public constant MINT_TIME_LIMIT = 3600; // 1 hour
 
     mapping(address => uint256) private _requestLog;
@@ -40,21 +41,54 @@ contract ERC20Primitive is
         PrimitiveBase(llmPrecompile, "erc20", metadata, primitiveStorageAddress)
     {}
 
-    function initialize(
-        address owner,
-        string calldata descriptor,
-        uint256 amount,
-        string calldata customRules_
-    ) external initializer {
-        __ERC20_init(descriptor, _getContractName());
-        _mint(owner, amount);
-        _updateHolder(owner);
-        __Primitive_init(owner, customRules_);
+    /**
+     * @dev Initializes base contract data. Sets ownership to given address, name and custom rules
+     * for custom primitives and proxy address.
+     * @param owner_ custom primitive owner address
+     * @param customRules custom primitive rules
+     */
+    // slither-disable-next-line naming-convention
+    function robotContractInit(
+        // solhint-disable-previous-line
+        address owner_,
+        string calldata customRules
+    ) public override initializer {
+        _robotContractBaseInit(owner_, customRules);
+        __ERC20_init(
+            string.concat("ROBOT_DEPLOYED_", _getContractName()),
+            _getContractName()
+        );
+        // _mint(owner(), INITIAL_MINT_AMOUNT);
+        // _updateHolder(owner());
+    }
+
+    // // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.ERC20")) - 1)) & ~bytes32(uint256(0xff))
+    // bytes32 private constant _ERC20_STORAGE_LOCATION =
+    //     0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00;
+
+    // function _getStorage() private pure returns (ERC20Storage storage $) {
+    //     // slither-disable-next-line timestamp
+    //     assembly {
+    //         $.slot := _ERC20_STORAGE_LOCATION
+    //     }
+    // }
+
+    // function _setDescriptor(string memory name_) internal {
+    //     ERC20Storage storage $ = _getStorage();
+    //     $._name = name_;
+    // }
+
+    function configure(
+        // string memory descriptor,
+        string calldata amount
+    ) external onlyOwner {
+        // _setDescriptor(descriptor);
+        mintFloat(amount);
     }
 
     // users other than owner can mint only a max of 100 tokens in a request
     // users can request only once per hour
-    function mint(uint256 amount) external onlyProxy {
+    function mint(uint256 amount) public onlyProxy {
         address sender = _msgSender();
         if (sender != owner()) {
             // slither-disable-next-line timestamp
@@ -70,11 +104,17 @@ contract ERC20Primitive is
         _emitMintStateChangeSupply(_updateHolder(sender));
     }
 
+    function mintFloat(string calldata amount) public onlyProxy {
+        if (bytes(amount).length == 0) revert EmptyInputString();
+        uint256 amountInContractFormat = userFormatToContractFormat(amount);
+        mint(amountInContractFormat);
+    }
+
     function _emitMintStateChangeSupply(bool holderChanged) internal {
         IRobotStateEmitter.StateChangePayload
             memory payload = IRobotStateEmitter.StateChangePayload({
                 uints: new IRobotStateEmitter.NamedUint[](0),
-                floats: new IRobotStateEmitter.NamedFloat[](0),
+                floats: new IRobotStateEmitter.NamedFloat[](1),
                 strings: new IRobotStateEmitter.NamedString[](0),
                 addresses: new IRobotStateEmitter.NamedAddress[](0),
                 bools: new IRobotStateEmitter.NamedBool[](0)
@@ -91,7 +131,6 @@ contract ERC20Primitive is
             );
         }
 
-        payload.floats = new IRobotStateEmitter.NamedFloat[](1);
         payload.floats[0] = IRobotStateEmitter.NamedFloat(
             "totalSupply",
             contractFormatToUserFormat(totalSupply())
@@ -100,7 +139,7 @@ contract ERC20Primitive is
         _getRobotStateEmitter().emitStateChange(payload);
     }
 
-    function burn(uint256 amount) external onlyProxy {
+    function burn(uint256 amount) public onlyProxy {
         address sender = _msgSender();
 
         _burn(sender, amount);
@@ -136,6 +175,12 @@ contract ERC20Primitive is
         );
 
         _getRobotStateEmitter().emitStateChange(payload);
+    }
+
+    function burnFloat(string calldata amount) external onlyProxy {
+        if (bytes(amount).length == 0) revert EmptyInputString();
+        uint256 amountInContractFormat = userFormatToContractFormat(amount);
+        burn(amountInContractFormat);
     }
 
     function transfer(
@@ -189,6 +234,15 @@ contract ERC20Primitive is
         return success;
     }
 
+    function transferFloat(
+        address to,
+        string calldata amount
+    ) external onlyProxy {
+        if (bytes(amount).length == 0) revert EmptyInputString();
+        uint256 amountInContractFormat = userFormatToContractFormat(amount);
+        transfer(to, amountInContractFormat);
+    }
+
     function _updateHolder(address account) internal returns (bool updated) {
         bool hadBalance = _hasBalance[account];
         bool hasBalanceNow = balanceOf(account) > 0;
@@ -222,6 +276,52 @@ contract ERC20Primitive is
         return
             UserDecimalFormatting.userFormatToContractFormat(
                 userFixedPointString,
+                decimals()
+            );
+    }
+
+    function balanceOfFloat(
+        address account
+    ) external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                balanceOf(account),
+                decimals()
+            );
+    }
+
+    function allowanceFloat(
+        address owner,
+        address spender
+    ) external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                allowance(owner, spender),
+                decimals()
+            );
+    }
+    function approveFloat(
+        address spender,
+        string calldata amount
+    ) external onlyProxy returns (bool) {
+        if (bytes(amount).length == 0) revert EmptyInputString();
+        uint256 amountInContractFormat = userFormatToContractFormat(amount);
+        return approve(spender, amountInContractFormat);
+    }
+    function transferFromFloat(
+        address sender,
+        address recipient,
+        string calldata amount
+    ) external onlyProxy returns (bool) {
+        if (bytes(amount).length == 0) revert EmptyInputString();
+        uint256 amountInContractFormat = userFormatToContractFormat(amount);
+        return transferFrom(sender, recipient, amountInContractFormat);
+    }
+
+    function totalSupplyFloat() external view returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                totalSupply(),
                 decimals()
             );
     }

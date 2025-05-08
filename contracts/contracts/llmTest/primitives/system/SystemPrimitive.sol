@@ -28,7 +28,9 @@ contract SystemPrimitive is SystemPrimitiveBase, ReentrancyGuard {
 
     function deployRobotContract(
         string memory primitiveName,
-        string memory contractName
+        string memory contractName,
+        address ownerAddress,
+        string memory customRules
     ) external nonReentrant returns (address customPrimitive) {
         address primitiveAddress = IRobotStorage(executor)
             .getPrimitiveImplementation(primitiveName);
@@ -38,7 +40,6 @@ contract SystemPrimitive is SystemPrimitiveBase, ReentrancyGuard {
             executor,
             contractName
         );
-
         customPrimitive = address(customPrimitiveContract);
 
         IRobotStorage(executor).publishRobotContract(
@@ -46,6 +47,6 @@ contract SystemPrimitive is SystemPrimitiveBase, ReentrancyGuard {
             customPrimitive,
             primitiveName
         );
-        // emit RobotContractDeployed(customPrimitive, primitiveAddress);
+        customPrimitiveContract.robotContractInit(ownerAddress, customRules);
     }
 }
