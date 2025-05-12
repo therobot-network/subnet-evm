@@ -1,7 +1,7 @@
 {
   "questionAnswer": [
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "signer"
         }
@@ -9,11 +9,11 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "balanceOf",
+      "Operator": "balanceOf",
       "Output": ["call_result_1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "call_result_1"
         }
@@ -21,11 +21,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["usdc_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "How much #USDC do I have?"
         },
@@ -36,22 +36,22 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "answerUserQuestion",
+      "Operator": "answerUserQuestion",
       "Output": ["call_result_2"]
     }
   ],
   "withJumpIfNot": [
     {
-      "Method": "reset",
+      "Operator": "reset",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": []
+      "Operands": []
     },
     {
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Contract": { "Value": "" },
-      "Args": [
+      "Operands": [
         {
           "Value": "3"
         },
@@ -61,31 +61,31 @@
       ]
     },
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "10"
         }
       ]
     },
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "20"
         }
       ]
     },
     {
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Contract": { "Value": "" },
-      "Args": [
+      "Operands": [
         {
           "Value": "6"
         },
@@ -95,11 +95,11 @@
       ]
     },
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "30"
         }
@@ -108,28 +108,28 @@
   ],
   "withAssign": [
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "10"
         }
       ]
     },
     {
-      "Method": "getCounter",
+      "Operator": "getCounter",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [],
+      "Operands": [],
       "Output": ["CountA"]
     },
     {
-      "Method": "assign",
+      "Operator": "assign",
       "Contract": { "Value": "" },
-      "Args": [
+      "Operands": [
         {
           "Lookup": "CountA",
           "AbiType": "uint256"
@@ -138,11 +138,11 @@
       "Output": ["CountANew"]
     },
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterB"
       },
-      "Args": [
+      "Operands": [
         {
           "Lookup": "CountANew"
         }
@@ -151,44 +151,44 @@
   ],
   "withAssignArray": [
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "10"
         }
       ]
     },
     {
-      "Method": "getCounter",
+      "Operator": "getCounter",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [],
+      "Operands": [],
       "Output": ["CountA"]
     },
     {
-      "Method": "getCounter",
+      "Operator": "getCounter",
       "Contract": {
         "Lookup": "CounterB"
       },
-      "Args": [],
+      "Operands": [],
       "Output": ["CountB"]
     },
     {
-      "Method": "getCounter",
+      "Operator": "getCounter",
       "Contract": {
         "Lookup": "CounterB"
       },
-      "Args": [],
+      "Operands": [],
       "Output": ["CountBAgain"]
     },
     {
-      "Method": "assignArray",
+      "Operator": "assignArray",
       "Contract": { "Value": "" },
-      "Args": [
+      "Operands": [
         {
           "Lookup": "CountA",
           "AbiType": "uint256"
@@ -201,7 +201,7 @@
       "Output": ["CountArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "CountArray"
         }
@@ -209,11 +209,11 @@
       "Contract": {
         "Lookup": "PythonPrimitive"
       },
-      "Method": "max",
+      "Operator": "max",
       "Output": ["maxValue"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "What's the max value of the counters?"
         },
@@ -225,49 +225,49 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "answerUserQuestion",
+      "Operator": "answerUserQuestion",
       "Output": []
     }
   ],
   "withLookup": [
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "10"
         }
       ]
     },
     {
-      "Method": "getCounter",
+      "Operator": "getCounter",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [],
+      "Operands": [],
       "Output": ["CountA"]
     },
     {
       "Contract": {
         "Lookup": "CounterB"
       },
-      "Args": [
+      "Operands": [
         {
           "Lookup": "CountA"
         }
       ],
-      "Method": "increase"
+      "Operator": "increase"
     }
   ],
   "basic": [
     {
-      "Method": "increase",
+      "Operator": "increase",
       "Contract": {
         "Lookup": "CounterA"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "10"
         }
@@ -277,21 +277,21 @@
       "Contract": {
         "Lookup": "CounterB"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "20"
         }
       ],
-      "Method": "increase"
+      "Operator": "increase"
     }
   ],
   "withMathAndErc20": [
     {
-      "Method": "transfer",
+      "Operator": "transfer",
       "Contract": {
         "Lookup": "USDC"
       },
-      "Args": [
+      "Operands": [
         {
           "Value": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         },
@@ -301,11 +301,11 @@
       ]
     },
     {
-      "Method": "balanceOf",
+      "Operator": "balanceOf",
       "Contract": {
         "Lookup": "USDC"
       },
-      "Args": [
+      "Operands": [
         {
           "Lookup": "signer"
         }
@@ -313,7 +313,7 @@
       "Output": ["signerbalance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "signerbalance"
         },
@@ -324,11 +324,11 @@
       "Contract": {
         "Lookup": "PythonPrimitive"
       },
-      "Method": "divide",
+      "Operator": "divide",
       "Output": ["half_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "user1"
         },
@@ -339,12 +339,12 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "transfer"
+      "Operator": "transfer"
     }
   ],
   "withAnswerUserQuestion": [
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "signer"
         }
@@ -352,12 +352,12 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "balanceOf",
+      "Operator": "balanceOf",
       "Output": ["call_result_1"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "call_result_1",
           "AbiType": "uint256"
@@ -366,11 +366,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "balance"
         }
@@ -378,12 +378,12 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "contractFormatToUserFormat",
+      "Operator": "contractFormatToUserFormat",
       "Output": ["call_result_2"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "call_result_2",
           "AbiType": "string"
@@ -392,11 +392,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["user_format_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "How much USDC do I have?"
         },
@@ -407,13 +407,13 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "answerUserQuestion",
+      "Operator": "answerUserQuestion",
       "Output": ["call_result_3"]
     }
   ],
   "withAMM": [
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "JIRI"
@@ -422,12 +422,12 @@
       "Contract": {
         "Lookup": "AMM_1"
       },
-      "Method": "price",
+      "Operator": "price",
       "Output": ["call_result_1"],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_1"
@@ -436,11 +436,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["price1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "JIRI"
@@ -449,12 +449,12 @@
       "Contract": {
         "Lookup": "AMM_2"
       },
-      "Method": "price",
+      "Operator": "price",
       "Output": ["call_result_2"],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_2"
@@ -463,11 +463,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["price2"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "JIRI"
@@ -476,12 +476,12 @@
       "Contract": {
         "Lookup": "AMM_3"
       },
-      "Method": "price",
+      "Operator": "price",
       "Output": ["call_result_3"],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_3"
@@ -490,11 +490,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["price3"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "price1"
@@ -511,11 +511,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assignArray",
+      "Operator": "assignArray",
       "Output": ["Array0"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "Array0"
@@ -524,11 +524,11 @@
       "Contract": {
         "Lookup": "PythonPrimitive"
       },
-      "Method": "max",
+      "Operator": "max",
       "Output": ["call_result_4"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_4"
@@ -537,11 +537,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["max_price"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "price1"
@@ -558,11 +558,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assignArray",
+      "Operator": "assignArray",
       "Output": ["Array1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "Array1"
@@ -571,11 +571,11 @@
       "Contract": {
         "Lookup": "PythonPrimitive"
       },
-      "Method": "min",
+      "Operator": "min",
       "Output": ["call_result_5"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_5"
@@ -584,11 +584,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["min_price"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "max_price"
@@ -601,11 +601,11 @@
       "Contract": {
         "Lookup": "calculator"
       },
-      "Method": "equal",
+      "Operator": "equal",
       "Output": ["condition_result_6"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "16"
@@ -618,11 +618,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_1"
@@ -631,11 +631,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["max_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "23"
@@ -648,11 +648,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "max_price"
@@ -665,11 +665,11 @@
       "Contract": {
         "Lookup": "calculator"
       },
-      "Method": "equal",
+      "Operator": "equal",
       "Output": ["condition_result_10"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "20"
@@ -682,11 +682,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_2"
@@ -695,11 +695,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["max_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "22"
@@ -712,11 +712,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_3"
@@ -725,11 +725,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["max_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "22"
@@ -742,11 +742,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "23"
@@ -759,11 +759,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "min_price"
@@ -776,11 +776,11 @@
       "Contract": {
         "Lookup": "calculator"
       },
-      "Method": "equal",
+      "Operator": "equal",
       "Output": ["condition_result_14"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "27"
@@ -793,11 +793,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_1"
@@ -806,11 +806,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["min_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "34"
@@ -823,11 +823,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "min_price"
@@ -840,11 +840,11 @@
       "Contract": {
         "Lookup": "calculator"
       },
-      "Method": "equal",
+      "Operator": "equal",
       "Output": ["condition_result_18"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "31"
@@ -857,11 +857,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_2"
@@ -870,11 +870,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["min_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "33"
@@ -887,11 +887,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "AMM_3"
@@ -900,11 +900,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["min_exchange"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "33"
@@ -917,11 +917,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "string",
           "Value": "34"
@@ -934,11 +934,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "JumpIfNot",
+      "Operator": "JumpIfNot",
       "Output": [null]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "signer"
@@ -947,12 +947,12 @@
       "Contract": {
         "Lookup": "JIRI"
       },
-      "Method": "balanceOf",
+      "Operator": "balanceOf",
       "Output": ["call_result_22"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_22"
@@ -961,11 +961,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["jiri_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "jiri_balance"
@@ -978,11 +978,11 @@
       "Contract": {
         "Lookup": "calculator"
       },
-      "Method": "divide",
+      "Operator": "divide",
       "Output": ["half_jiri"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "max_exchange"
@@ -995,12 +995,12 @@
       "Contract": {
         "Lookup": "JIRI"
       },
-      "Method": "approve",
+      "Operator": "approve",
       "Output": ["call_result_23"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "JIRI"
@@ -1013,12 +1013,12 @@
       "Contract": {
         "Lookup": "max_exchange"
       },
-      "Method": "swap",
+      "Operator": "swap",
       "Output": ["call_result_24"],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "signer"
@@ -1027,12 +1027,12 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "balanceOf",
+      "Operator": "balanceOf",
       "Output": ["call_result_25"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "uint256",
           "Lookup": "call_result_25"
@@ -1041,11 +1041,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["usdc_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "min_exchange"
@@ -1058,12 +1058,12 @@
       "Contract": {
         "Lookup": "USDC"
       },
-      "Method": "approve",
+      "Operator": "approve",
       "Output": ["call_result_26"],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "AbiType": "address",
           "Lookup": "USDC"
@@ -1076,32 +1076,32 @@
       "Contract": {
         "Lookup": "min_exchange"
       },
-      "Method": "swap",
+      "Operator": "swap",
       "Output": ["call_result_27"],
       "Primitive": "unknown"
     }
   ],
   "withAssignDict": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "100"
         }
       ],
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["balance1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "200"
         }
       ],
-      "Method": "assign",
+      "Operator": "assign",
       "Output": ["balance2"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "adam"
         },
@@ -1115,11 +1115,11 @@
           "Lookup": "balance2"
         }
       ],
-      "Method": "assignDict",
+      "Operator": "assignDict",
       "Output": ["dict_1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1130,11 +1130,11 @@
           "Value": "default"
         }
       ],
-      "Method": "getDict",
+      "Operator": "getDict",
       "Output": ["adam_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1145,11 +1145,11 @@
           "Value": "Default Value"
         }
       ],
-      "Method": "getDict",
+      "Operator": "getDict",
       "Output": ["karen_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Adam's balance is"
         },
@@ -1157,10 +1157,10 @@
           "Lookup": "adam_balance"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Karen's balance is"
         },
@@ -1168,10 +1168,10 @@
           "Lookup": "karen_balance"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1182,11 +1182,11 @@
           "Value": "300"
         }
       ],
-      "Method": "setDict",
+      "Operator": "setDict",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1197,11 +1197,11 @@
           "Value": "default"
         }
       ],
-      "Method": "getDict",
+      "Operator": "getDict",
       "Output": ["karen_balance"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Karen's new balance is"
         },
@@ -1209,12 +1209,12 @@
           "Lookup": "karen_balance"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "toArray": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "adam"
         },
@@ -1228,11 +1228,11 @@
           "Value": "200"
         }
       ],
-      "Method": "assignDict",
+      "Operator": "assignDict",
       "Output": ["dict_1"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1243,11 +1243,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "toArray",
+      "Operator": "toArray",
       "Output": ["keysArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "keysArray is"
         },
@@ -1255,10 +1255,10 @@
           "Lookup": "keysArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1269,11 +1269,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "toArray",
+      "Operator": "toArray",
       "Output": ["valuesArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "valuesArray is"
         },
@@ -1281,10 +1281,10 @@
           "Lookup": "valuesArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         },
@@ -1295,11 +1295,11 @@
       "Contract": {
         "Value": ""
       },
-      "Method": "toArray",
+      "Operator": "toArray",
       "Output": ["dictArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "dictArray is"
         },
@@ -1307,19 +1307,19 @@
           "Lookup": "dictArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "dict_1"
         }
       ],
-      "Method": "forItems",
+      "Operator": "forItems",
       "Output": ["forItemsKeysArray", "forItemsValuesArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "forItemsKeysArray is"
         },
@@ -1327,10 +1327,10 @@
           "Lookup": "forItemsKeysArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "forItemsValuesArray is"
         },
@@ -1338,12 +1338,12 @@
           "Lookup": "forItemsValuesArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withLen": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "adam"
         },
@@ -1357,20 +1357,20 @@
           "Value": "200"
         }
       ],
-      "Method": "assignDict",
+      "Operator": "assignDict",
       "Output": ["adamDict"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "adamDict"
         }
       ],
-      "Method": "len",
+      "Operator": "len",
       "Output": ["lenAdamDict"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "value": "a"
         },
@@ -1381,20 +1381,20 @@
           "value": "c"
         }
       ],
-      "Method": "assignArray",
+      "Operator": "assignArray",
       "Output": ["abcArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "abcArray"
         }
       ],
-      "Method": "len",
+      "Operator": "len",
       "Output": ["lenAbcArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "dictionary length is"
         },
@@ -1402,10 +1402,10 @@
           "Lookup": "lenAdamDict"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "array length is"
         },
@@ -1413,12 +1413,12 @@
           "Lookup": "lenAbcArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withIndex": [
     {
-      "Args": [
+      "Operands": [
         {
           "value": "a"
         },
@@ -1429,11 +1429,11 @@
           "value": "c"
         }
       ],
-      "Method": "assignArray",
+      "Operator": "assignArray",
       "Output": ["abcArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "abcArray"
         },
@@ -1441,11 +1441,11 @@
           "value": "0"
         }
       ],
-      "Method": "index",
+      "Operator": "index",
       "Output": ["oneAbcArray"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "index 1 is"
         },
@@ -1453,12 +1453,12 @@
           "Lookup": "oneAbcArray"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withRobotContractDeploy": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "erc20"
         },
@@ -1475,11 +1475,11 @@
       "Contract": {
         "Lookup": "SystemPrimitive"
       },
-      "Method": "deployRobotContract",
+      "Operator": "deployRobotContract",
       "Output": ["new_contract_address"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "1000"
         }
@@ -1487,11 +1487,11 @@
       "Contract": {
         "Lookup": "new_contract_address"
       },
-      "Method": "configure",
+      "Operator": "configure",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "TST address is:"
         },
@@ -1499,12 +1499,12 @@
           "Lookup": "new_contract_address"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withAmmDeploy": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "erc20"
         },
@@ -1521,11 +1521,11 @@
       "Contract": {
         "Lookup": "SystemPrimitive"
       },
-      "Method": "deployRobotContract",
+      "Operator": "deployRobotContract",
       "Output": ["tokenAAddress"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "10000"
         }
@@ -1533,11 +1533,11 @@
       "Contract": {
         "Lookup": "tokenAAddress"
       },
-      "Method": "configure",
+      "Operator": "configure",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "erc20"
         },
@@ -1554,11 +1554,11 @@
       "Contract": {
         "Lookup": "SystemPrimitive"
       },
-      "Method": "deployRobotContract",
+      "Operator": "deployRobotContract",
       "Output": ["tokenBAddress"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "1000"
         }
@@ -1566,11 +1566,11 @@
       "Contract": {
         "Lookup": "tokenBAddress"
       },
-      "Method": "configure",
+      "Operator": "configure",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "amm"
         },
@@ -1587,11 +1587,11 @@
       "Contract": {
         "Lookup": "SystemPrimitive"
       },
-      "Method": "deployRobotContract",
+      "Operator": "deployRobotContract",
       "Output": ["new_contract_address"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "tokenAAddress"
         },
@@ -1605,11 +1605,11 @@
       "Contract": {
         "Lookup": "new_contract_address"
       },
-      "Method": "initialize",
+      "Operator": "configure",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "amm"
         },
@@ -1626,11 +1626,11 @@
       "Contract": {
         "Lookup": "SystemPrimitive"
       },
-      "Method": "deployRobotContract",
+      "Operator": "deployRobotContract",
       "Output": ["ammAddress"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "tokenAAddress"
         },
@@ -1644,11 +1644,11 @@
       "Contract": {
         "Lookup": "new_contract_address"
       },
-      "Method": "initialize",
+      "Operator": "configure",
       "Output": []
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "ammAddress"
         },
@@ -1659,12 +1659,12 @@
       "Contract": {
         "Lookup": "tokenAAddress"
       },
-      "Method": "approve",
+      "Operator": "approve",
       "Output": [],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "ammAddress"
         },
@@ -1675,12 +1675,12 @@
       "Contract": {
         "Lookup": "tokenBAddress"
       },
-      "Method": "approve",
+      "Operator": "approve",
       "Output": [],
       "Primitive": "erc20"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "tokenAAddress"
         },
@@ -1697,12 +1697,12 @@
       "Contract": {
         "Lookup": "ammAddress"
       },
-      "Method": "addLiquidity",
+      "Operator": "addLiquidity",
       "Output": [],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "tokenAAddress"
         },
@@ -1719,21 +1719,21 @@
       "Contract": {
         "Lookup": "ammAddress"
       },
-      "Method": "addLiquidity",
+      "Operator": "addLiquidity",
       "Output": [],
       "Primitive": "amm"
     },
     {
-      "Args": [],
+      "Operands": [],
       "Contract": {
         "Lookup": "ammAddress"
       },
-      "Method": "activate",
+      "Operator": "activate",
       "Output": [],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "tokenAAddress"
         },
@@ -1744,12 +1744,12 @@
       "Contract": {
         "Lookup": "ammAddress"
       },
-      "Method": "swap",
+      "Operator": "swap",
       "Output": [],
       "Primitive": "amm"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "AMM address is:"
         },
@@ -1757,12 +1757,12 @@
           "Lookup": "ammAddress"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withBoolOps": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "true"
         },
@@ -1770,11 +1770,11 @@
           "Value": "false"
         }
       ],
-      "Method": "and",
+      "Operator": "and",
       "Output": ["andResult"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "true"
         },
@@ -1782,20 +1782,20 @@
           "Value": "false"
         }
       ],
-      "Method": "or",
+      "Operator": "or",
       "Output": ["orResult"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "true"
         }
       ],
-      "Method": "not",
+      "Operator": "not",
       "Output": ["notResult"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Lookup": "bool1"
         },
@@ -1803,11 +1803,11 @@
           "Lookup": "bool2"
         }
       ],
-      "Method": "is",
+      "Operator": "is",
       "Output": ["isResult"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Result of true and false"
         },
@@ -1815,10 +1815,10 @@
           "Lookup": "andResult"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Result of true or false"
         },
@@ -1826,10 +1826,10 @@
           "Lookup": "orResult"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Result of not true"
         },
@@ -1837,10 +1837,10 @@
           "Lookup": "notResult"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "Result of bool1 is bool2"
         },
@@ -1848,12 +1848,12 @@
           "Lookup": "isResult"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ],
   "withIs": [
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "None"
         },
@@ -1861,11 +1861,11 @@
           "Lookup": "nilValue"
         }
       ],
-      "Method": "is",
+      "Operator": "is",
       "Output": ["isValue"]
     },
     {
-      "Args": [
+      "Operands": [
         {
           "Value": "null is nil:"
         },
@@ -1873,7 +1873,7 @@
           "Lookup": "isValue"
         }
       ],
-      "Method": "answerUserQuestion"
+      "Operator": "answerUserQuestion"
     }
   ]
 }

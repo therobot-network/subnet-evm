@@ -23,8 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// getLookupValue retrieves a value from the lookup table or directly from the Arg.
-func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
+// getLookupValue retrieves a value from the lookup table or directly from the Operand.
+func getLookupValue(arg Operand, stateDB contract.StateDB) (interface{}, error) {
 	// If Value is explicitly set (even to ""), use it
 	if arg.Value != nil {
 		return *arg.Value, nil
@@ -209,7 +209,7 @@ func convertToABIType(value interface{}, abiType abi.Type) (interface{}, error) 
 
 
 
-func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
+func ProcessArguments(inputs abi.Arguments, args []Operand, stateDB contract.StateDB) ([]interface{}, error) {
 	if len(inputs) != len(args) {
 		return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
 	}
@@ -246,7 +246,7 @@ func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB
 	return packedArgs, nil
 }
 
-func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
+func getContractAddress(contract Operand, stateDB contract.StateDB) (common.Address, error) {
 	addrValue, err := getLookupValue(contract, stateDB)
 	if err != nil {
 		log.Info("Failed fetching contract address", "error", err)

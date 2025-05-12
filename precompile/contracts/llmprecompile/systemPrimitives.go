@@ -18,16 +18,16 @@ import (
 
 func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, accessibleState contract.AccessibleState, remainingGas uint64) (*big.Int, uint64, error) {
 
-	switch step.Method {
+	switch step.Operator {
 	case "answerUserQuestion":
 		// Fetch `question` and `answer`
-		questionRaw, err := getLookupValue(step.Args[0], stateDB)
+		questionRaw, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch question", "error", err)
 			return nil, 0, fmt.Errorf("failed to fetch question: %w", err)
 		}
 	
-		answerRaw, err := getLookupValue(step.Args[1], stateDB)
+		answerRaw, err := getLookupValue(step.Operands[1], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch answer", "error", err)
 			return nil, 0, fmt.Errorf("failed to fetch answer: %w", err)
@@ -68,7 +68,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 	
 	
 	case "assign":
-		arg, err := getLookupValue(step.Args[0], stateDB)
+		arg, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch argument", "Error", err)
 			return nil, 0, fmt.Errorf("failed to fetch arg: %w", err)
@@ -82,7 +82,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 	case "JumpIfNot":
 		jumpTarget := new(big.Int)
 	
-		jumpTargetStr, err := getLookupValue(step.Args[0], stateDB)
+		jumpTargetStr, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch jumpTarget", "Error", err)
 			return nil, 0, fmt.Errorf("failed to fetch jumpTarget: %w", err)
@@ -93,7 +93,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			return nil, 0, fmt.Errorf("JumpIfNot: failed to convert string '%s' to big.Int", jumpTargetStr)
 		}
 	
-		conditionStr, err := getLookupValue(step.Args[1], stateDB)
+		conditionStr, err := getLookupValue(step.Operands[1], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch condition", "Error", err)
 			return nil, 0, fmt.Errorf("failed to fetch condition: %w", err)
@@ -117,8 +117,8 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		}
 	
 	case "assignArray":
-		rawArrayValues := make([]interface{}, len(step.Args))
-		for i, arg := range step.Args {
+		rawArrayValues := make([]interface{}, len(step.Operands))
+		for i, arg := range step.Operands {
 			value, err := getLookupValue(arg, stateDB)
 			if err != nil {
 				log.Info("Failed to fetch array value", "index", i, "error", err)
@@ -140,16 +140,16 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully updated memory in state for assignArray step", "OutputKey", step.Output[0])
 	
 	case "assignDict":
-		if len(step.Args)%2 != 0 {
-			log.Info("Invalid argument count for assignDict", "got", len(step.Args))
+		if len(step.Operands)%2 != 0 {
+			log.Info("Invalid argument count for assignDict", "got", len(step.Operands))
 			return currentPC, remainingGas, fmt.Errorf("assignDict expects an even number of arguments (key-value pairs)")
 		}
 	
 		dict := make(map[string]interface{})
 	
-		for i := 0; i < len(step.Args); i += 2 {
-			keyArg := step.Args[i]
-			valueArg := step.Args[i+1]
+		for i := 0; i < len(step.Operands); i += 2 {
+			keyArg := step.Operands[i]
+			valueArg := step.Operands[i+1]
 	
 			keyRaw, err := getLookupValue(keyArg, stateDB)
 			if err != nil {
@@ -181,12 +181,12 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully updated memory in state for assignDict step", "OutputKey", step.Output[0])
 	
 	case "getDict":
-		if len(step.Args) < 2 {
-			log.Info("Invalid arguments for getDict", "argsCount", len(step.Args), "outputsCount", len(step.Output))
+		if len(step.Operands) < 2 {
+			log.Info("Invalid arguments for getDict", "argsCount", len(step.Operands), "outputsCount", len(step.Output))
 			return currentPC, remainingGas, fmt.Errorf("getDict requires exactly 3 args and 1 output")
 		}
 	
-		dictRaw, err := getLookupValue(step.Args[0], stateDB)
+		dictRaw, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch dict for getDict", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch dict: %w", err)
@@ -198,7 +198,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			return currentPC, remainingGas, fmt.Errorf("expected dict to be map[string]interface{}, got %T", dictRaw)
 		}
 	
-		keyRaw, err := getLookupValue(step.Args[1], stateDB)
+		keyRaw, err := getLookupValue(step.Operands[1], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch key for getDict", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch dict lookup key: %w", err)
@@ -208,7 +208,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 	
 		val, exists := dict[keyStr]
 		if !exists {
-			defaultValue, err := getLookupValue(step.Args[2], stateDB)
+			defaultValue, err := getLookupValue(step.Operands[2], stateDB)
 			if err != nil {
 				log.Info("Failed to fetch default value for getDict", "error", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch default value: %w", err)
@@ -227,12 +227,12 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully stored getDict result", "OutputKey", step.Output[0], "Value", val)
 	
 	case "setDict":
-		if len(step.Args) != 3 {
-			log.Info("Invalid argument count for setDict", "expected", 3, "got", len(step.Args))
+		if len(step.Operands) != 3 {
+			log.Info("Invalid argument count for setDict", "expected", 3, "got", len(step.Operands))
 			return currentPC, remainingGas, fmt.Errorf("setDict requires exactly 3 arguments")
 		}
 	
-		dictNameArg := step.Args[0]
+		dictNameArg := step.Operands[0]
 		if dictNameArg.Lookup == nil {
 			log.Info("Lookup field is nil in dictNameArg")
 			return currentPC, remainingGas, fmt.Errorf("lookup field is nil")
@@ -258,14 +258,14 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			}
 		}
 	
-		keyRaw, err := getLookupValue(step.Args[1], stateDB)
+		keyRaw, err := getLookupValue(step.Operands[1], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch dictionary key", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch dict key: %w", err)
 		}
 		keyStr := fmt.Sprintf("%v", keyRaw)
 	
-		value, err := getLookupValue(step.Args[2], stateDB)
+		value, err := getLookupValue(step.Operands[2], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch dictionary value", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch dict value: %w", err)
@@ -282,18 +282,18 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully stored updated dictionary", "dictKey", dictKey)
 	
 	case "toArray":
-		if len(step.Args) != 2 || len(step.Output) != 1 {
-			log.Info("Invalid argument/output count for toArray", "args", len(step.Args), "outputs", len(step.Output))
+		if len(step.Operands) != 2 || len(step.Output) != 1 {
+			log.Info("Invalid argument/output count for toArray", "args", len(step.Operands), "outputs", len(step.Output))
 			return currentPC, remainingGas, fmt.Errorf("toArray requires 2 args and 1 output")
 		}
 	
-		inputRaw, err := getLookupValue(step.Args[0], stateDB)
+		inputRaw, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch input for toArray", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch input: %w", err)
 		}
 	
-		modeRaw, err := getLookupValue(step.Args[1], stateDB)
+		modeRaw, err := getLookupValue(step.Operands[1], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch mode for toArray", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch mode: %w", err)
@@ -354,12 +354,12 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully stored toArray result", "key", step.Output[0])
 	
 	case "forItems":
-		if len(step.Args) != 1 || len(step.Output) != 2 {
-			log.Info("Invalid argument/output count for forItems", "args", len(step.Args), "outputs", len(step.Output))
+		if len(step.Operands) != 1 || len(step.Output) != 2 {
+			log.Info("Invalid argument/output count for forItems", "args", len(step.Operands), "outputs", len(step.Output))
 			return currentPC, remainingGas, fmt.Errorf("forItems requires 1 arg (dict) and 2 outputs (keys, values)")
 		}
 	
-		dictRaw, err := getLookupValue(step.Args[0], stateDB)
+		dictRaw, err := getLookupValue(step.Operands[0], stateDB)
 		if err != nil {
 			log.Info("Failed to fetch dictionary for forItems", "error", err)
 			return currentPC, remainingGas, fmt.Errorf("failed to fetch dictionary: %w", err)
@@ -394,12 +394,12 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 		log.Info("Successfully stored forItems result", "keysOutput", step.Output[0], "valuesOutput", step.Output[1])
 			
 	case "len":
-			if len(step.Args) != 1 || len(step.Output) != 1 {
-				log.Info("Invalid argument/output count for len", "args", len(step.Args), "outputs", len(step.Output))
+			if len(step.Operands) != 1 || len(step.Output) != 1 {
+				log.Info("Invalid argument/output count for len", "args", len(step.Operands), "outputs", len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("len requires 1 arg and 1 output")
 			}
 	
-			rawValue, err := getLookupValue(step.Args[0], stateDB)
+			rawValue, err := getLookupValue(step.Operands[0], stateDB)
 			if err != nil {
 				log.Info("Failed to fetch input for len", "error", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch input for len: %w", err)
@@ -431,18 +431,18 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 			log.Info("Successfully stored len result", "outputKey", step.Output[0], "length", length)
 		
 	case "index":
-			if len(step.Args) != 2 || len(step.Output) != 1 {
-				log.Info("Invalid argument/output count for index", "args", len(step.Args), "outputs", len(step.Output))
+			if len(step.Operands) != 2 || len(step.Output) != 1 {
+				log.Info("Invalid argument/output count for index", "args", len(step.Operands), "outputs", len(step.Output))
 				return currentPC, remainingGas, fmt.Errorf("index requires 2 args and 1 output")
 			}
 
-			arrayRaw, err := getLookupValue(step.Args[0], stateDB)
+			arrayRaw, err := getLookupValue(step.Operands[0], stateDB)
 			if err != nil {
 				log.Info("Failed to fetch array for index", "error", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch array: %w", err)
 			}
 
-			indexRaw, err := getLookupValue(step.Args[1], stateDB)
+			indexRaw, err := getLookupValue(step.Operands[1], stateDB)
 			if err != nil {
 				log.Info("Failed to fetch index for index", "error", err)
 				return currentPC, remainingGas, fmt.Errorf("failed to fetch index: %w", err)
@@ -517,7 +517,7 @@ func systemPrimitiveStep(currentPC *big.Int, step Step, llmAddr common.Address, 
 
 func handleBoolOps(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
 	log.Info("in handleBoolOps")
-    switch step.Method {
+    switch step.Operator {
     case "and":
 		log.Info("in case and")
 
@@ -529,8 +529,8 @@ func handleBoolOps(currentPC *big.Int, step Step, llmAddr common.Address, stateD
     case "is":
         return boolIs(currentPC, step, llmAddr, stateDB, remainingGas)
     default:
-        log.Info("Unknown boolean method", "method", step.Method)
-        return currentPC, remainingGas, fmt.Errorf("unknown boolean method: %s", step.Method)
+        log.Info("Unknown boolean method", "method", step.Operator)
+        return currentPC, remainingGas, fmt.Errorf("unknown boolean method: %s", step.Operator)
     }
 }
 
@@ -553,13 +553,13 @@ func parseBoolFromString(rawValue interface{}) (bool, error) {
 
 func boolAnd(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
 	log.Info("in function boolAnd")
-    if len(step.Args) < 2 || len(step.Output) != 1 {
-        log.Info("Invalid argument/output count for and", "args", len(step.Args), "outputs", len(step.Output))
+    if len(step.Operands) < 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for and", "args", len(step.Operands), "outputs", len(step.Output))
         return currentPC, remainingGas, fmt.Errorf("and requires at least two args and one output")
     }
 
     result := true
-    for _, arg := range step.Args {
+    for _, arg := range step.Operands {
         rawValue, err := getLookupValue(arg, stateDB)
         if err != nil {
             log.Info("Failed to fetch input for and", "error", err)
@@ -589,12 +589,12 @@ func boolAnd(currentPC *big.Int, step Step, llmAddr common.Address, stateDB cont
 
 
 func boolIs(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
-    if len(step.Args) != 2 || len(step.Output) != 1 {
-        log.Info("Invalid argument/output count for is", "args", len(step.Args), "outputs", len(step.Output))
+    if len(step.Operands) != 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for is", "args", len(step.Operands), "outputs", len(step.Output))
         return currentPC, remainingGas, fmt.Errorf("is requires exactly two args and one output")
     }
 
-    rawValue1, err := getLookupValue(step.Args[0], stateDB)
+    rawValue1, err := getLookupValue(step.Operands[0], stateDB)
     log.Info("rawValue1 is result", "result", rawValue1)
 	if rawValue1 == "None" {
 		rawValue1 = nil
@@ -605,7 +605,7 @@ func boolIs(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contr
         return currentPC, remainingGas, fmt.Errorf("failed to fetch first input for is: %w", err)
     }
 
-    rawValue2, err := getLookupValue(step.Args[1], stateDB)
+    rawValue2, err := getLookupValue(step.Operands[1], stateDB)
     log.Info("rawValue2 is result", "result", rawValue2)
 	if rawValue2 == "None" {
 		rawValue2 = nil
@@ -631,12 +631,12 @@ func boolIs(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contr
 }
 
 func boolNot(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
-    if len(step.Args) != 1 || len(step.Output) != 1 {
-        log.Info("Invalid argument/output count for not", "args", len(step.Args), "outputs", len(step.Output))
+    if len(step.Operands) != 1 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for not", "args", len(step.Operands), "outputs", len(step.Output))
         return currentPC, remainingGas, fmt.Errorf("not requires exactly one arg and one output")
     }
 
-    rawValue, err := getLookupValue(step.Args[0], stateDB)
+    rawValue, err := getLookupValue(step.Operands[0], stateDB)
     if err != nil {
         log.Info("Failed to fetch input for not", "error", err)
         return currentPC, remainingGas, fmt.Errorf("failed to fetch input for not: %w", err)
@@ -664,13 +664,13 @@ func boolNot(currentPC *big.Int, step Step, llmAddr common.Address, stateDB cont
 
 
 func boolOr(currentPC *big.Int, step Step, llmAddr common.Address, stateDB contract.StateDB, remainingGas uint64) (*big.Int, uint64, error) {
-    if len(step.Args) < 2 || len(step.Output) != 1 {
-        log.Info("Invalid argument/output count for or", "args", len(step.Args), "outputs", len(step.Output))
+    if len(step.Operands) < 2 || len(step.Output) != 1 {
+        log.Info("Invalid argument/output count for or", "args", len(step.Operands), "outputs", len(step.Output))
         return currentPC, remainingGas, fmt.Errorf("or requires at least two args and one output")
     }
 
     result := false
-    for _, arg := range step.Args {
+    for _, arg := range step.Operands {
         rawValue, err := getLookupValue(arg, stateDB)
         if err != nil {
             log.Info("Failed to fetch input for or", "error", err)

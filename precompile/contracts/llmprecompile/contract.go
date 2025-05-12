@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 
 	"math/big"
@@ -49,21 +49,16 @@ var (
 )
 
 
-// type Arg struct {
-// 	Value  string `json:"Value"`
-// 	Lookup string    `json:"Lookup"`
-//     // AbiType string `json:"AbiType"`
-// }
 
-type Arg struct {
+type Operand struct {
 	Value  *string `json:"Value"`
 	Lookup *string  `json:"Lookup"`
 }
 
 type Step struct {
-	Method    string   `json:"Method"`
-	Contract  Arg      `json:"Contract"`
-	Args      []Arg    `json:"Args"`
+	Operator  string   `json:"Operator"`
+	Contract  Operand      `json:"Contract"`
+	Operands  []Operand    `json:"Operands"`
     Output    []string   `json:"Output"`
 }
 
@@ -126,12 +121,12 @@ func HTTPPostJSON(url string, requestBody interface{}) ([]byte, error) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			log.Info("Non-200 response", "status", resp.StatusCode, "body", string(body))
 			return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
 		}
 
-		respBytes, err = ioutil.ReadAll(resp.Body)
+		respBytes, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read HTTP response: %w", err)
 		}
@@ -223,7 +218,7 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 
 // Utility function to prepare the next step's contract call
 func prepareNextStep(step Step, contractAddress common.Address, addr common.Address, stateDB contract.StateDB) ([]ILLMContractMethodParams, error) {
-	log.Info("Preparing next step", "Method", step.Method, "Contract", step.Contract)
+	log.Info("Preparing next step", "Operator", step.Operator, "Contract", step.Contract)
 
 	_, contractAbi := getContractPrimitive(stateDB, addr, contractAddress.Hex())
 	if contractAbi == "" {
@@ -233,31 +228,31 @@ func prepareNextStep(step Step, contractAddress common.Address, addr common.Addr
 
 	parsedABI, err := abi.JSON(strings.NewReader(contractAbi))
 	if err != nil {
-		log.Info("Failed to parse ABI", "Method", step.Method, "Contract", step.Contract, "Error", err)
+		log.Info("Failed to parse ABI", "Operator", step.Operator, "Contract", step.Contract, "Error", err)
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
 	}
-	log.Info("Parsed ABI", "Method", step.Method, "Contract", step.Contract)
+	log.Info("Parsed ABI", "Operator", step.Operator, "Contract", step.Contract)
 
-	method, exists := parsedABI.Methods[step.Method]
+	method, exists := parsedABI.Methods[step.Operator]
 	if !exists {
-		log.Info("Method not found in ABI", "Method", step.Method, "Contract", step.Contract)
-		return nil, fmt.Errorf("method %s not found in ABI", step.Method)
+		log.Info("Operator not found in ABI", "Operator", step.Operator, "Contract", step.Contract)
+		return nil, fmt.Errorf("method %s not found in ABI", step.Operator)
 	}
-	log.Info("Retrieved method from ABI", "Method", step.Method, "Contract", step.Contract)
+	log.Info("Retrieved method from ABI", "Operator", step.Operator, "Contract", step.Contract)
 
-	packedArgs, err := ProcessArguments(method.Inputs, step.Args, stateDB)
+	packedArgs, err := ProcessArguments(method.Inputs, step.Operands, stateDB)
 	if err != nil {
-		log.Info("Failed to process arguments", "Method", step.Method, "Contract", step.Contract, "Error", err)
+		log.Info("Failed to process arguments", "Operator", step.Operator, "Contract", step.Contract, "Error", err)
 		return nil, fmt.Errorf("failed to process arguments: %w", err)
 	}
-	log.Info("Processed arguments", "Method", step.Method, "PackedArguments", packedArgs)
+	log.Info("Processed arguments", "Operator", step.Operator, "PackedArguments", packedArgs)
 
 	methodData, err := method.Inputs.Pack(packedArgs...)
 	if err != nil {
-		log.Info("Failed to pack method data", "Method", step.Method, "Contract", step.Contract, "Error", err)
+		log.Info("Failed to pack method data", "Operator", step.Operator, "Contract", step.Contract, "Error", err)
 		return nil, fmt.Errorf("failed to pack method data: %w", err)
 	}
-	log.Info("Packed method data", "Method", step.Method, "DataHex", fmt.Sprintf("%x", methodData))
+	log.Info("Packed method data", "Operator", step.Operator, "DataHex", fmt.Sprintf("%x", methodData))
 
 	contractParams := []ILLMContractMethodParams{
 		{
@@ -265,7 +260,7 @@ func prepareNextStep(step Step, contractAddress common.Address, addr common.Addr
 			MethodData:      append(method.ID, methodData...),
 		},
 	}
-	log.Info("Prepared contract method parameters", "Method", step.Method, "Contract", step.Contract, "Params", contractParams)
+	log.Info("Prepared contract method parameters", "Operator", step.Operator, "Contract", step.Contract, "Params", contractParams)
 
 	return contractParams, nil
 }
@@ -316,7 +311,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 
 	currentStep := steps[currentPC.Int64()]
 	stepJson, _ := json.MarshalIndent(currentStep, "", "  ")
-	log.Info("Processing step", "PC", currentPC.Int64(), "Method", currentStep.Method, "Contract", currentStep.Contract, "Step", string(stepJson))
+	log.Info("Processing step", "PC", currentPC.Int64(), "Operator", currentStep.Operator, "Contract", currentStep.Contract, "Step", string(stepJson))
 
 	contractAddress, err := getContractAddress(currentStep.Contract, stateDB)
 	if err != nil {
@@ -337,7 +332,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 	}
 	log.Info("Parsed ABI", "PC", currentPC.Int64())
 
-	decodedResults, err := parsedABI.Methods[currentStep.Method].Outputs.Unpack(inputStruct.ContractMethodResults[0])
+	decodedResults, err := parsedABI.Methods[currentStep.Operator].Outputs.Unpack(inputStruct.ContractMethodResults[0])
 	if err != nil {
 		log.Info("Failed to decode results", "PC", currentPC.Int64(), "Error", err)
 		return nil, remainingGas, fmt.Errorf("failed to decode results: %w", err)
@@ -395,7 +390,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 	}
 
 	nextStep := steps[nextPC.Int64()]
-	log.Info("Preparing next step", "PC", nextPC.Int64(), "Method", nextStep.Method, "Contract", nextStep.Contract)
+	log.Info("Preparing next step", "PC", nextPC.Int64(), "Operator", nextStep.Operator, "Contract", nextStep.Contract)
 
 	contractAddress, err = getContractAddress(nextStep.Contract, stateDB)
 	if err != nil {
