@@ -1,83 +1,72 @@
 import { ethers } from "hardhat";
-import fs from "fs";
-import path from "path";
-import {
-  BaseContract,
-  Contract,
-  Signer,
-  Interface,
-  LogDescription,
-} from "ethers";
+import { Contract, Signer, Interface, LogDescription } from "ethers";
 import { generateFunctionCallData } from "./utils";
 
 export const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 export const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
+const EXEC_ADDR = "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922";
 
 export interface TestEnv {
   executor: Contract;
   executorAddress: string;
   owner: Signer;
   llmContract: Contract;
-  // testContract: Contract;
-  counterAContract: Contract;
-  counterAContractAddress: string;
-  counterBContract: Contract;
-  counterBContractAddress: string;
-  mathContractAddress: string;
-  ammContract1: Contract;
-  ammContract1Address: string;
-  ammContract2: Contract;
-  ammContract2Address: string;
-  ammContract3: Contract;
-  ammContract3Address: string;
-  usdcContract: Contract;
-  usdcContractAddress: string;
-  jiriContract: Contract;
-  jiriContractAddress: string;
+
+  // these might be undefined if you didn’t request them
+  counterAContract?: Contract;
+  counterAContractAddress?: string;
+
+  counterBContract?: Contract;
+  counterBContractAddress?: string;
+
+  mathContractAddress?: string;
+  mathContract?: Contract;
+
+  usdcContractAddress?: string;
+  usdcContract?: Contract;
+
+  jiriContractAddress?: string;
+  jiriContract?: Contract;
+
+  ammContract1Address?: string;
+  ammContract1?: Contract;
+
+  ammContract2Address?: string;
+  ammContract2?: Contract;
+
+  ammContract3Address?: string;
+  ammContract3?: Contract;
 }
 
-/**
- * Deploys or attaches all precompile + primitives + clones via Executor
- * and returns an object with all of your test‑level instances & addresses.
- */
-export async function setupTestEnvironment(): Promise<TestEnv> {
+export async function setupTestEnvironment(
+  contractsToDeploy: string[],
+): Promise<TestEnv> {
+  const toDeploy = new Set(contractsToDeploy);
   const [owner] = await ethers.getSigners();
 
-  // 1) Attach to LLM precompile (must already exist on‑chain)
+  // 1) always attach to LLM
   const llmContract = await ethers.getContractAt("ILLM", LLM_ADDRESS, owner);
-  const code = await ethers.provider.getCode(LLM_ADDRESS);
-  if (code === "0x") throw new Error("LLM precompile not deployed");
+  if ((await ethers.provider.getCode(LLM_ADDRESS)) === "0x") {
+    throw new Error("LLM precompile not deployed");
+  }
 
-  // // 2) Deploy ExampleLLM test contract
-  // const ExampleLLM = await ethers.getContractFactory("ExampleLLMPrecompile", {
-  //   signer: owner,
-  // });
-  // const testContract = await ExampleLLM.deploy();
-  // await testContract.waitForDeployment();
-
-  // 3) Deploy or attach Executor
-  const EXEC_ADDR = "0x52C84043CD9c865236f11d9Fc9F56aa003c1f922";
+  // 2) deploy or attach Executor
   let executorAddress = EXEC_ADDR;
-  const existingCode = await ethers.provider.getCode(EXEC_ADDR);
-  if (existingCode === "0x") {
+  if ((await ethers.provider.getCode(EXEC_ADDR)) === "0x") {
     const ExecutorFactory = await ethers.getContractFactory("Executor", {
       signer: owner,
     });
     const deployed = await ExecutorFactory.deploy(LLM_ADDRESS);
     await deployed.waitForDeployment();
     executorAddress = await deployed.getAddress();
-    console.log(
-      `Deployed Executor at ${executorAddress} (LLM: ${LLM_ADDRESS})`,
-    );
   }
-  // get executor contract instance
   const executor = await ethers.getContractAt(
     "Executor",
     executorAddress,
     owner,
   );
 
-  // 0) Deploy and link UserDecimalFormatting library
+  // 3) link UserDecimalFormatting if needed
   const UDFFactory = await ethers.getContractFactory("UserDecimalFormatting", {
     signer: owner,
   });
@@ -85,86 +74,74 @@ export async function setupTestEnvironment(): Promise<TestEnv> {
   await udf.waitForDeployment();
   const udfAddress = await udf.getAddress();
 
-  // 4) Deploy core primitives (no library linking here, excluding PythonPrimitive)
-  const [CounterFactory, MathFactory, SystemFactory] = await Promise.all([
-    ethers.getContractFactory("CounterPrimitive"),
-    ethers.getContractFactory("MathPrimitive"),
-    ethers.getContractFactory("SystemPrimitive"),
-  ]);
+  // 4) Decide which primitives to deploy
+  //    if you have at least one "counter" clone, deploy CounterPrimitive, etc.
+  const needCounter =
+    contractsToDeploy.includes("counterAContract") ||
+    contractsToDeploy.includes("counterBContract");
+  const needMath = contractsToDeploy.includes("mathContract");
+  const needERC20 =
+    contractsToDeploy.includes("usdcContract") ||
+    contractsToDeploy.includes("jiriContract");
+  const needAMM =
+    contractsToDeploy.includes("ammContract1") ||
+    contractsToDeploy.includes("ammContract2") ||
+    contractsToDeploy.includes("ammContract3");
+  const needSystem = contractsToDeploy.includes("systemPrimitive");
+  const needPython = contractsToDeploy.includes("pythonPrimitive");
 
-  try {
-    const counterImpl = await CounterFactory.deploy(
-      LLM_ADDRESS,
-      "",
-      executorAddress,
+  // 5) deploy each primitive only if needed
+  if (needCounter) {
+    const CounterFactory = await ethers.getContractFactory("CounterPrimitive");
+    await CounterFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
+      console.warn("Skipping CounterPrimitive"),
     );
-    await counterImpl.waitForDeployment();
-  } catch (err) {
-    console.warn("Did not deploy CounterPrimitive");
   }
-
-  try {
-    const mathImpl = await MathFactory.deploy(LLM_ADDRESS, "", executorAddress);
-    await mathImpl.waitForDeployment();
-  } catch (err) {
-    console.warn("Did not deploy MathPrimitive");
-  }
-
-  try {
-    const systemImpl = await SystemFactory.deploy(
-      LLM_ADDRESS,
-      "",
-      executorAddress,
+  if (needMath) {
+    const MathFactory = await ethers.getContractFactory("MathPrimitive");
+    await MathFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
+      console.warn("Skipping MathPrimitive"),
     );
-    await systemImpl.waitForDeployment();
-  } catch (err) {
-    console.warn("Did not deploy SystemPrimitive deployment");
   }
-
-  // 5) Prepare factories for ERC20, AMM and Python with library linkage
-  const [ERC20Factory, AmmFactory, PythonFactory] = await Promise.all([
-    ethers.getContractFactory("ERC20Primitive", {
-      signer: owner,
+  if (needERC20) {
+    const ERC20Factory = await ethers.getContractFactory("ERC20Primitive", {
       libraries: { UserDecimalFormatting: udfAddress },
-    }),
-    ethers.getContractFactory("AmmPrimitive", {
-      signer: owner,
+    });
+    await ERC20Factory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
+      console.warn("Skipping ERC20Primitive"),
+    );
+  }
+  if (needAMM) {
+    const AmmFactory = await ethers.getContractFactory("AmmPrimitive", {
       libraries: { UserDecimalFormatting: udfAddress },
-    }),
-    ethers.getContractFactory("PythonPrimitive", {
-      signer: owner,
+    });
+    await AmmFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
+      console.warn("Skipping AmmPrimitive"),
+    );
+  }
+  if (needSystem) {
+    const SystemFactory = await ethers.getContractFactory("SystemPrimitive", {
       libraries: { UserDecimalFormatting: udfAddress },
-    }),
-  ]);
-
-  // Deploy ERC20, AMM and Python implementations (linked)
-  try {
-    const ercImpl = await ERC20Factory.deploy(LLM_ADDRESS, "", executorAddress);
-    await ercImpl.waitForDeployment();
-  } catch {
-    console.warn("Did not deploy ERC20Primitive");
+    });
+    await SystemFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
+      console.warn("Skipping SystemPrimitive"),
+    );
+  }
+  if (needPython) {
+    const PythonFactory = await ethers.getContractFactory("PythonPrimitive", {
+      libraries: { UserDecimalFormatting: udfAddress },
+    });
+    await PythonFactory.deploy(LLM_ADDRESS, "").catch(() =>
+      console.warn("Skipping PythonPrimitive"),
+    );
   }
 
-  try {
-    const ammImpl = await AmmFactory.deploy(LLM_ADDRESS, "", executorAddress);
-    await ammImpl.waitForDeployment();
-  } catch {
-    console.warn("Did not deploy AmmPrimitive");
-  }
-
-  try {
-    const pyImpl = await PythonFactory.deploy(LLM_ADDRESS, "");
-    await pyImpl.waitForDeployment();
-  } catch {
-    console.warn("Did not deploy PythonPrimitive");
-  }
-
-  // Helper to deploy via Executor
+  // 6) helper to clone via executor
   async function deployClone(
     name: string,
     label: string,
     initArgs: any[] = [],
-  ): Promise<string> {
+  ) {
     const sigTypes = initArgs.map((a) =>
       typeof a === "string" && a.startsWith("0x")
         ? "address"
@@ -173,117 +150,119 @@ export async function setupTestEnvironment(): Promise<TestEnv> {
           : "uint256",
     );
     const initData = generateFunctionCallData("configure", sigTypes, initArgs);
-    const ownerAddress = await owner.getAddress();
     const tx = await executor.deployRobotContract(
       name,
       label,
-      ownerAddress,
+      await owner.getAddress(),
       "",
       initData,
     );
-    // const rcpt = await tx.wait();
-
-    // const iface = executor.interface as unknown as Interface;
-    // const event = iface.getEvent("RobotContractDeployed");
-    // if (!event) {
-    //   throw new Error(`Event ${"RobotContractDeployed"} not found in the ABI`);
-    // }
-
-    // // Filter logs for the specific event topic
-    // const logs = rcpt.logs.filter((log) => {
-    //   const parsedLog = iface.parseLog(log);
-    //   return parsedLog?.name === "RobotContractDeployed";
-    // });
-
-    // return logs[0].args[1] as string;
-
     const rcpt = await tx.wait();
     const iface = executor.interface as unknown as Interface;
 
-    let cloneAddr: string | undefined;
-
     for (const rawLog of rcpt.logs) {
-      let parsed: LogDescription;
       try {
-        parsed = iface.parseLog(rawLog);
+        const parsed = iface.parseLog(rawLog);
+        if (parsed.name === "RobotContractDeployed") {
+          return parsed.args.contractAddress as string;
+        }
       } catch {
-        // this log isn't our event
-        continue;
-      }
-      if (parsed.name === "RobotContractDeployed") {
-        // grab the clone address (2nd indexed param)
-        cloneAddr = parsed.args.contractAddress as string;
-        break;
+        /* not our event */
       }
     }
-
-    if (!cloneAddr) {
-      throw new Error("RobotContractDeployed event not found");
-    }
-
-    return cloneAddr;
+    throw new Error("RobotContractDeployed event not found");
   }
 
-  // 5) Clone out each primitive
-  const counterAContractAddress = await deployClone("counter", "xCounter");
-  const counterBContractAddress = await deployClone("counter", "xCounter");
-  const mathContractAddress = await deployClone("math", "calculator");
-  const usdcContractAddress = await deployClone("erc20", "USDC", ["100000"]);
-  const jiriContractAddress = await deployClone("erc20", "JIRI", ["100000"]);
-  const ammContract1Address = await deployClone("amm", "AMM USDC-JIRI", [
-    usdcContractAddress,
-    jiriContractAddress,
-    "0",
-  ]);
-  const ammContract2Address = await deployClone("amm", "AMM USDC-JIRI", [
-    usdcContractAddress,
-    jiriContractAddress,
-    "0",
-  ]);
-  const ammContract3Address = await deployClone("amm", "AMM USDC-JIRI", [
-    usdcContractAddress,
-    jiriContractAddress,
-    "0",
-  ]);
-
-  // 6) Attach to those clones
-  const [
-    counterAContract,
-    counterBContract,
-    ammContract1,
-    ammContract2,
-    ammContract3,
-    usdcContract,
-    jiriContract,
-  ] = await Promise.all([
-    ethers.getContractAt("CounterPrimitive", counterAContractAddress, owner),
-    ethers.getContractAt("CounterPrimitive", counterBContractAddress, owner),
-    ethers.getContractAt("AmmPrimitive", ammContract1Address, owner),
-    ethers.getContractAt("AmmPrimitive", ammContract2Address, owner),
-    ethers.getContractAt("AmmPrimitive", ammContract3Address, owner),
-    ethers.getContractAt("ERC20Primitive", usdcContractAddress, owner),
-    ethers.getContractAt("ERC20Primitive", jiriContractAddress, owner),
-  ]);
-
-  return {
+  // 7) Clone only what you asked for
+  const env: Partial<TestEnv> = {
     executor,
     executorAddress,
     owner,
     llmContract,
-    counterAContract,
-    counterAContractAddress,
-    counterBContract,
-    counterBContractAddress,
-    mathContractAddress,
-    ammContract1,
-    ammContract1Address,
-    ammContract2,
-    ammContract2Address,
-    ammContract3,
-    ammContract3Address,
-    usdcContract,
-    usdcContractAddress,
-    jiriContract,
-    jiriContractAddress,
   };
+
+  if (toDeploy.has("counterAContract")) {
+    const addr = await deployClone("counter", "counterA");
+    env.counterAContractAddress = addr;
+    env.counterAContract = await ethers.getContractAt(
+      "CounterPrimitive",
+      addr,
+      owner,
+    );
+  }
+  if (toDeploy.has("counterBContract")) {
+    const addr = await deployClone("counter", "counterB");
+    env.counterBContractAddress = addr;
+    env.counterBContract = await ethers.getContractAt(
+      "CounterPrimitive",
+      addr,
+      owner,
+    );
+  }
+  if (toDeploy.has("mathContract")) {
+    const addr = await deployClone("math", "calculator");
+    env.mathContractAddress = addr;
+    env.mathContract = await ethers.getContractAt("MathPrimitive", addr, owner);
+  }
+  if (toDeploy.has("usdcContract")) {
+    const addr = await deployClone("erc20", "USDC", ["100000"]);
+    env.usdcContractAddress = addr;
+    env.usdcContract = await ethers.getContractAt(
+      "ERC20Primitive",
+      addr,
+      owner,
+    );
+  }
+  if (toDeploy.has("jiriContract")) {
+    const addr = await deployClone("erc20", "JIRI", ["100000"]);
+    env.jiriContractAddress = addr;
+    env.jiriContract = await ethers.getContractAt(
+      "ERC20Primitive",
+      addr,
+      owner,
+    );
+  }
+
+  // for AMM we depend on having both token addresses in env
+  if (
+    toDeploy.has("ammContract1") &&
+    env.usdcContractAddress &&
+    env.jiriContractAddress
+  ) {
+    const addr1 = await deployClone("amm", "amm1", [
+      env.usdcContractAddress,
+      env.jiriContractAddress,
+      "0",
+    ]);
+    env.ammContract1Address = addr1;
+    env.ammContract1 = await ethers.getContractAt("AmmPrimitive", addr1, owner);
+  }
+  if (
+    toDeploy.has("ammContract2") &&
+    env.usdcContractAddress &&
+    env.jiriContractAddress
+  ) {
+    const addr2 = await deployClone("amm", "amm2", [
+      env.usdcContractAddress,
+      env.jiriContractAddress,
+      "0",
+    ]);
+    env.ammContract2Address = addr2;
+    env.ammContract2 = await ethers.getContractAt("AmmPrimitive", addr2, owner);
+  }
+  if (
+    toDeploy.has("ammContract3") &&
+    env.usdcContractAddress &&
+    env.jiriContractAddress
+  ) {
+    const addr3 = await deployClone("amm", "amm3", [
+      env.usdcContractAddress,
+      env.jiriContractAddress,
+      "0",
+    ]);
+    env.ammContract3Address = addr3;
+    env.ammContract3 = await ethers.getContractAt("AmmPrimitive", addr3, owner);
+  }
+
+  return env as TestEnv;
 }

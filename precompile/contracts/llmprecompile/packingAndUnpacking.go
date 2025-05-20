@@ -87,11 +87,11 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 
 // UnpackEvaluatePlanInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePlanInput(input []byte) (string, string, string, error) {
+func UnpackEvaluatePlanInput(input []byte) (string, string, string, bool, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePlan", input, false)
 	if err != nil {
 		log.Info("Failed to unpack ABI input for evaluatePlan", "Error", err)
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
@@ -128,10 +128,10 @@ func UnpackEvaluatePlanOutput(output []byte) (EvaluatePlanOutput, error) {
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePromptInput(input []byte) (string, string, string, error) {
+func UnpackEvaluatePromptInput(input []byte) (string, string, string, bool, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePrompt", input, false)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
 	return parseEvalInputJSON(unpacked, "prompt")
