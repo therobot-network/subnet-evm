@@ -43,15 +43,17 @@ describe("LLM Precompiled Contract - plus operator", function () {
       const data = yaml.load(raw) as {
         title: string;
         description: string;
-        prompt: string;
+        prompt?: string;
         python: string;
+        expected: string;
         json: string;
       };
 
-      // 2) pull out the JSON payload
+      // 2) parse expected and plan
+      const expected = JSON.parse(data.expected);
       const planObj = JSON.parse(data.json);
       const payload = JSON.stringify({
-        plan: JSON.stringify(planObj.script),
+        plan: JSON.stringify(planObj),
         lookupTable: JSON.stringify({}),
       });
 
@@ -60,19 +62,15 @@ describe("LLM Precompiled Contract - plus operator", function () {
       await tx.wait();
 
       // 4) assert that each expected answer was emitted
-      //    (we assume one QuestionAnswer per test)
-      const expected = planObj.expected;
       await expect(tx)
         .to.emit(llmContract, "QuestionAnswer")
         .withArgs(
           (_question) => true,
           (answer) => {
             const exp = expected[0];
-            // If expected is array or object, compare JSON stringified
             if (typeof exp === "object") {
               return answer === JSON.stringify(exp);
             }
-            // Otherwise, compare as string
             return answer === String(exp);
           },
         );
