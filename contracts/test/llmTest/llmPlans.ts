@@ -2,107 +2,80 @@
 // See the file LICENSE for licensing terms.
 
 import { expect } from "chai";
-import { BaseContract, Contract, Signer } from "ethers";
+import { Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
 import yaml from "js-yaml";
 import { setupTestEnvironment, TestEnv } from "./helpers/setupFixtures";
 
-const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
-const boolenTrueHash =
-  "0x0000000000000000000000000000000000000000000000000000000000000001";
 
-describe("LLM Precompiled Contract", function () {
+describe("LLM Precompiled Contract - plus operator", function () {
   let env: TestEnv;
   let executor: Contract;
-  let executorAddress: string;
-  let owner: Signer;
   let llmContract: Contract;
-  let counterAContract: Contract;
-  let counterAContractAddress: string;
-  let counterBContract: Contract;
-  let counterBContractAddress: string;
-  let mathContractAddress: string;
-  let ammContract1: Contract;
-  let ammContract1Address: string;
-  let ammContract2: Contract;
-  let ammContract2Address: string;
-  let ammContract3: Contract;
-  let ammContract3Address: string;
-  let usdcContract: Contract;
-  let usdcContractAddress: string;
-  let jiriContract: Contract;
-  let jiriContractAddress: string;
 
-  const yamlPath = path.resolve(__dirname, "planTests", "tests");
-
-  // Read the JSON file containing the plans
-  // const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
-  // const fileContent = fs.readFileSync(planPath, "utf8");
-  // const plans = JSON.parse(fileContent);
+  const testsDir = path.resolve(
+    __dirname,
+    "planTests",
+    "tests",
+    "binary_operators",
+    "plus",
+  );
 
   before(async function () {
     env = await setupTestEnvironment(["llm", "executor"]);
-    ({
-      executor,
-      executorAddress,
-      owner,
-      llmContract,
-      counterAContract,
-      counterAContractAddress,
-      counterBContract,
-      counterBContractAddress,
-      mathContractAddress,
-      ammContract1,
-      ammContract1Address,
-      ammContract2,
-      ammContract2Address,
-      ammContract3,
-      ammContract3Address,
-      usdcContract,
-      usdcContractAddress,
-      jiriContract,
-      jiriContractAddress,
-    } = env);
+    ({ executor, llmContract } = env);
   });
 
-  it("should test int addition", async function () {
-    const planPath = path.resolve(
-      yamlPath,
-      "binary_operators",
-      "plus",
-      "int_add.yaml",
-    );
+  // Read all `.yaml` files under the "plus" directory
+  const files = fs.readdirSync(testsDir).filter((f) => f.endsWith(".yaml"));
 
-    const raw = fs.readFileSync(planPath, "utf8");
+  for (const file of files) {
+    const testName = path.basename(file, ".yaml");
+    // if (testName !== "list_plus_list_is_merge") {
+    //   continue;
+    // }
+    it(`should pass ${testName}`, async function () {
+      // 1) load & parse the YAML
+      const raw = fs.readFileSync(path.join(testsDir, file), "utf8");
+      const data = yaml.load(raw) as {
+        title: string;
+        description: string;
+        prompt: string;
+        python: string;
+        json: string;
+      };
 
-    // parse the YAML into a JS object
-    const data = yaml.load(raw) as {
-      title: string;
-      description: string;
-      prompt: string;
-      python: string;
-      json: string;
-    };
+      // 2) pull out the JSON payload
+      const planObj = JSON.parse(data.json);
+      const payload = JSON.stringify({
+        plan: JSON.stringify(planObj.script),
+        lookupTable: JSON.stringify({}),
+      });
 
-    const plan = JSON.parse(data.json);
+      // 3) invoke evalPlan
+      const tx = await executor.evalPlan(payload);
+      await tx.wait();
 
-    // Read the JSON file containing the plans
-    const simplest_math_plan = JSON.stringify({
-      plan: JSON.stringify(plan.script),
-      lookupTable: JSON.stringify({}),
+      // 4) assert that each expected answer was emitted
+      //    (we assume one QuestionAnswer per test)
+      const expected = planObj.expected;
+      await expect(tx)
+        .to.emit(llmContract, "QuestionAnswer")
+        .withArgs(
+          (_question) => true,
+          (answer) => {
+            const exp = expected[0];
+            // If expected is array or object, compare JSON stringified
+            if (typeof exp === "object") {
+              return answer === JSON.stringify(exp);
+            }
+            // Otherwise, compare as string
+            return answer === String(exp);
+          },
+        );
     });
-
-    let tx = await executor.evalPlan(simplest_math_plan);
-    await tx.wait();
-
-    await expect(tx)
-      .to.emit(llmContract, "QuestionAnswer")
-      .withArgs(
-        (question) => true,
-        (answer) => answer == plan.expected[0],
-      );
-  });
+  }
 });

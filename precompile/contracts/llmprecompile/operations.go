@@ -37,6 +37,21 @@ func evaluateOperand(
             log.Error("evaluateOperand: unmarshal pop", "bytes", string(data), "err", err)
             return Value{}, err
         }
+        if out.Type == "list" {
+            // Ensure Data is []Value, not []interface{}
+            // Marshal the Data back to JSON, then unmarshal as []Value
+            raw, err := json.Marshal(out.Data)
+            if err != nil {
+                log.Error("evaluateOperand: marshal list data failed", "err", err)
+                return Value{}, err
+            }
+            var vals []Value
+            if err := json.Unmarshal(raw, &vals); err != nil {
+                log.Error("evaluateOperand: unmarshal list data as []Value failed", "err", err)
+                return Value{}, err
+            }
+            out.Data = vals
+        }
         log.Info("evaluateOperand: popped result", "value", out)
         return out, nil
     }
@@ -89,7 +104,19 @@ func handleBinaryOp(
 
     switch step.Operator {
     case "plus":
-        if leftVal.Type == "string" || rightVal.Type == "string" {
+        if leftVal.Type == "list" && rightVal.Type == "list" {
+            // Merge two lists
+            leftList, ok1 := leftVal.Data.([]interface{})
+            rightList, ok2 := rightVal.Data.([]interface{})
+            if !ok1 || !ok2 {
+                err := fmt.Errorf("plus: operands are not lists")
+                log.Error("handleBinaryOp", "error", err)
+                return ip, remainingGas, err
+            }
+            merged := append(leftList, rightList...)
+            result = merged
+            resultType = "list"
+        } else if leftVal.Type == "string" || rightVal.Type == "string" {
             if leftVal.Type != "string" || rightVal.Type != "string" {
                 err := fmt.Errorf("cannot mix string and non-string with +")
                 log.Error("handleBinaryOp", "error", err)
@@ -248,6 +275,26 @@ func answerUserQuestion(
     var answerStr string
     if s, ok := aVal.Data.(string); ok {
         answerStr = s
+    } else if aVal.Type == "list" {
+    // Convert []Value to []interface{} of their Data fields
+    vals, ok := aVal.Data.([]Value)
+    if !ok {
+        log.Error("answerUserQuestion: list answer is not []Value", "data", aVal.Data)
+        answerStr = fmt.Sprintf("%v", aVal.Data)
+    } else {
+        arr := make([]interface{}, len(vals))
+        for i, v := range vals {
+            arr[i] = v.Data
+        }
+        // Marshal as JSON array
+        bytes, err := json.Marshal(arr)
+        if err != nil {
+            log.Error("answerUserQuestion: failed to marshal list answer", "err", err)
+            answerStr = fmt.Sprintf("%v", arr)
+        } else {
+            answerStr = string(bytes)
+        }
+    }
     } else {
         answerStr = fmt.Sprintf("%v", aVal.Data)
     }
