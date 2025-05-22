@@ -34,7 +34,7 @@ describe("LLM Precompiled Contract - plus operator", function () {
 
   for (const file of files) {
     const testName = path.basename(file, ".yaml");
-    // if (testName !== "list_plus_list_is_merge") {
+    // if (testName !== "string_plus_float_fails") {
     //   continue;
     // }
     it(`should pass ${testName}`, async function () {
@@ -45,17 +45,28 @@ describe("LLM Precompiled Contract - plus operator", function () {
         description: string;
         prompt?: string;
         python: string;
-        expected: string;
+        expected?: string;
         json: string;
+        fails?: boolean;
       };
 
-      // 2) parse expected and plan
-      const expected = JSON.parse(data.expected);
       const planObj = JSON.parse(data.json);
       const payload = JSON.stringify({
         plan: JSON.stringify(planObj),
         lookupTable: JSON.stringify({}),
       });
+
+      if (data.fails) {
+        let isFailed = false;
+        await executor.evalPlan(payload).catch((err) => {
+          isFailed = true;
+        });
+        expect(isFailed).to.be.true;
+        return;
+      }
+
+      // 2) parse expected and assert event
+      const expected = JSON.parse(data.expected!);
 
       // 3) invoke evalPlan
       const tx = await executor.evalPlan(payload);
