@@ -78,7 +78,7 @@ type Operands struct {
     Object  *Value               `json:"object,omitempty"`  // for call
     Args    RobotArgsForFunction    `json:"args,omitempty"`    // positional/keyword
     Target  *string               `json:"target,omitempty"`  // for assign
-	Question *Value 		      `json:"question,omitempty"` // for ask
+	Question *string 		      `json:"question,omitempty"` // for ask
 	Answer   *Value 		      `json:"answer,omitempty"`   // for answer
     // add more as needed
 }

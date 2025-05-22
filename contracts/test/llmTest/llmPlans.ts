@@ -6,9 +6,8 @@ import { BaseContract, Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
-// import { test } from "./utils";
+import yaml from "js-yaml";
 import { setupTestEnvironment, TestEnv } from "./helpers/setupFixtures";
-// import { setupAmmLiquidity } from "./helpers/utils";
 
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
@@ -37,10 +36,12 @@ describe("LLM Precompiled Contract", function () {
   let jiriContract: Contract;
   let jiriContractAddress: string;
 
+  const yamlPath = path.resolve(__dirname, "planTests", "tests");
+
   // Read the JSON file containing the plans
-  const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
-  const fileContent = fs.readFileSync(planPath, "utf8");
-  const plans = JSON.parse(fileContent);
+  // const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
+  // const fileContent = fs.readFileSync(planPath, "utf8");
+  // const plans = JSON.parse(fileContent);
 
   before(async function () {
     env = await setupTestEnvironment(["llm", "executor"]);
@@ -67,9 +68,28 @@ describe("LLM Precompiled Contract", function () {
     } = env);
   });
 
-  it("should test evalPlan and continueEvaluation basic", async function () {
+  it("should test int addition", async function () {
+    const planPath = path.resolve(
+      yamlPath,
+      "binary_operators",
+      "plus",
+      "int_add.yaml",
+    );
+
+    const raw = fs.readFileSync(planPath, "utf8");
+
+    // parse the YAML into a JS object
+    const data = yaml.load(raw) as {
+      title: string;
+      description: string;
+      prompt: string;
+      python: string;
+      json: string;
+    };
+
+    const plan = JSON.parse(data.json);
+
     // Read the JSON file containing the plans
-    const plan = plans["simplest_math"];
     const simplest_math_plan = JSON.stringify({
       plan: JSON.stringify(plan.script),
       lookupTable: JSON.stringify({}),

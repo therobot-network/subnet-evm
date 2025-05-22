@@ -1,0 +1,3 @@
+[submodule "contracts/test/llmTest/planTests"]
+	path = contracts/test/llmTest/planTests
+	url = https://github.com/therobot-network/plan-tests.git

@@ -229,13 +229,12 @@ func answerUserQuestion(
     remainingGas uint64,
     accessibleState contract.AccessibleState,
 ) (InstructionPointer, uint64, error) {
-    // 1) Evaluate operands into Value structs
-    qVal, err := evaluateOperand(step.Operands.Question, stateDB, addr)
-    if err != nil {
-        log.Error("answerUserQuestion: failed to evaluate question", "error", err)
-        return ip, remainingGas, err
+    // 1) Pull question directly from the JSON‐string field
+    if step.Operands.Question == nil {
+        return ip, remainingGas, fmt.Errorf("answerUserQuestion: missing question")
     }
-    log.Info("answerUserQuestion: question Value", "qVal", qVal)
+    questionStr := *step.Operands.Question
+    log.Info("answerUserQuestion: raw question", "q", questionStr)
 
     // 2) Evaluate answer
     aVal, err := evaluateOperand(step.Operands.Answer, stateDB, addr)
@@ -245,20 +244,15 @@ func answerUserQuestion(
     }
     log.Info("answerUserQuestion: answer Value", "aVal", aVal)
 
-    // 2) Coerce to strings
-    var questionStr, answerStr string
-    if s, ok := qVal.Data.(string); ok {
-        questionStr = s
-    } else {
-        questionStr = fmt.Sprintf("%v", qVal.Data)
-    }
+    // 3) Coerce answer to string
+    var answerStr string
     if s, ok := aVal.Data.(string); ok {
         answerStr = s
     } else {
         answerStr = fmt.Sprintf("%v", aVal.Data)
     }
 
-    // 3) If Durango is active, emit the event
+    // 4) If Durango is active, emit the event
     if contract.IsDurangoActivated(accessibleState) {
         log.Info("Durango activated, emitting QuestionAnswerEvent",
             "question", questionStr, "answer", answerStr,
@@ -270,13 +264,13 @@ func answerUserQuestion(
         }
         cost := GetQuestionAnswerEventGasCost(event)
         if remainingGas, err = contract.DeductGas(remainingGas, cost); err != nil {
-            log.Info("Failed to deduct gas for QuestionAnswerEvent", "error", err)
+            log.Error("Failed to deduct gas for QuestionAnswerEvent", "error", err)
             return InstructionPointer{}, 0, err
         }
 
         topics, data, err := PackQuestionAnswerEvent(event)
         if err != nil {
-            log.Info("Failed to pack QuestionAnswerEvent", "error", err)
+            log.Error("Failed to pack QuestionAnswerEvent", "error", err)
             return InstructionPointer{}, remainingGas, err
         }
         stateDB.AddLog(
@@ -289,10 +283,11 @@ func answerUserQuestion(
         log.Info("Durango not activated, skipping QuestionAnswerEvent")
     }
 
-    // 4) Advance the IP and return
+    // 5) Advance the IP and return
     ip.advance()
     return ip, remainingGas, nil
 }
+
 
 
 // pushToVarStack pushes a JSON-encoded entry onto a growing stack without reading the entire stack.
