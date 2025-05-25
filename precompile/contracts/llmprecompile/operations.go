@@ -139,10 +139,14 @@ func handleBinaryOp(
             lf, rf := toFloat(leftVal), toFloat(rightVal)
             result = lf + rf
             resultType = "float"
-        } else {
+        } else if leftVal.Type == rightVal.Type {
             li, ri := toInt(leftVal), toInt(rightVal)
             result = li + ri
-            resultType = "int"
+            resultType = leftVal.Type
+        } else {
+            err := fmt.Errorf("plus: cannot add types %s and %s", leftVal.Type, rightVal.Type)
+            log.Error("handleBinaryOp", "error", err)
+            return ip, remainingGas, err
         }
 
     case "minus":
