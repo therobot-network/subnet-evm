@@ -37,17 +37,17 @@ func evaluateOperand(
             log.Error("evaluateOperand: unmarshal pop", "bytes", string(data), "err", err)
             return Value{}, err
         }
-        if out.Type == "list" {
+        if out.Type == "list" || out.Type == "tuple" {
             // Ensure Data is []Value, not []interface{}
             // Marshal the Data back to JSON, then unmarshal as []Value
             raw, err := json.Marshal(out.Data)
             if err != nil {
-                log.Error("evaluateOperand: marshal list data failed", "err", err)
+                log.Error("evaluateOperand: marshal list/tuple data failed", "err", err)
                 return Value{}, err
             }
             var vals []Value
             if err := json.Unmarshal(raw, &vals); err != nil {
-                log.Error("evaluateOperand: unmarshal list data as []Value failed", "err", err)
+                log.Error("evaluateOperand: unmarshal list/tuple data as []Value failed", "err", err)
                 return Value{}, err
             }
             out.Data = vals
@@ -85,7 +85,7 @@ func handleBinaryOp(
     addr common.Address,
     remainingGas uint64,
 ) (InstructionPointer, uint64, error) {
-        log.Info("handleBinaryOp ENTER", "op", step.Operator, "idx", ip.index)
+    log.Info("handleBinaryOp ENTER", "op", step.Operator, "idx", ip.index)
 
     leftVal, err := evaluateOperand(step.Operands.Left, stateDB, addr)
     if err != nil {
@@ -116,6 +116,17 @@ func handleBinaryOp(
             merged := append(leftList, rightList...)
             result = merged
             resultType = "list"
+        } else if leftVal.Type == "tuple" && rightVal.Type == "tuple" {
+            leftTuple, ok1 := leftVal.Data.([]interface{})
+            rightTuple, ok2 := rightVal.Data.([]interface{})
+            if !ok1 || !ok2 {
+                err := fmt.Errorf("plus: operands are not tuples")
+                log.Error("handleBinaryOp", "error", err)
+                return ip, remainingGas, err
+            }
+            merged := append(leftTuple, rightTuple...)
+            result = merged
+            resultType = "tuple"
         } else if leftVal.Type == "string" || rightVal.Type == "string" {
             if leftVal.Type != "string" || rightVal.Type != "string" {
                 err := fmt.Errorf("cannot mix string and non-string with +")
@@ -276,25 +287,38 @@ func answerUserQuestion(
     if s, ok := aVal.Data.(string); ok {
         answerStr = s
     } else if aVal.Type == "list" {
-    // Convert []Value to []interface{} of their Data fields
-    vals, ok := aVal.Data.([]Value)
-    if !ok {
-        log.Error("answerUserQuestion: list answer is not []Value", "data", aVal.Data)
-        answerStr = fmt.Sprintf("%v", aVal.Data)
-    } else {
-        arr := make([]interface{}, len(vals))
-        for i, v := range vals {
-            arr[i] = v.Data
-        }
-        // Marshal as JSON array
-        bytes, err := json.Marshal(arr)
-        if err != nil {
-            log.Error("answerUserQuestion: failed to marshal list answer", "err", err)
-            answerStr = fmt.Sprintf("%v", arr)
+        // Convert []Value to []interface{} of their Data fields
+        vals, ok := aVal.Data.([]Value)
+        if !ok {
+            log.Error("answerUserQuestion: list answer is not []Value", "data", aVal.Data)
+            answerStr = fmt.Sprintf("%v", aVal.Data)
         } else {
-            answerStr = string(bytes)
+            arr := make([]interface{}, len(vals))
+            for i, v := range vals {
+                arr[i] = v.Data
+            }
+            // Marshal as JSON array
+            bytes, err := json.Marshal(arr)
+            if err != nil {
+                log.Error("answerUserQuestion: failed to marshal list answer", "err", err)
+                answerStr = fmt.Sprintf("%v", arr)
+            } else {
+                answerStr = string(bytes)
+            }
         }
-    }
+    } else if aVal.Type == "tuple" {
+        // Convert []Value to Python-style tuple string
+        vals, ok := aVal.Data.([]Value)
+        if !ok {
+            log.Error("answerUserQuestion: tuple answer is not []Value", "data", aVal.Data)
+            answerStr = fmt.Sprintf("%v", aVal.Data)
+        } else {
+            elems := make([]string, len(vals))
+            for i, v := range vals {
+                elems[i] = fmt.Sprintf("%v", v.Data)
+            }
+            answerStr = "(" + strings.Join(elems, ", ") + ")"
+        }
     } else {
         answerStr = fmt.Sprintf("%v", aVal.Data)
     }
