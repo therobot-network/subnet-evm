@@ -98,7 +98,7 @@ type RobotFunctionBody []ActionStep
 
 // RobotFunction ties together its signature and its action-plan.
 type RobotFunction struct {
-    Args RobotArgsForFunction `json:"args"`
+    Parameters RobotArgsForFunction `json:"parameters"`
     Body RobotFunctionBody    `json:"body"`
 }
 

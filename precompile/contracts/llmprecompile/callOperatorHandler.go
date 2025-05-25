@@ -28,7 +28,7 @@ func handleCallOp(
 
 	var methodName string
 	if step.Operands.Method != nil {
-		if step.Operands.Method.Type != "string" {
+		if step.Operands.Method.Type != "lookup" {
 			return ip, remainingGas, fmt.Errorf("handleCallOp: method type is not 'string' (got '%s')", step.Operands.Method.Type)
 		}
 		var ok bool
