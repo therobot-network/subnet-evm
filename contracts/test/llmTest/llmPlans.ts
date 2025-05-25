@@ -43,7 +43,6 @@ describe("LLM Precompiled Contract - plus operator", function () {
       const data = yaml.load(raw) as {
         title: string;
         description: string;
-        prompt?: string;
         python: string;
         expected?: string;
         json: string;

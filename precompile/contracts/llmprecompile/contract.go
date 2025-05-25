@@ -57,7 +57,7 @@ type Value struct {
     Pop    bool        `json:"pop,omitempty"`    // for stack‐pop operands
 }
 
-// RobotArgsForFunction describes the signature of a user-defined function.
+// RobotArgsForFunction describes the signature of a user-defined function (for function definitions only).
 type RobotArgsForFunction struct {
     PositionalNames        []string `json:"positional-names,omitempty"`
     PositionalDefaults     []Value  `json:"positional-defaults,omitempty"`
@@ -67,19 +67,23 @@ type RobotArgsForFunction struct {
     NamedKwargsName        string   `json:"named-kwargs-name,omitempty"`
 }
 
+// CallArgs is used for the 'args' field in Operands for call steps.
+type CallArgs struct {
+    Positional []Value              `json:"positional,omitempty"`
+    Keywords   [][2]interface{}     `json:"keywords,omitempty"` // [name, Value] pairs
+}
+
 // Operands represents whatever an action-step needs (lookup, value, left/right, etc).
 // You can expand this to cover Pop, Lookup, plus left/right, call args, etc.
 type Operands struct {
     // Example fields; adjust per your JSON spec for each operator:
     Value   *Value                `json:"value,omitempty"`
-    Left    *Value              `json:"left,omitempty"`
-    Right   *Value               `json:"right,omitempty"`
-    Method  *string               `json:"method,omitempty"`  // for call
-    Object  *Value               `json:"object,omitempty"`  // for call
-    Args    RobotArgsForFunction    `json:"args,omitempty"`    // positional/keyword
+    Left    *Value                `json:"left,omitempty"`
+    Right   *Value                `json:"right,omitempty"`
+    Method  *Value                `json:"method,omitempty"`  // for call
+    Object  *Value                `json:"object,omitempty"`  // for call
+    Args    CallArgs              `json:"args,omitempty"`    // CallArgs (for call)
     Target  *string               `json:"target,omitempty"`  // for assign
-	Question *string 		      `json:"question,omitempty"` // for ask
-	Answer   *Value 		      `json:"answer,omitempty"`   // for answer
     // add more as needed
 }
 
@@ -489,7 +493,7 @@ func sanitizeSteps(input []byte) ([]byte, error) {
 func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address, instructions map[string]RobotFunction, suppliedGas uint64, gasCost uint64) (ret []byte, remainingGas uint64, err error) {
 	stateDB := accessibleState.GetStateDB()
 
-	if remainingGas, err = contract.DeductGas(suppliedGas, gasCost); err != nil {
+	if _, err = contract.DeductGas(suppliedGas, gasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -588,6 +592,16 @@ func invokeStep(
             return nil, newGas, err
         }
         log.Info("invokeStep: binary op succeeded", "newIndex", newIP.index)
+        return invokeStep(accessibleState, addr, robotFunction, newIP, promptID, newGas)
+
+    case "call":
+        log.Info("invokeStep: dispatch -> handleCallOp")
+        newIP, newGas, err := handleCallOp(step, ip, stateDB, addr, remainingGas, accessibleState)
+        if err != nil {
+            log.Error("invokeStep: call op failed", "error", err)
+            return nil, newGas, err
+        }
+        log.Info("invokeStep: call op succeeded", "newIndex", newIP.index)
         return invokeStep(accessibleState, addr, robotFunction, newIP, promptID, newGas)
 
     case "answerUserQuestion":
