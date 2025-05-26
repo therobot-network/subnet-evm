@@ -593,7 +593,15 @@ func invokeStep(
         }
         log.Info("invokeStep: binary op succeeded", "newIndex", newIP.index)
         return invokeStep(accessibleState, addr, robotFunction, newIP, promptID, newGas)
-
+    case "assign":
+        log.Info("invokeStep: dispatch -> handleAssignOp")
+        newIP, newGas, err := handleAssignOp(step, ip, stateDB, addr, remainingGas)
+        if err != nil {
+            log.Error("invokeStep: assign op failed", "error", err)
+            return nil, newGas, err
+        }
+        log.Info("invokeStep: assign op succeeded", "newIndex", newIP.index)
+        return invokeStep(accessibleState, addr, robotFunction, newIP, promptID, newGas)
     case "call":
         log.Info("invokeStep: dispatch -> handleCallOp")
         newIP, newGas, err := handleCallOp(step, ip, stateDB, addr, remainingGas, accessibleState)

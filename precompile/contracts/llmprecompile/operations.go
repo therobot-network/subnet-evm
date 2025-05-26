@@ -191,7 +191,6 @@ func handleBinaryOp(
             result = toInt(leftVal) / toInt(rightVal)
             resultType = "int"
         }
-
     default:
         err := fmt.Errorf("unsupported operator: %s", step.Operator)
         log.Error("handleBinaryOp", "error", err)
@@ -218,6 +217,35 @@ func handleBinaryOp(
 
     ip.advance()
     log.Info("handleBinaryOp EXIT", "newIndex", ip.index)
+    return ip, remainingGas, nil
+}
+
+// handleAssignOp implements the 'assign' operator: assigns a value to a variable in the lookup table.
+func handleAssignOp(
+    step ActionStep,
+    ip InstructionPointer,
+    stateDB contract.StateDB,
+    addr common.Address,
+    remainingGas uint64,
+) (InstructionPointer, uint64, error) {
+    if step.Operands.Target == nil {
+        err := fmt.Errorf("assign: missing target")
+        log.Error("handleAssignOp", "error", err)
+        return ip, remainingGas, err
+    }
+    key := *step.Operands.Target
+    val, err := evaluateOperand(step.Operands.Value, stateDB, addr)
+    if err != nil {
+        log.Error("assign: failed to evaluate value", "err", err)
+        return ip, remainingGas, err
+    }
+    if err := updatePlanLocalState(stateDB, addr, key, val); err != nil {
+        log.Error("assign: failed to update lookup table", "err", err)
+        return ip, remainingGas, err
+    }
+    log.Info("assign: updated lookup table", "key", key, "value", val)
+    ip.advance()
+    log.Info("handleAssignOp EXIT", "newIndex", ip.index)
     return ip, remainingGas, nil
 }
 
