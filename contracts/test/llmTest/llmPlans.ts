@@ -65,7 +65,26 @@ describe("LLM Precompiled Contract - plus operator", function () {
       }
 
       // 2) parse expected and assert event
-      const expected = JSON.parse(data.expected!);
+      let expected: string[] = [];
+      // Prefer YAML array of strings if possible
+      if (
+        Array.isArray(data.expected!) &&
+        data.expected!.every((x) => typeof x === "string")
+      ) {
+        expected = data.expected;
+      } else {
+        try {
+          const parsed = JSON.parse(data.expected!);
+          if (Array.isArray(parsed)) {
+            expected = parsed.map((x) => String(x));
+          } else {
+            expected = [String(parsed)];
+          }
+        } catch (e) {
+          // Fallback: treat as string
+          expected = [data.expected!.trim()];
+        }
+      }
 
       // 3) invoke evalPlan
       const tx = await executor.evalPlan(payload);
