@@ -508,21 +508,21 @@ func evaluateSteps(accessibleState contract.AccessibleState, addr common.Address
         }
     }
 
-    // === NEW: locate & extract "main" ===
-    mainFn, found := instructions["main"]
+    // === NEW: locate & extract "(entry_point)" ===
+    mainFn, found := instructions["(entry_point)"]
     if !found {
-        return nil, suppliedGas, fmt.Errorf("evaluatePlan: missing \"main\" function")
+        return nil, suppliedGas, fmt.Errorf("evaluatePlan: missing \"(entry_point)\" function")
     }
     inputSteps := mainFn.Body
-    log.Info("Loaded main function", "StepCount", len(inputSteps))
+    log.Info("Loaded (entry_point) function", "StepCount", len(inputSteps))
 
     if len(inputSteps) == 0 {
-        return nil, suppliedGas, fmt.Errorf("evaluatePlan: \"main\" has no steps")
+        return nil, suppliedGas, fmt.Errorf("evaluatePlan: \"(entry_point)\" has no steps")
     }
 
 	startingIP := InstructionPointer{
 		index: 0,
-		robotFunction: "main",
+		robotFunction: "(entry_point)",
 	}
 
 	ret, remainingGas, err = invokeStep(accessibleState, addr, mainFn, startingIP, currentPromptId, suppliedGas)
@@ -689,7 +689,7 @@ func invokeStep(
 }
 
 // evaluatePlan unpacks a full instructions set (map of functions), 
-// saves all definitions, then executes from "main".
+// saves all definitions, then executes from "(entry_point)".
 func evaluatePlan(
     accessibleState contract.AccessibleState,
     caller common.Address,
