@@ -1,7 +1,6 @@
 package llmprecompile
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -90,27 +89,18 @@ func answerUserQuestion(
 	if s, ok := aVal.Data.(string); ok {
 		answerStr = s
 	} else if aVal.Type == "list" {
-		// Convert []Value to []interface{} of their Data fields
 		vals, ok := aVal.Data.([]Value)
 		if !ok {
 			log.Error("answerUserQuestion: list answer is not []Value", "data", aVal.Data)
 			answerStr = fmt.Sprintf("%v", aVal.Data)
 		} else {
-			arr := make([]interface{}, len(vals))
+			elems := make([]string, len(vals))
 			for i, v := range vals {
-				arr[i] = v.Data
+				elems[i] = fmt.Sprintf("%v", v.Data)
 			}
-			// Marshal as JSON array
-			bytes, err := json.Marshal(arr)
-			if err != nil {
-				log.Error("answerUserQuestion: failed to marshal list answer", "err", err)
-				answerStr = fmt.Sprintf("%v", arr)
-			} else {
-				answerStr = string(bytes)
-			}
+			answerStr = "[" + strings.Join(elems, ", ") + "]"
 		}
 	} else if aVal.Type == "tuple" {
-		// Convert []Value to Python-style tuple string
 		vals, ok := aVal.Data.([]Value)
 		if !ok {
 			log.Error("answerUserQuestion: tuple answer is not []Value", "data", aVal.Data)
