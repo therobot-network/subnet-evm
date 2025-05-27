@@ -244,6 +244,12 @@ func handleBinaryOp(
             resultType = "int"
         }
     case "divide":
+        // Always perform float division using decimal, even for int inputs
+        ldec, errL := decimalFromValue(leftVal)
+        if errL != nil {
+            log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+            return ip, remainingGas, errL
+        }
         rdec, errR := decimalFromValue(rightVal)
         if errR != nil {
             log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
@@ -255,29 +261,9 @@ func handleBinaryOp(
             log.Error("handleBinaryOp", "error", err)
             return ip, remainingGas, err
         }
-        if leftVal.Type == "float" || rightVal.Type == "float" {
-            ldec, errL := decimalFromValue(leftVal)
-            if errL != nil {
-                log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
-                return ip, remainingGas, errL
-            }
-            quot := ldec.Div(rdec)
-            result = quot.String()
-            resultType = "float"
-        } else {
-            li, errL := toInt(leftVal)
-            if errL != nil {
-                log.Error("handleBinaryOp: left toInt failed", "err", errL)
-                return ip, remainingGas, errL
-            }
-            ri, errR := toInt(rightVal)
-            if errR != nil {
-                log.Error("handleBinaryOp: right toInt failed", "err", errR)
-                return ip, remainingGas, errR
-            }
-            result = li / ri
-            resultType = "int"
-        }
+        quot := ldec.Div(rdec)
+        result = quot.String()
+        resultType = "float"
     default:
         err := fmt.Errorf("unsupported operator: %s", step.Operator)
         log.Error("handleBinaryOp", "error", err)
