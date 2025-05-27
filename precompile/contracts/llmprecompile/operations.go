@@ -14,6 +14,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+var zero = decimal.NewFromInt(0)
+
 // evaluateOperand takes one *Value slot (literal, lookup, or pop) and returns its full Value.
 func evaluateOperand(
     v *Value,
@@ -264,6 +266,35 @@ func handleBinaryOp(
         quot := ldec.Div(rdec)
         result = quot.String()
         resultType = "float"
+    case "floorDivide":
+        // Floor division: always use decimal, return int if both operands are int, else string (Python: 7//3=2, 7//2.5=2.0, 7.5//2.5=3.0)
+        ldec, errL := decimalFromValue(leftVal)
+        if errL != nil {
+            log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+            return ip, remainingGas, errL
+        }
+        rdec, errR := decimalFromValue(rightVal)
+        if errR != nil {
+            log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+            return ip, remainingGas, errR
+        }
+        
+        if rdec.Equal(zero) {
+            err := fmt.Errorf("floor division by zero")
+            log.Error("handleBinaryOp", "error", err)
+            return ip, remainingGas, err
+        }
+        quot := ldec.Div(rdec)
+        floored := quot.Floor()
+        // If both operands are int, return int type, else string (float)
+        if leftVal.Type == "int" && rightVal.Type == "int" {
+            result = floored.IntPart()
+            resultType = "int"
+        } else {
+            // Always show .0 for float floor division (Python: 7//2.5 = 2.0)
+            result = floored.StringFixed(1)
+            resultType = "float"
+        }
     default:
         err := fmt.Errorf("unsupported operator: %s", step.Operator)
         log.Error("handleBinaryOp", "error", err)

@@ -584,7 +584,7 @@ func invokeStep(
     )
 
     switch step.Operator {
-    case "plus", "minus", "multiply", "divide":
+    case "plus", "minus", "multiply", "divide", "floorDivide", "power":
         log.Info("invokeStep: dispatch -> handleBinaryOp", "operator", step.Operator)
         newIP, newGas, err := handleBinaryOp(step, ip, stateDB, addr, remainingGas)
         if err != nil {
