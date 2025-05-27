@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -163,7 +164,8 @@ func handleBinaryOp(
                 log.Error("handleBinaryOp: right toInt failed", "err", errR)
                 return ip, remainingGas, errR
             }
-            result = li + ri
+            // Use decimal for int math to ensure plain decimal output
+            result = decimal.NewFromInt(int64(li)).Add(decimal.NewFromInt(int64(ri))).StringFixed(0)
             resultType = leftVal.Type
         } else {
             err := fmt.Errorf("plus: cannot add types %s and %s", leftVal.Type, rightVal.Type)
@@ -196,7 +198,7 @@ func handleBinaryOp(
                 log.Error("handleBinaryOp: right toInt failed", "err", errR)
                 return ip, remainingGas, errR
             }
-            result = li - ri
+            result = decimal.NewFromInt(int64(li)).Sub(decimal.NewFromInt(int64(ri))).StringFixed(0)
             resultType = "int"
         }
     case "multiply":
@@ -242,7 +244,7 @@ func handleBinaryOp(
                 log.Error("handleBinaryOp: right toInt failed", "err", errR)
                 return ip, remainingGas, errR
             }
-            result = li * ri
+            result = decimal.NewFromInt(int64(li)).Mul(decimal.NewFromInt(int64(ri))).StringFixed(0)
             resultType = "int"
         }
     case "divide":
@@ -293,6 +295,43 @@ func handleBinaryOp(
         } else {
             // Always show .0 for float floor division (Python: 7//2.5 = 2.0)
             result = floored.StringFixed(1)
+            resultType = "float"
+        }
+    case "power":
+        // Exponentiation: use decimal for int/int, float64 math for float exponents
+        if leftVal.Type == "string" || rightVal.Type == "string" {
+            err := fmt.Errorf("power: cannot exponentiate with a string operand")
+            log.Error("handleBinaryOp", "error", err)
+            return ip, remainingGas, err
+        }
+        ldec, errL := decimalFromValue(leftVal)
+        if errL != nil {
+            log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+            return ip, remainingGas, errL
+        }
+        rdec, errR := decimalFromValue(rightVal)
+        if errR != nil {
+            log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+            return ip, remainingGas, errR
+        }
+        // If both operands are int and exponent is non-negative, use integer exponentiation
+        if leftVal.Type == "int" && rightVal.Type == "int" && rdec.Exponent() >= 0 && rdec.Equal(rdec.Floor()) {
+            base := ldec.IntPart()
+            exp := rdec.IntPart()
+            result = decimal.NewFromInt(base).Pow(decimal.NewFromInt(exp)).IntPart()
+            resultType = "int"
+        } else {
+            // Use float64 math for float exponents: exp(y * log(x))
+            lf, _ := ldec.Float64()
+            rf, _ := rdec.Float64()
+            if lf <= 0 {
+                err := fmt.Errorf("power: base must be positive for non-integer exponent")
+                log.Error("handleBinaryOp", "error", err)
+                return ip, remainingGas, err
+            }
+            pow := math.Exp(rf * math.Log(lf))
+            // Format with high precision, trim trailing zeros
+            result = strings.TrimRight(strings.TrimRight(strconv.FormatFloat(pow, 'f', 30, 64), "0"), ".")
             resultType = "float"
         }
     default:
