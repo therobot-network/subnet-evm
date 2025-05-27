@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/shopspring/decimal"
 )
 
 // evaluateOperand takes one *Value slot (literal, lookup, or pop) and returns its full Value.
@@ -136,11 +137,30 @@ func handleBinaryOp(
             result = leftVal.Data.(string) + rightVal.Data.(string)
             resultType = "string"
         } else if leftVal.Type == "float" || rightVal.Type == "float" {
-            lf, rf := toFloat(leftVal), toFloat(rightVal)
-            result = lf + rf
+            ldec, errL := decimalFromValue(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            rdec, errR := decimalFromValue(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            sum := ldec.Add(rdec)
+            result = sum.String()
             resultType = "float"
         } else if leftVal.Type == rightVal.Type {
-            li, ri := toInt(leftVal), toInt(rightVal)
+            li, errL := toInt(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left toInt failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            ri, errR := toInt(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right toInt failed", "err", errR)
+                return ip, remainingGas, errR
+            }
             result = li + ri
             resultType = leftVal.Type
         } else {
@@ -148,47 +168,114 @@ func handleBinaryOp(
             log.Error("handleBinaryOp", "error", err)
             return ip, remainingGas, err
         }
-
     case "minus":
         if leftVal.Type == "float" || rightVal.Type == "float" {
-            lf, rf := toFloat(leftVal), toFloat(rightVal)
-            result = lf - rf
+            ldec, errL := decimalFromValue(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            rdec, errR := decimalFromValue(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            diff := ldec.Sub(rdec)
+            result = diff.String()
             resultType = "float"
         } else {
-            li, ri := toInt(leftVal), toInt(rightVal)
+            li, errL := toInt(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left toInt failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            ri, errR := toInt(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right toInt failed", "err", errR)
+                return ip, remainingGas, errR
+            }
             result = li - ri
             resultType = "int"
         }
-
     case "multiply":
         switch {
         case leftVal.Type == "string" && rightVal.Type == "int":
-            result = strings.Repeat(leftVal.Data.(string), toInt(rightVal))
+            ri, errR := toInt(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right toInt failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            result = strings.Repeat(leftVal.Data.(string), ri)
             resultType = "string"
         case rightVal.Type == "string" && leftVal.Type == "int":
-            result = strings.Repeat(rightVal.Data.(string), toInt(leftVal))
+            li, errL := toInt(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left toInt failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            result = strings.Repeat(rightVal.Data.(string), li)
             resultType = "string"
         case leftVal.Type == "float" || rightVal.Type == "float":
-            lf, rf := toFloat(leftVal), toFloat(rightVal)
-            result = lf * rf
+            ldec, errL := decimalFromValue(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            rdec, errR := decimalFromValue(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            prod := ldec.Mul(rdec)
+            result = prod.String()
             resultType = "float"
         default:
-            result = toInt(leftVal) * toInt(rightVal)
+            li, errL := toInt(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left toInt failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            ri, errR := toInt(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right toInt failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            result = li * ri
             resultType = "int"
         }
-
     case "divide":
-        if toFloat(rightVal) == 0 {
+        rdec, errR := decimalFromValue(rightVal)
+        if errR != nil {
+            log.Error("handleBinaryOp: right decimalFromValue failed", "err", errR)
+            return ip, remainingGas, errR
+        }
+        zero := decimal.NewFromInt(0)
+        if rdec.Equal(zero) {
             err := fmt.Errorf("divide by zero")
             log.Error("handleBinaryOp", "error", err)
             return ip, remainingGas, err
         }
         if leftVal.Type == "float" || rightVal.Type == "float" {
-            lf, rf := toFloat(leftVal), toFloat(rightVal)
-            result = lf / rf
+            ldec, errL := decimalFromValue(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left decimalFromValue failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            quot := ldec.Div(rdec)
+            result = quot.String()
             resultType = "float"
         } else {
-            result = toInt(leftVal) / toInt(rightVal)
+            li, errL := toInt(leftVal)
+            if errL != nil {
+                log.Error("handleBinaryOp: left toInt failed", "err", errL)
+                return ip, remainingGas, errL
+            }
+            ri, errR := toInt(rightVal)
+            if errR != nil {
+                log.Error("handleBinaryOp: right toInt failed", "err", errR)
+                return ip, remainingGas, errR
+            }
+            result = li / ri
             resultType = "int"
         }
     default:
@@ -203,6 +290,7 @@ func handleBinaryOp(
     )
 
     wrapped := Value{Data: result, Type: resultType}
+    log.Info("handleBinaryOp: about to marshal wrapped result", "wrapped", wrapped, "dataType", fmt.Sprintf("%T", wrapped.Data))
     data, err := json.Marshal(wrapped)
     if err != nil {
         log.Error("handleBinaryOp: marshal wrapped result failed", "error", err)
@@ -249,42 +337,23 @@ func handleAssignOp(
     return ip, remainingGas, nil
 }
 
-// toFloat converts an int or float Value to float64.
-func toFloat(v Value) float64 {
-    switch x := v.Data.(type) {
-    case float64:
-        return x
-    case int:
-        return float64(x)
-    case string:
-        f, err := strconv.ParseFloat(x, 64)
-        if err != nil {
-            log.Error("toFloat: failed to parse string", "value", x, "err", err)
-            return 0
-        }
-        return f
-    default:
-        log.Error("toFloat: unexpected data type", "type", fmt.Sprintf("%T", v.Data))
-        return 0
-    }
-}
-
-func toInt(v Value) int {
+// toInt converts an int or float Value to int, returns error if not possible.
+func toInt(v Value) (int, error) {
     switch x := v.Data.(type) {
     case int:
-        return x
+        return x, nil
     case float64:
-        return int(x)
+        return int(x), nil
     case string:
         i, err := strconv.Atoi(x)
         if err != nil {
             log.Error("toInt: failed to parse string", "value", x, "err", err)
-            return 0
+            return 0, fmt.Errorf("toInt: failed to parse string '%s': %w", x, err)
         }
-        return i
+        return i, nil
     default:
         log.Error("toInt: unexpected data type", "type", fmt.Sprintf("%T", v.Data))
-        return 0
+        return 0, fmt.Errorf("toInt: unexpected data type %T", v.Data)
     }
 }
 
@@ -359,4 +428,26 @@ func popFromVarStack(
     log.Info("popFromVarStack: updated length", "newLength", newLen)
 
     return data, nil
+}
+
+// decimalFromValue converts a Value to decimal.Decimal for fixed-point math.
+func decimalFromValue(v Value) (decimal.Decimal, error) {
+	if v.Type == "int" {
+		switch x := v.Data.(type) {
+		case int:
+			return decimal.NewFromInt(int64(x)), nil
+		case float64:
+			return decimal.NewFromFloat(x), nil
+		case string:
+			return decimal.NewFromString(x)
+		}
+	} else if v.Type == "float" {
+		switch x := v.Data.(type) {
+		case float64:
+			return decimal.NewFromFloat(x), nil
+		case string:
+			return decimal.NewFromString(x)
+		}
+	}
+	return decimal.Decimal{}, fmt.Errorf("decimalFromValue: unsupported type %s/%T", v.Type, v.Data)
 }

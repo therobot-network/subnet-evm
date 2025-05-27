@@ -50,6 +50,7 @@ require (
 	golang.org/x/time v0.3.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	github.com/shopspring/decimal v1.4.0
 )
 
 require (
