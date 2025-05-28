@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
 // import { test } from "./utils";
-import { setupTestEnvironment, TestEnv } from "./helpers/setupFixtures";
+import { setupTestEnvironment, TestEnv } from "../helpers/setupFixtures";
 // import { setupAmmLiquidity } from "./helpers/utils";
 
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";

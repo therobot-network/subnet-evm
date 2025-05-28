@@ -7,12 +7,14 @@ import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
 import yaml from "js-yaml";
-import { setupTestEnvironment, TestEnv } from "./helpers/setupFixtures";
+import { setupTestEnvironment, TestEnv } from "../helpers/setupFixtures";
 
 const LLM_ADDRESS = "0x0300000000000000000000000000000000000000";
 
 const binaryOpsRoot = path.resolve(
   __dirname,
+  "..",
+  "..",
   "planTests",
   "tests",
   "binary_operators",
@@ -23,8 +25,8 @@ const opDirs = fs
   .filter((d) => fs.statSync(path.join(binaryOpsRoot, d)).isDirectory());
 
 for (const opDir of opDirs) {
-  // if (opDir != "minus") {
-  //   continue; // Skip all but "minus" directory
+  // if (opDir != "specificDir") {
+  //   continue;
   // }
   describe(`LLM Precompiled Contract - ${opDir}`, function () {
     let env: TestEnv;
@@ -43,7 +45,7 @@ for (const opDir of opDirs) {
 
     for (const file of files) {
       const testName = path.basename(file, ".yaml");
-      // if (testName != "text_minus_float") {
+      // if (testName != "specificTest") {
       //   continue;
       // }
       it(`should pass ${testName}`, async function () {
