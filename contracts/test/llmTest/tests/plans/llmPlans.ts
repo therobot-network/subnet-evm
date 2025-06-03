@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
 import fs from "fs";
 import * as path from "path";
 // import { test } from "./utils";
-import { setupTestEnvironment, TestEnv } from "./helpers/setupFixtures";
+import { setupTestEnvironment, TestEnv } from "../helpers/setupFixtures";
 // import { setupAmmLiquidity } from "./helpers/utils";
 
 const ADMIN_ADDRESS = "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC";
@@ -38,7 +38,13 @@ describe("LLM Precompiled Contract", function () {
   let jiriContractAddress: string;
 
   // Read the JSON file containing the plans
-  const planPath = path.resolve(__dirname, "llm_test_input_plans.json");
+  const planPath = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "pythonBasedPlans",
+    "llm_test_input_plans.json",
+  );
   const fileContent = fs.readFileSync(planPath, "utf8");
   const plans = JSON.parse(fileContent);
 
@@ -78,7 +84,18 @@ describe("LLM Precompiled Contract", function () {
   }
 
   before(async function () {
-    env = await setupTestEnvironment();
+    env = await setupTestEnvironment([
+      "llm",
+      "executor",
+      "counterAContract",
+      "counterBContract",
+      "mathContract",
+      "usdcContract",
+      "jiriContract",
+      "ammContract1",
+      "ammContract2",
+      "ammContract3",
+    ]);
     ({
       executor,
       executorAddress,
