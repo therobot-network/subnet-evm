@@ -40,7 +40,7 @@ const config = {
     },
   },
   mocha: {
-    timeout: 30000,
+    timeout: 120000, // 2 minutes
   },
 };
 

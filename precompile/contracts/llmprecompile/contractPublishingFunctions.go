@@ -11,12 +11,13 @@ import (
 )
 
 func publishPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
-		return nil, 0, err
-	}
-	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
-	}
+if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
+	log.Info("Insufficient gas supplied", "Error", err)
+	return nil, 0, err
+}
+if readOnly {
+	return nil, remainingGas, vmerrs.ErrWriteProtection
+}
 
 	stateDB := accessibleState.GetStateDB()
 
@@ -78,6 +79,7 @@ func publishRobotContract(accessibleState contract.AccessibleState, caller commo
 	// log.Info("Made it to publishRobotContract function", "Caller", caller.Hex(), "ContractAddress", addr.Hex())
 
 	if remainingGas, err = contract.DeductGas(suppliedGas, PublishRobotContractGasCost); err != nil {
+		log.Info("Insufficient gas supplied", "Error", err)
 		return nil, 0, err
 	}
 	if readOnly {
@@ -127,12 +129,13 @@ func publishRobotContract(accessibleState contract.AccessibleState, caller commo
 
 
 func publishSystemPrimitive(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
-		return nil, 0, err
-	}
-	if readOnly {
-		return nil, remainingGas, vmerrs.ErrWriteProtection
-	}
+if remainingGas, err = contract.DeductGas(suppliedGas, PublishPrimitiveGasCost); err != nil {
+	log.Info("Insufficient gas supplied", "Error", err)
+	return nil, 0, err
+}
+if readOnly {
+	return nil, remainingGas, vmerrs.ErrWriteProtection
+}
 
 	stateDB := accessibleState.GetStateDB()
 
