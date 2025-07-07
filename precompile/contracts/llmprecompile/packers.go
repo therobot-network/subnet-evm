@@ -1,12 +1,15 @@
 package llmprecompile
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // ILLMContractMethodParams is an auto generated low-level Go binding around an user-defined struct.
@@ -85,12 +88,69 @@ func UnpackContinueEvaluationOutput(output []byte) (ContinueEvaluationOutput, er
 	return outputStruct, err
 }
 
+// Helper function to parse JSON and extract "prompt"/"plan", "contracts", "wallets", and "txLogsId"
+func parseEvalInputJSON(input string, expectedKey string) (string, map[string]interface{}, map[string]string, string, error) {
+	log.Info("parseEvalInputJSON called", "input", input, "expectedKey", expectedKey)
+	var parsed map[string]interface{}
+	err := json.Unmarshal([]byte(input), &parsed)
+	if err != nil {
+		log.Info("Failed to parse JSON", "Error", err)
+		return "", nil, nil, "", errors.New("failed to parse JSON: " + err.Error())
+	}
+
+	// Extract the main string (prompt or plan)
+	evalDataRaw, ok := parsed[expectedKey]
+	if !ok {
+		log.Info("Missing expected key", "Key", expectedKey)
+		return "", nil, nil, "", fmt.Errorf("missing required key: '%s'", expectedKey)
+	}
+	evalData, ok := evalDataRaw.(string)
+	if !ok {
+		return "", nil, nil, "", fmt.Errorf("expected '%s' to be a string", expectedKey)
+	}
+
+	// Extract contracts (map[string]interface{})
+	contracts := make(map[string]interface{})
+	if contractsRaw, ok := parsed["contracts"]; ok {
+		if contractsMap, ok := contractsRaw.(map[string]interface{}); ok {
+			for k, v := range contractsMap {
+				contracts[k] = v
+			}
+		}
+	}
+
+	// Extract wallets (map[string]string)
+	wallets := make(map[string]string)
+	if walletsRaw, ok := parsed["wallets"]; ok {
+		if walletsMap, ok := walletsRaw.(map[string]interface{}); ok {
+			for k, v := range walletsMap {
+				if str, ok := v.(string); ok {
+					wallets[k] = str
+				}
+			}
+		}
+	}
+
+	planIdRaw, ok := parsed["planId"]
+	if !ok {
+		log.Info("Missing planId")
+		return evalData, contracts, wallets, "", nil
+	}
+	planId, ok := planIdRaw.(string)
+	if !ok {
+		return "", nil, nil, "", fmt.Errorf("expected '%s' to be a string", expectedKey)
+	}
+
+	log.Info("Parsed eval input JSON", "EvalKey", expectedKey, "EvalData", evalData, "Contracts", contracts, "Wallets", wallets)
+	return evalData, contracts, wallets, planId, nil
+}
+
 // UnpackEvaluatePlanInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePlanInput(input []byte) (string, string, string, error) {
+func UnpackEvaluatePlanInput(input []byte) (string, map[string]interface{}, map[string]string, string, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePlan", input, false)
 	if err != nil {
-		return "", "", "", err
+		return "", nil, nil, "", err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
 	return parseEvalInputJSON(unpacked, "plan")
@@ -123,10 +183,10 @@ func UnpackEvaluatePlanOutput(output []byte) (EvaluatePlanOutput, error) {
 
 // UnpackEvaluatePromptInput attempts to unpack [input] into the string type argument
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackEvaluatePromptInput(input []byte) (string, string, string, error) {
+func UnpackEvaluatePromptInput(input []byte) (string, map[string]interface{}, map[string]string, string, error) {
 	res, err := LLMPrecompileABI.UnpackInput("evaluatePrompt", input, false)
 	if err != nil {
-		return "", "", "", err
+		return "", nil, nil, "", err
 	}
 	unpacked := *abi.ConvertType(res[0], new(string)).(*string)
 	return parseEvalInputJSON(unpacked, "prompt")
