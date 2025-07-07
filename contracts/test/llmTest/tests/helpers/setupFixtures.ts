@@ -107,9 +107,16 @@ export async function setupTestEnvironment(
     const ERC20Factory = await ethers.getContractFactory("ERC20Primitive", {
       libraries: { UserDecimalFormatting: udfAddress },
     });
-    await ERC20Factory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
-      console.warn("Skipping ERC20Primitive"),
-    );
+    try {
+      const ERC20Primitive = await ERC20Factory.deploy(
+        LLM_ADDRESS,
+        "",
+        executorAddress,
+      );
+      await ERC20Primitive.waitForDeployment();
+    } catch (e) {
+      console.warn("Skipping ERC20Primitive", e);
+    }
   }
   if (needAMM) {
     const AmmFactory = await ethers.getContractFactory("AmmPrimitive", {

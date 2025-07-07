@@ -1,0 +1,11 @@
+title: "Float + Float is Float"
+description: |
+  Shows float addition.
+expected:
+  - "4.4"
+prompt: |
+  Transfer half of my USDC to Bob.
+python: |
+  signer_balance = USDC.balanceOf(signer)
+  half_balance_signer = signer_balance // 2
+  USDC.transfer(joe, half_balance_signer)

@@ -3,7 +3,7 @@
 
 import { expect } from "chai";
 import { BaseContract, Contract, Signer } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import fs from "fs";
 import * as path from "path";
 // import { test } from "./utils";
@@ -190,6 +190,8 @@ describe("LLM Precompiled Contract", function () {
 
     let tx = await executor.evalPlan(withMathAndErc20Plan);
     await tx.wait();
+
+    // let tx = await testContract.evaluatePrompt(withMathAndErc20Plan);
 
     const adminBalanceEnd = await usdcContract.balanceOf(ADMIN_ADDRESS);
     const userBalanceEnd = await usdcContract.balanceOf(
