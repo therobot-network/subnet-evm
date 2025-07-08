@@ -10,7 +10,7 @@ library UserDecimalFormatting {
     function contractFormatToUserFormat(
         uint256 userInteger,
         uint8 decimals
-    ) external pure returns (string memory) {
+    ) internal pure returns (string memory) {
         if (userInteger == 0) return "0";
 
         uint256 factor = 10 ** uint256(decimals);
@@ -44,7 +44,7 @@ library UserDecimalFormatting {
     function userFormatToContractFormat(
         string memory userFixedPointString,
         uint8 decimals
-    ) external pure returns (uint256) {
+    ) internal pure returns (uint256) {
         bytes memory strBytes = bytes(userFixedPointString);
         if (strBytes.length == 0) revert EmptyInputString();
 

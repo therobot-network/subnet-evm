@@ -37,30 +37,43 @@ interface IRobotStorage {
         string memory primitiveName
     ) external;
 }
+
+enum Operation {
+    Set,
+    Add,
+    Subtract
+}
 interface IRobotStateEmitter {
     struct NamedFloat {
         string name;
         string value;
+        address account;
+        Operation operation;
     }
 
     struct NamedUint {
         string name;
         uint256 value;
+        address account;
+        Operation operation;
     }
 
     struct NamedString {
         string name;
         string value;
+        address account;
     }
 
     struct NamedAddress {
         string name;
         address value;
+        address account;
     }
 
     struct NamedBool {
         string name;
         bool value;
+        address account;
     }
 
     struct StateChangePayload {

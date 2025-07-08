@@ -2,6 +2,7 @@ package llmprecompile
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,8 +64,8 @@ var (
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
-	// backendUrl = "http://192.168.1.96:80"
-	backendUrl = "https://brain-sprint.therobot.network"
+	backendUrl = "http://192.168.1.62:80"
+	// backendUrl = "https://brain-sprint.therobot.network"
 
 	llmApiPromptURL   = backendUrl + "/eval_prompt"
 	llmApiPlanURL     = backendUrl + "/eval_plan"
@@ -155,9 +156,27 @@ func processBackendResponse(
 			returnTypes = v
 		}
 	}
-
 	log.Info("Parsed method details", "methodName", methodName, "contractAddress", contractAddrStr, "inputCount", len(inputsRaw))
 	contractAddr := common.HexToAddress(contractAddrStr)
+	// Handle system primitive if contractAddr is zero address
+	if contractAddr == (common.Address{}) {
+		// Call system primitive, send result to backend, and recursively process response
+		resultToSend, remainingGas, sysErr := systemPrimitiveMethod(methodName, inputsRaw, accessibleState, suppliedGas)
+		if sysErr != nil {
+			log.Error("processBackendResponse: systemPrimitiveMethod failed", "error", sysErr, "methodName", methodName, "inputsRaw", inputsRaw)
+			return false, nil, fmt.Errorf("systemPrimitiveMethod failed: %w", sysErr)
+		}
+		log.Info("processBackendResponse: systemPrimitiveMethod executed successfully", "methodName", methodName, "inputsRaw", inputsRaw, "result", resultToSend)
+		payload := map[string]interface{}{"run_id": promptId, "result": resultToSend, "id": backendCallId}
+		log.Info("processBackendResponse: sending systemPrimitive result to backend", "payload", payload)
+		respNew, err := sendToBackend(llmApiContinueURL, payload)
+		if err != nil {
+			log.Error("processBackendResponse: sendToBackend failed", "error", err)
+			return false, nil, err
+		}
+		// Recursively process the new backend response
+		return processBackendResponse(respNew, accessibleState, addr, promptId, remainingGas)
+	}
 
 	// --- Build ABI method signature ---
 	abiInputs := make([]abi.Argument, len(inputsRaw))
@@ -239,7 +258,7 @@ func continueEvaluation(accessibleState contract.AccessibleState, caller common.
 	}
 
 	results := in.ContractMethodResults
-	log.Info("continueEvaluation unpacked input", "promptId", promptIdBig, "resultsLen", len(results))
+	log.Info("continueEvaluation unpacked input", "promptId", promptIdBig, "resultsLen", len(results), "results", results)
 
 	// Robustly extract returnTypes as []string from backendCache
 	var returnTypes []string
@@ -367,7 +386,7 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 	}
 	log.Info("evaluatePlan unpacked input", "plan", plan, "contracts", contracts, "wallets", wallets)
 
-	promptIdInt := getAndIncrementPromptId(accessibleState, addr)
+	promptIdInt := getPromptIdFromInput(input)
 
 	// Use promptIdInt for run_id and output
 	payload := map[string]interface{}{"plan": plan, "contracts": contracts, "wallet_addresses": wallets, "run_id": promptIdInt, "localModel": false}
@@ -415,15 +434,14 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 	}
 	log.Info("evaluatePrompt unpacked input", "prompt", prompt, "contracts", contracts, "wallets", wallets)
 
-	// Use getAndIncrementPromptId for promptId management
-	runIDBigInt := getAndIncrementPromptId(accessibleState, addr)
+	promptIdInt := getPromptIdFromInput(input)
 
 	payload := map[string]interface{}{
 		"user_prompt":      prompt,
 		"contracts":        contracts,
 		"wallet_addresses": wallets,
 		"localModel":       false,
-		"run_id":           runIDBigInt,
+		"run_id":           promptIdInt,
 	}
 
 	resp, err := sendToBackend(llmApiPromptURL, payload)
@@ -431,7 +449,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, err
 	}
 
-	evaluationDone, contractMethodParams, err := processBackendResponse(resp, accessibleState, addr, runIDBigInt, suppliedGas)
+	evaluationDone, contractMethodParams, err := processBackendResponse(resp, accessibleState, addr, promptIdInt, suppliedGas)
 
 	if err != nil {
 		log.Error("evaluatePrompt: processBackendResponse failed", "error", err)
@@ -439,7 +457,7 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 	}
 
 	var output EvaluatePromptOutput
-	output.PromptId = runIDBigInt
+	output.PromptId = promptIdInt
 	output.EvaluationDone = evaluationDone
 	output.ContractMethodParams = contractMethodParams
 	packed, err := PackEvaluatePromptOutput(output)
@@ -447,21 +465,12 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		log.Info("Failed to pack output", "Error", err)
 		return nil, remainingGas, err
 	}
-	log.Info("evaluatePrompt returning", "packedLen", len(packed), "runIDBigInt", runIDBigInt.String())
+	log.Info("evaluatePrompt returning", "packedLen", len(packed), "runIDBigInt", promptIdInt.String())
 	return packed, remainingGas, nil
 }
 
-// getAndIncrementPromptId retrieves the current promptId for the given contract address from state, increments it, stores it, and returns the new value.
-func getAndIncrementPromptId(accessibleState contract.AccessibleState, addr common.Address) *big.Int {
-	promptIdRaw := accessibleState.GetStateDB().GetState(addr, promptIdKey).Bytes()
-	var promptIdInt *big.Int
-	if len(promptIdRaw) == 0 {
-		promptIdInt = big.NewInt(1)
-	} else {
-		promptIdInt = new(big.Int)
-		promptIdInt.SetBytes(promptIdRaw)
-		promptIdInt.Add(promptIdInt, big.NewInt(1))
-	}
-	accessibleState.GetStateDB().SetState(addr, promptIdKey, common.BigToHash(promptIdInt))
-	return promptIdInt
+// getPromptIdFromInput computes a uint256 promptId as the sha256 hash of the input bytes
+func getPromptIdFromInput(input []byte) *big.Int {
+	hash := sha256.Sum256(input)
+	return new(big.Int).SetBytes(hash[:])
 }
