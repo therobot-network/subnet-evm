@@ -133,7 +133,6 @@ func parseEvalInputJSON(input string, expectedKey string) (string, map[string]in
 
 	planIdRaw, ok := parsed["planId"]
 	if !ok {
-		log.Info("Missing planId")
 		return evalData, contracts, wallets, "", nil
 	}
 	planId, ok := planIdRaw.(string)

@@ -1,8 +1,7 @@
-title: "Float + Float is Float"
+title: "transferHalf"
 description: |
-  Shows float addition.
+  Shows division and erc20 transfer.
 expected:
-  - "4.4"
 prompt: |
   Transfer half of my USDC to Bob.
 python: |
