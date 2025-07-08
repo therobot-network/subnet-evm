@@ -60,12 +60,12 @@ var (
 	promptCounterKey       = common.BytesToHash([]byte("promptCounter"))
 	addressToPrimitiveName = common.BytesToHash([]byte("addressToPrimitiveName"))
 	lookupStorageKey       = crypto.Keccak256Hash([]byte("lookupStorage")) // Base slot key
-	promptIdKey            = common.BytesToHash([]byte("promtIdKey"))
+	// promptIdKey            = common.BytesToHash([]byte("promtIdKey"))
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
-	backendUrl = "http://192.168.1.62:80"
-	// backendUrl = "https://brain-sprint.therobot.network"
+	// backendUrl = "http://192.168.1.62:80"
+	backendUrl = "https://brain-sprint.therobot.network"
 
 	llmApiPromptURL   = backendUrl + "/eval_prompt"
 	llmApiPlanURL     = backendUrl + "/eval_plan"
