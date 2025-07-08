@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	// "log"
@@ -20,49 +19,7 @@ import (
 	_ "embed"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
-
-// getLookupValue retrieves a value from the lookup table or directly from the Arg.
-func getLookupValue(arg Arg, stateDB contract.StateDB) (interface{}, error) {
-	// If Value is explicitly set (even to ""), use it
-	if arg.Value != nil {
-		return *arg.Value, nil
-	}
-
-	// If Lookup is not set or is explicitly empty, stop here
-	if arg.Lookup == nil {
-		return nil, nil
-	}
-
-	lookupKey := *arg.Lookup // safely dereference once
-
-	lookupData, err := getLargeState(stateDB, ContractAddress, lookupStorageKey)
-	if err != nil {
-		log.Info("Failed to retrieve lookup state", "Error", err)
-		return nil, fmt.Errorf("failed to retrieve lookup storage: %w", err)
-	}
-
-	if len(lookupData) == 0 {
-		log.Info("Lookup state is empty", "LookupKey", lookupKey)
-		return nil, nil
-	}
-
-	var lookupMap map[string]interface{}
-	if err := json.Unmarshal(lookupData, &lookupMap); err != nil {
-		log.Info("Failed to decode lookup JSON", "Error", err)
-		return nil, fmt.Errorf("failed to decode lookup JSON: %w", err)
-	}
-
-	val, exists := lookupMap[lookupKey]
-	if !exists {
-		log.Info("Lookup key not found", "LookupKey", lookupKey)
-		return nil, nil
-	}
-
-	log.Info("Found lookup value", "LookupKey", lookupKey, "Value", val)
-	return val, nil
-}
 
 // convertToABIType dynamically converts a value into the expected ABI type.
 func convertToABIType(value interface{}, abiType abi.Type) (interface{}, error) {
@@ -207,141 +164,6 @@ func convertToABIType(value interface{}, abiType abi.Type) (interface{}, error) 
 	}
 }
 
-
-
-func ProcessArguments(inputs abi.Arguments, args []Arg, stateDB contract.StateDB) ([]interface{}, error) {
-	if len(inputs) != len(args) {
-		return nil, fmt.Errorf("mismatch between expected input count (%d) and provided arguments (%d)", len(inputs), len(args))
-	}
-
-	packedArgs := make([]interface{}, len(args))
-	for i, input := range inputs {
-		arg := args[i]
-
-		// Step 1: Load value from state or direct value
-		argValue, err := getLookupValue(arg, stateDB)
-		if err != nil {
-			log.Info("Failed fetching argument value", "ArgIndex", i, "Error", err)
-			return nil, fmt.Errorf("failed to fetch argument value from lookup storage: %w", err)
-		}
-
-		// Step 2: Get the ABI type
-		abiType, err := abi.NewType(input.Type.String(), "", nil)
-		if err != nil {
-			log.Info("Failed creating ABI type", "ArgIndex", i, "Type", input.Type.String(), "Error", err)
-			return nil, fmt.Errorf("failed to create ABI type: %w", err)
-		}
-
-		// Step 3: Convert to ABI-compatible value
-		convertedValue, err := convertToABIType(argValue, abiType)
-		if err != nil {
-			log.Info("Failed converting value to ABI type", "ArgIndex", i, "RawValue", argValue, "ExpectedType", abiType.String(), "Error", err)
-			return nil, fmt.Errorf("failed to convert value for argument %d: %w", i, err)
-		}
-
-		log.Info("Processed argument", "ArgIndex", i, "RawValue", argValue, "ConvertedValue", convertedValue, "ExpectedType", input.Type.String())
-		packedArgs[i] = convertedValue
-	}
-
-	return packedArgs, nil
-}
-
-func getContractAddress(contract Arg, stateDB contract.StateDB) (common.Address, error) {
-	addrValue, err := getLookupValue(contract, stateDB)
-	if err != nil {
-		log.Info("Failed fetching contract address", "error", err)
-		return common.Address{}, fmt.Errorf("failed to fetch contract address from lookup storage: %w", err)
-	}
-
-	if addrStr, ok := addrValue.(string); ok {
-		if addrStr == "" {
-			log.Info("Address string is empty, returning zero address")
-			return common.Address{}, nil
-		}
-		if common.IsHexAddress(addrStr) {
-			addr := common.HexToAddress(addrStr)
-			log.Info("Converted string to contract address", "address", addr.Hex())
-			return addr, nil
-		}
-		log.Info("Invalid Ethereum address string", "input", addrStr)
-		return common.Address{}, fmt.Errorf("invalid contract address string: %s", addrStr)
-	}
-
-	if addrValue == nil {
-		log.Info("Lookup value is nil, returning zero address")
-		return common.Address{}, nil
-	}
-
-	if addr, ok := addrValue.(common.Address); ok {
-		log.Info("Retrieved contract address", "address", addr.Hex())
-		return addr, nil
-	}
-
-	log.Info("Invalid contract address type", "value", addrValue)
-	return common.Address{}, fmt.Errorf("invalid contract address type: %T", addrValue)
-}
-
-func getPCFromState(stateDB contract.StateDB, addr common.Address) (*big.Int, error) {
-	currentPCBytes := stateDB.GetState(addr, pcKey)
-	if currentPCBytes == (common.Hash{}) {
-		return nil, errors.New("program counter not initialized")
-	}
-
-	if currentPCBytes == (common.Hash{1}) {
-		return big.NewInt(0), nil
-	}
-
-	currentPC := new(big.Int).SetBytes(currentPCBytes.Bytes())
-	log.Info("Retrieved program counter from state", "address", addr.Hex(), "pc", currentPC.String())
-	return currentPC, nil
-}
-
-func savePCToState(stateDB contract.StateDB, addr common.Address, pc *big.Int) {
-	valueToSave := common.BytesToHash(pc.Bytes())
-	if pc.Sign() == 0 {
-		valueToSave = common.Hash{1}
-	}
-	stateDB.SetState(addr, pcKey, valueToSave)
-	log.Info("Saved program counter to state", "address", addr.Hex(), "pc", pc.String())
-}
-
-// Temporary function. Later we will use a DB
-func getContractPrimitive(stateDB contract.StateDB, addr common.Address, address string) (contract string, primitive string) {
-	log.Info("Fetching contract primitive", "target_address", address)
-
-	parsedAddress := common.HexToAddress(address)
-	addressHash := common.BytesToHash(parsedAddress.Bytes())
-	fullKey := crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
-
-	log.Info("Looking up primitive mapping", "lookup_address", addr.Hex(), "hashed_target", addressHash.Hex(), "full_key", fullKey.Hex())
-
-	contractBytes, err := getLargeState(stateDB, addr, fullKey)
-	if err != nil {
-		log.Info("Error retrieving contract from state", "error", err)
-		return "", ""
-	}
-	if len(contractBytes) == 0 {
-		log.Info("No contract found for address", "address", address)
-		return "", ""
-	}
-
-	contract = string(contractBytes)
-	log.Info("Found contract", "address", address, "contract", contract)
-
-	primitive, exists := primitiveABI[contract]
-	if !exists {
-		log.Info("No ABI found for contract", "contract", contract)
-		return contract, ""
-	}
-
-	if len(primitive) > 500 {
-		log.Info("Found primitive for contract", "contract", contract, "primitive", primitive[:500])
-	}else{
-		log.Info("Found primitive for contract", "contract", contract, "primitive", primitive)
-	}
-	return contract, primitive
-}
-
 func updatePlanLocalState(stateDB contract.StateDB, addr common.Address, key string, storageData interface{}) error {
 	if key == "" {
 		return nil
@@ -380,46 +202,42 @@ func updatePlanLocalState(stateDB contract.StateDB, addr common.Address, key str
 	return nil
 }
 
-// deletePlanFromState removes all chunks of data stored under the given key in the state.
-func deletePlanFromState(stateDB contract.StateDB, addr common.Address, key common.Hash) {
-	log.Info("Deleting plan from state", "key", key.Hex())
-
-	for i := 0; ; i++ {
-		chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
-		chunk := stateDB.GetState(addr, chunkKey)
-		if chunk == (common.Hash{}) {
-			log.Info("No more chunks found during deletion", "lastIndex", i)
-			break
-		}
-
-		stateDB.SetState(addr, chunkKey, common.Hash{})
-		log.Info("Deleted chunk", "index", i, "chunkKey", chunkKey.Hex())
+// removeItemLocalState removes a key from the plan-local state JSON object stored in lookupStorageKey.
+func removeItemLocalState(stateDB contract.StateDB, addr common.Address, key string) error {
+	if key == "" {
+		return nil
 	}
 
-	log.Info("Completed deletion of all chunks", "key", key.Hex())
-}
-
-func storeLookupEntries(stateDB contract.StateDB, addr common.Address, lookupJsonString string) (map[string]interface{}, error) {
-	if lookupJsonString == "" {
-		log.Info("No lookup entries to store")
-		return map[string]interface{}{}, nil
+	raw, err := getLargeState(stateDB, addr, lookupStorageKey)
+	if err != nil {
+		return fmt.Errorf("failed to get existing state: %w", err)
 	}
 
-	var lookupMap map[string]interface{}
-	if err := json.Unmarshal([]byte(lookupJsonString), &lookupMap); err != nil {
-		log.Info("Failed to parse lookup JSON", "error", err)
-		return nil, fmt.Errorf("failed to unmarshal lookup JSON: %w", err)
+	if len(raw) == 0 {
+		// Nothing to remove
+		return nil
 	}
 
-	for key, val := range lookupMap {
-		if err := updatePlanLocalState(stateDB, addr, key, val); err != nil {
-			log.Info("Failed to store lookup entry", "key", key, "error", err)
-			return nil, fmt.Errorf("failed to store lookup entry for key %s: %w", key, err)
-		}
-		log.Info("Stored lookup entry", "key", key, "value", val)
+	var jsonMap map[string]interface{}
+	if err := json.Unmarshal(raw, &jsonMap); err != nil {
+		return fmt.Errorf("failed to parse existing JSON state: %w", err)
 	}
 
-	return lookupMap, nil
+	if _, exists := jsonMap[key]; !exists {
+		// Key not present, nothing to do
+		return nil
+	}
+	delete(jsonMap, key)
+
+	updated, err := json.Marshal(jsonMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated JSON: %w", err)
+	}
+
+	setLargeState(stateDB, addr, lookupStorageKey, updated)
+	log.Info("Removed item from plan-local state", "key", key)
+
+	return nil
 }
 
 func GetPromptCounter(stateDB contract.StateDB) *big.Int {
@@ -433,7 +251,6 @@ func GetPromptCounter(stateDB contract.StateDB) *big.Int {
 	return counter
 }
 
-
 // IncrementPromptCounter increments the value of promptCounter in the StateDB by 1.
 func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
 	currentCounter := GetPromptCounter(stateDB)
@@ -445,82 +262,89 @@ func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
 	return nextCounter // Return the current value before incrementing
 }
 
-// setLargeState stores [data] and includes its total length as an 8-byte prefix. TODO: remove extra byes from previous
+// setLargeState stores [data] and includes its total length as an 8-byte prefix. It also removes any leftover chunks from previous larger values.
 func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash, data []byte) {
+	// 1) Write length + data
+	totalLen := uint64(len(data))
+	prefix := make([]byte, 8)
+	binary.BigEndian.PutUint64(prefix, totalLen)
+	fullData := append(prefix, data...)
 
-    // 1) Write length + data
-    // The first chunk stores the length in the first 8 bytes
-    // The rest is data chunking
-    totalLen := uint64(len(data))
-    prefix := make([]byte, 8)
-    binary.BigEndian.PutUint64(prefix, totalLen) // 8-byte length prefix
+	chunkSize := common.HashLength // 32
+	chunks := (len(fullData) + chunkSize - 1) / chunkSize
 
-    fullData := append(prefix, data...) // Combine length prefix + actual data
+	// 2) Store [fullData] in 32-byte chunks
+	for i := 0; i < chunks; i++ {
+		start := i * chunkSize
+		end := start + chunkSize
+		if end > len(fullData) {
+			end = len(fullData)
+		}
+		chunkData := make([]byte, chunkSize)
+		copy(chunkData, fullData[start:end])
+		chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+		stateDB.SetState(addr, chunkKey, common.BytesToHash(chunkData))
+	}
 
-    // 2) Store [fullData] in 32-byte chunks
-    chunkSize := common.HashLength // 32
-    chunks := (len(fullData) + chunkSize - 1) / chunkSize
-    for i := 0; i < chunks; i++ {
-        start := i * chunkSize
-        end := start + chunkSize
-        if end > len(fullData) {
-            end = len(fullData)
-        }
-
-        // Pad the chunk to 32 bytes if needed
-        chunkData := make([]byte, chunkSize)
-        copy(chunkData, fullData[start:end])
-
-        chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
-        stateDB.SetState(addr, chunkKey, common.BytesToHash(chunkData))
-    }
+	// 3) Remove any leftover chunks from previous larger values
+	// Read the previous length (if any) to determine if cleanup is needed
+	firstChunkKey := common.BytesToHash(append(key.Bytes(), byte(0)))
+	firstChunk := stateDB.GetState(addr, firstChunkKey).Bytes()
+	var prevTotalLen uint64
+	if len(firstChunk) >= 8 {
+		prevTotalLen = binary.BigEndian.Uint64(firstChunk[:8])
+	}
+	prevChunks := int((prevTotalLen + 8 + uint64(chunkSize) - 1) / uint64(chunkSize))
+	for i := chunks; i < prevChunks; i++ {
+		chunkKey := common.BytesToHash(append(key.Bytes(), byte(i)))
+		stateDB.SetState(addr, chunkKey, common.Hash{}) // zero out leftover chunk
+	}
 }
 
 func getLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash) ([]byte, error) {
-    // 1) Read the first chunk for length prefix
-    firstChunkKey := common.BytesToHash(append(key.Bytes(), byte(0)))
-    firstChunk := stateDB.GetState(addr, firstChunkKey).Bytes()
-    if len(firstChunk) == 0 {
-        // No data at all
-        // return nil, fmt.Errorf("no data found for key %s", key.Hex())
-        return []byte{}, nil
-    }
+	// 1) Read the first chunk for length prefix
+	firstChunkKey := common.BytesToHash(append(key.Bytes(), byte(0)))
+	firstChunk := stateDB.GetState(addr, firstChunkKey).Bytes()
+	if len(firstChunk) == 0 {
+		// No data at all
+		// return nil, fmt.Errorf("no data found for key %s", key.Hex())
+		return []byte{}, nil
+	}
 
-    // The first 8 bytes store the total length
-    if len(firstChunk) < 8 {
-        return nil, fmt.Errorf("invalid length prefix in first chunk")
-    }
-    totalLen := binary.BigEndian.Uint64(firstChunk[:8])
+	// The first 8 bytes store the total length
+	if len(firstChunk) < 8 {
+		return nil, fmt.Errorf("invalid length prefix in first chunk")
+	}
+	totalLen := binary.BigEndian.Uint64(firstChunk[:8])
 
-    // Full data includes the first chunk's leftover part after length prefix
-    data := append([]byte(nil), firstChunk[8:]...) // Copy remainder after length
-    chunkIndex := 1
+	// Full data includes the first chunk's leftover part after length prefix
+	data := append([]byte(nil), firstChunk[8:]...) // Copy remainder after length
+	chunkIndex := 1
 
-    // 2) Read subsequent chunks until we collect totalLen
-    bytesNeeded := int(totalLen) - len(data)
-    for bytesNeeded > 0 {
-        chunkKey := common.BytesToHash(append(key.Bytes(), byte(chunkIndex)))
-        chunk := stateDB.GetState(addr, chunkKey).Bytes()
-        if len(chunk) == 0 {
-            // Means no more data is stored
-            break
-        }
-        data = append(data, chunk...)
-        bytesNeeded = int(totalLen) - len(data)
-        chunkIndex++
-    }
+	// 2) Read subsequent chunks until we collect totalLen
+	bytesNeeded := int(totalLen) - len(data)
+	for bytesNeeded > 0 {
+		chunkKey := common.BytesToHash(append(key.Bytes(), byte(chunkIndex)))
+		chunk := stateDB.GetState(addr, chunkKey).Bytes()
+		if len(chunk) == 0 {
+			// Means no more data is stored
+			break
+		}
+		data = append(data, chunk...)
+		bytesNeeded = int(totalLen) - len(data)
+		chunkIndex++
+	}
 
-    // 3) If data is longer than totalLen, truncate
-    if len(data) > int(totalLen) {
-        data = data[:totalLen]
-    }
+	// 3) If data is longer than totalLen, truncate
+	if len(data) > int(totalLen) {
+		data = data[:totalLen]
+	}
 
-    // If data is still less than totalLen, user stored incomplete data
-    if len(data) < int(totalLen) {
-        return nil, fmt.Errorf("incomplete data retrieved for key %s: expected %d bytes, got %d",
-            key.Hex(), totalLen, len(data))
-    }
+	// If data is still less than totalLen, user stored incomplete data
+	if len(data) < int(totalLen) {
+		return nil, fmt.Errorf("incomplete data retrieved for key %s: expected %d bytes, got %d",
+			key.Hex(), totalLen, len(data))
+	}
 
-    return data, nil
+	return data, nil
 }
-

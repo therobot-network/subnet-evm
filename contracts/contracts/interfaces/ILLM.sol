@@ -11,7 +11,6 @@ interface ILLM {
     bytes methodData;
   }
 
-  // sayHello returns the stored greeting string
   function evaluatePrompt(
     string calldata prompt
   ) external returns (uint promptId, bool evaluationDone, ContractMethodParams[] calldata contractMethodParams);

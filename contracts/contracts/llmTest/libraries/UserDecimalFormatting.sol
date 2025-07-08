@@ -17,6 +17,8 @@ library UserDecimalFormatting {
         uint256 intPart = userInteger / factor;
         uint256 decPart = userInteger % factor;
 
+        if (decPart == 0) return Strings.toString(intPart);
+
         string memory intString = Strings.toString(intPart);
         string memory decString = Strings.toString(decPart);
 
@@ -24,7 +26,18 @@ library UserDecimalFormatting {
             decString = string(abi.encodePacked("0", decString));
         }
 
-        return string(abi.encodePacked(intString, ".", decString));
+        bytes memory decBytes = bytes(decString);
+        uint256 len = decBytes.length;
+        while (len > 0 && decBytes[len - 1] == bytes1("0")) {
+            len--;
+        }
+
+        bytes memory trimmed = new bytes(len);
+        for (uint256 i = 0; i < len; i++) {
+            trimmed[i] = decBytes[i];
+        }
+
+        return string(abi.encodePacked(intString, ".", trimmed));
     }
 
     // Converts a fixed-point string to an unsigned integer

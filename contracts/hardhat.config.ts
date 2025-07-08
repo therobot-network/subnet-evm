@@ -1,31 +1,28 @@
 import "@nomicfoundation/hardhat-toolbox";
 import "./tasks";
 
-// HardHat users must populate these environment variables in order to connect to their subnet-evm instance
-// Since the blockchainID is not known in advance, there's no good default to use and we use the C-Chain here.
-var local_rpc_uri =
-  process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/the-robot/rpc";
-// var local_rpc_uri = process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/C/rpc";
-var local_chain_id = parseInt(process.env.CHAIN_ID, 10) || 99999;
-// var local_chain_id = parseInt(process.env.CHAIN_ID, 10) || 43112;
+const localRpcUri =
+  process.env.RPC_URI ?? "http://127.0.0.1:9650/ext/bc/the-robot/rpc";
+const localChainId = parseInt(process.env.CHAIN_ID ?? "99999", 10);
 
-export default {
+const config = {
   solidity: {
-    compilers: [
-      {
-        version: "0.8.24",
-        settings: {
-          evmVersion: "shanghai",
-        },
+    version: "0.8.24",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200, // tweak up/down for size vs. gas
       },
-    ],
+      metadata: {
+        bytecodeHash: "none", // strip Swarm hash
+      },
+      evmVersion: "shanghai",
+    },
   },
   networks: {
     local: {
-      //"http://{ip}:{port}/ext/bc/{chainID}/rpc
-      // expected to be populated by the environment variables above
-      url: local_rpc_uri,
-      chainId: local_chain_id,
+      url: localRpcUri,
+      chainId: localChainId,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",
         "0x7b4198529994b0dc604278c99d153cfd069d594753d471171a1d102a10438e07",
@@ -38,10 +35,13 @@ export default {
         "0x86f78c5416151fe3546dece84fda4b4b1e36089f2dbc48496faf3a950f16157c",
         "0x750839e9dbbd2a0910efe40f50b2f3b2f2f59f5580bb4b83bd8c1201cf9a010a",
       ],
-      pollingInterval: "1s",
+      // Lower polling to speed up tests
+      pollingInterval: 1000,
     },
   },
   mocha: {
-    timeout: 30000,
+    timeout: 120000, // 2 minutes
   },
 };
+
+export default config;

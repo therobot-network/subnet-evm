@@ -3,8 +3,10 @@ pragma solidity ^0.8.20;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SystemPrimitiveBase} from "./SystemPrimitiveBase.sol";
+import {UserDecimalFormatting} from "../../libraries/UserDecimalFormatting.sol";
 
 contract PythonPrimitive is SystemPrimitiveBase {
+    uint8 public constant DECIMALS = 18;
     error DivisionByZero();
     error Overflow();
     error ArrayCannotBeEmpty();
@@ -14,130 +16,300 @@ contract PythonPrimitive is SystemPrimitiveBase {
         string memory metadata
     ) SystemPrimitiveBase(llmPrecompile, "PythonPrimitive", metadata) {}
 
-    // Add two numbers with overflow protection
-    function add(uint256 a, uint256 b) public pure returns (uint256) {
-        (bool success, uint256 sum) = Math.tryAdd(a, b);
+    function add(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        (bool success, uint256 sum) = Math.tryAdd(aUint, bUint);
         if (!success) revert Overflow();
-        return sum;
+        return UserDecimalFormatting.contractFormatToUserFormat(sum, DECIMALS);
     }
 
-    // Subtract two numbers with underflow protection
-    function subtract(uint256 a, uint256 b) public pure returns (uint256) {
-        (bool success, uint256 difference) = Math.trySub(a, b);
+    function subtract(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        (bool success, uint256 result) = Math.trySub(aUint, bUint);
         if (!success) revert Overflow();
-        return difference;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
     }
 
-    // Multiply two numbers with overflow protection
-    function multiply(uint256 a, uint256 b) public pure returns (uint256) {
-        (bool success, uint256 product) = Math.tryMul(a, b);
+    function multiply(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        (bool success, uint256 result) = Math.tryMul(aUint, bUint);
         if (!success) revert Overflow();
-        return product;
+        uint256 scaled = result / (10 ** DECIMALS);
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(scaled, DECIMALS);
     }
 
-    // Divide two numbers with zero-division protection
-    function divide(uint256 a, uint256 b) public pure returns (uint256) {
-        (bool success, uint256 quotient) = Math.tryDiv(a, b);
+    function divide(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        (bool success, uint256 result) = Math.tryDiv(aUint, bUint);
+        result = result * (10 ** DECIMALS);
         if (!success) revert DivisionByZero();
-        return quotient;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
     }
 
-    // Divide two numbers with zero-division protection
-    function mod(uint256 a, uint256 b) public pure returns (uint256) {
-        (bool success, uint256 result) = Math.tryMod(a, b);
+    function mod(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        (bool success, uint256 result) = Math.tryMod(aUint, bUint);
         if (!success) revert DivisionByZero();
-        return result;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
     }
 
-    // Power function (equivalent to Python's pow)
-    function pow(uint256 base, uint256 exponent) public pure returns (uint256) {
-        return base ** exponent;
+    function pow(
+        string memory base,
+        string memory exponent
+    ) public pure returns (string memory) {
+        uint256 baseUint = UserDecimalFormatting.userFormatToContractFormat(
+            base,
+            DECIMALS
+        );
+        uint256 expUint = UserDecimalFormatting.userFormatToContractFormat(
+            exponent,
+            DECIMALS
+        ) / (10 ** DECIMALS);
+        uint256 result = baseUint ** expUint;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
     }
 
-    // check if number a is greater than number b
-    function greaterThan(uint256 a, uint256 b) public pure returns (bool) {
-        return a > b;
+    function max2(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                Math.max(
+                    UserDecimalFormatting.userFormatToContractFormat(
+                        a,
+                        DECIMALS
+                    ),
+                    UserDecimalFormatting.userFormatToContractFormat(
+                        b,
+                        DECIMALS
+                    )
+                ),
+                DECIMALS
+            );
     }
 
-    // check if number a is greater than or equal number b
-    function greaterThanOrEqual(
-        uint256 a,
-        uint256 b
-    ) public pure returns (bool) {
-        return a >= b;
+    function min2(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                Math.min(
+                    UserDecimalFormatting.userFormatToContractFormat(
+                        a,
+                        DECIMALS
+                    ),
+                    UserDecimalFormatting.userFormatToContractFormat(
+                        b,
+                        DECIMALS
+                    )
+                ),
+                DECIMALS
+            );
     }
 
-    // check if number a is less than number b
-    function lessThan(uint256 a, uint256 b) public pure returns (bool) {
-        return a < b;
-    }
-
-    // check if number a is less than or equal number b
-    function lessThanOrEqual(uint256 a, uint256 b) public pure returns (bool) {
-        return a <= b;
-    }
-
-    // check if number a equals number b
-    function equal(uint256 a, uint256 b) public pure returns (bool) {
-        return a == b;
-    }
-
-    // check if number a is not equal number b
-    function notEqual(uint256 a, uint256 b) public pure returns (bool) {
-        return a != b;
-    }
-
-    // Find the maximum of two numbers
-    function max2(uint256 a, uint256 b) public pure returns (uint256) {
-        return Math.max(a, b);
-    }
-
-    // Find the minimum of two numbers
-    function min2(uint256 a, uint256 b) public pure returns (uint256) {
-        return Math.min(a, b);
-    }
-
-    // Find the maximum in an array
-    function max(uint256[] memory arr) public pure returns (uint256) {
+    function max(string[] memory arr) public pure returns (string memory) {
         if (arr.length == 0) revert ArrayCannotBeEmpty();
-        uint256 maxValue = arr[0];
+        uint256 maxVal = UserDecimalFormatting.userFormatToContractFormat(
+            arr[0],
+            DECIMALS
+        );
         for (uint256 i = 1; i < arr.length; i++) {
-            if (arr[i] > maxValue) maxValue = arr[i];
+            uint256 val = UserDecimalFormatting.userFormatToContractFormat(
+                arr[i],
+                DECIMALS
+            );
+            if (val > maxVal) maxVal = val;
         }
-        return maxValue;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(maxVal, DECIMALS);
     }
 
-    // Find the minimum in an array
-    function min(uint256[] memory arr) public pure returns (uint256) {
+    function min(string[] memory arr) public pure returns (string memory) {
         if (arr.length == 0) revert ArrayCannotBeEmpty();
-        uint256 minValue = arr[0];
+        uint256 minVal = UserDecimalFormatting.userFormatToContractFormat(
+            arr[0],
+            DECIMALS
+        );
         for (uint256 i = 1; i < arr.length; i++) {
-            if (arr[i] < minValue) minValue = arr[i];
+            uint256 val = UserDecimalFormatting.userFormatToContractFormat(
+                arr[i],
+                DECIMALS
+            );
+            if (val < minVal) minVal = val;
         }
-        return minValue;
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(minVal, DECIMALS);
     }
 
-    // Absolute value
-    function abs(int256 x) public pure returns (uint256) {
-        return x < 0 ? uint256(-x) : uint256(x);
+    function abs(string memory x) public pure returns (string memory) {
+        int256 val = int256(
+            UserDecimalFormatting.userFormatToContractFormat(x, DECIMALS)
+        );
+        uint256 result = uint256(val < 0 ? -val : val);
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
     }
 
-    // Divide two numbers and round up
-    function ceilDiv(uint256 a, uint256 b) public pure returns (uint256) {
-        return Math.ceilDiv(a, b);
+    function ceilDiv(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 bUint = UserDecimalFormatting.userFormatToContractFormat(
+            b,
+            DECIMALS
+        );
+        uint256 result = Math.ceilDiv(aUint, bUint);
+        return UserDecimalFormatting.contractFormatToUserFormat(result, 0);
     }
 
-    // Compute the square root of a number
-    function sqrt(uint256 a) public pure returns (uint256) {
-        return Math.sqrt(a);
+    function sqrt(string memory a) public pure returns (string memory) {
+        uint256 aUint = UserDecimalFormatting.userFormatToContractFormat(
+            a,
+            DECIMALS
+        );
+        uint256 result = Math.sqrt(aUint);
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(
+                result,
+                DECIMALS / 2
+            );
     }
 
-    // Multiply two numbers and divide by a denominator with full precision
     function mulDiv(
-        uint256 x,
-        uint256 y,
-        uint256 denominator
-    ) public pure returns (uint256) {
-        return Math.mulDiv(x, y, denominator);
+        string memory x,
+        string memory y,
+        string memory denominator
+    ) public pure returns (string memory) {
+        uint256 xUint = UserDecimalFormatting.userFormatToContractFormat(
+            x,
+            DECIMALS
+        );
+        uint256 yUint = UserDecimalFormatting.userFormatToContractFormat(
+            y,
+            DECIMALS
+        );
+        uint256 dUint = UserDecimalFormatting.userFormatToContractFormat(
+            denominator,
+            DECIMALS
+        );
+        uint256 result = Math.mulDiv(xUint, yUint, dUint);
+        return
+            UserDecimalFormatting.contractFormatToUserFormat(result, DECIMALS);
+    }
+
+    // Boolean comparison functions (unchanged)
+    function greaterThan(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) >
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
+    }
+
+    function greaterThanOrEqual(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) >=
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
+    }
+
+    function lessThan(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) <
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
+    }
+
+    function lessThanOrEqual(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) <=
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
+    }
+
+    function equal(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) ==
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
+    }
+
+    function notEqual(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return
+            UserDecimalFormatting.userFormatToContractFormat(a, DECIMALS) !=
+            UserDecimalFormatting.userFormatToContractFormat(b, DECIMALS);
     }
 }

@@ -1463,7 +1463,13 @@
           "Value": "erc20"
         },
         {
-          "Value": "NC"
+          "Value": "TST"
+        },
+        {
+          "Value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        },
+        {
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1475,22 +1481,13 @@
     {
       "Args": [
         {
-          "Lookup": "sender"
-        },
-        {
-          "Value": "Test Token"
-        },
-        {
-          "Value": "1000000000000000000"
-        },
-        {
-          "Value": ""
+          "Value": "1000"
         }
       ],
       "Contract": {
         "Lookup": "new_contract_address"
       },
-      "Method": "initialize",
+      "Method": "configure",
       "Output": []
     },
     {
@@ -1513,6 +1510,12 @@
         },
         {
           "Value": "TKNA"
+        },
+        {
+          "Value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        },
+        {
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1524,22 +1527,13 @@
     {
       "Args": [
         {
-          "Lookup": "sender"
-        },
-        {
-          "Value": "Test Token A"
-        },
-        {
-          "Value": "10000000000000000000000"
-        },
-        {
-          "Value": ""
+          "Value": "10000"
         }
       ],
       "Contract": {
         "Lookup": "tokenAAddress"
       },
-      "Method": "initialize",
+      "Method": "configure",
       "Output": []
     },
     {
@@ -1549,6 +1543,12 @@
         },
         {
           "Value": "TKNB"
+        },
+        {
+          "Value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        },
+        {
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1560,22 +1560,13 @@
     {
       "Args": [
         {
-          "Lookup": "sender"
-        },
-        {
-          "Value": "Test Token B"
-        },
-        {
-          "Value": "10000000000000000000000"
-        },
-        {
-          "Value": "No Rules"
+          "Value": "1000"
         }
       ],
       "Contract": {
         "Lookup": "tokenBAddress"
       },
-      "Method": "initialize",
+      "Method": "configure",
       "Output": []
     },
     {
@@ -1585,6 +1576,12 @@
         },
         {
           "Value": "AMMAB"
+        },
+        {
+          "Value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        },
+        {
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1596,16 +1593,13 @@
     {
       "Args": [
         {
-          "Lookup": "sender"
-        },
-        {
           "Lookup": "tokenAAddress"
         },
         {
           "Lookup": "tokenBAddress"
         },
         {
-          "Value": "No Rules"
+          "Value": "0"
         }
       ],
       "Contract": {
@@ -1621,6 +1615,12 @@
         },
         {
           "Value": "AMMAB"
+        },
+        {
+          "Value": "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
+        },
+        {
+          "Value": ""
         }
       ],
       "Contract": {
@@ -1628,6 +1628,24 @@
       },
       "Method": "deployRobotContract",
       "Output": ["ammAddress"]
+    },
+    {
+      "Args": [
+        {
+          "Lookup": "tokenAAddress"
+        },
+        {
+          "Lookup": "tokenBAddress"
+        },
+        {
+          "Value": "0"
+        }
+      ],
+      "Contract": {
+        "Lookup": "new_contract_address"
+      },
+      "Method": "initialize",
+      "Output": []
     },
     {
       "Args": [
@@ -1742,7 +1760,7 @@
       "Method": "answerUserQuestion"
     }
   ],
-  "withBoolOps":[
+  "withBoolOps": [
     {
       "Args": [
         {
@@ -1833,18 +1851,18 @@
       "Method": "answerUserQuestion"
     }
   ],
-  "withIs":[
-    {      
+  "withIs": [
+    {
       "Args": [
-      {
-        "Value": "None"
-      },
-      {
-        "Lookup": "nilValue"
-      }
-    ],
-    "Method": "is",
-    "Output": ["isValue"]
+        {
+          "Value": "None"
+        },
+        {
+          "Lookup": "nilValue"
+        }
+      ],
+      "Method": "is",
+      "Output": ["isValue"]
     },
     {
       "Args": [
@@ -1858,5 +1876,4 @@
       "Method": "answerUserQuestion"
     }
   ]
-  
 }

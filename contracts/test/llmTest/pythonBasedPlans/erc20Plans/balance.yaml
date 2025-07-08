@@ -1,0 +1,7 @@
+title: "balance"
+description: |
+  Shows answerUSerQuestion for erc20 data.
+expected:
+prompt: |
+  What is bob's USDC balance?
+python:

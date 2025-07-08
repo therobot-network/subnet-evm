@@ -23,13 +23,6 @@ contract CounterPrimitive is Initializable, PrimitiveBase {
         )
     {}
 
-    function initialize(
-        address owner,
-        string calldata customRules_
-    ) external initializer {
-        __Primitive_init(owner, customRules_);
-    }
-
     function increase(uint256 number) external onlyProxy returns (uint256) {
         counter += number;
         return counter;
