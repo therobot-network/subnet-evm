@@ -10,7 +10,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IRobotStateEmitter} from "../interfaces/IExecutor.sol";
+import {IRobotStateEmitter, Operation} from "../interfaces/IExecutor.sol";
 
 import {IERC20Primitive} from "./interfaces/IERC20Primitive.sol";
 
@@ -146,7 +146,9 @@ contract AmmPrimitive is
             UserDecimalFormatting.contractFormatToUserFormat(
                 _fee,
                 _FEE_DECIMALS
-            )
+            ),
+            address(0),
+            Operation.Set
         );
         _getRobotStateEmitter().emitStateChange(payload);
     }
@@ -166,7 +168,11 @@ contract AmmPrimitive is
         isActive = true;
         IRobotStateEmitter.StateChangePayload
             memory payload = _initStateChangePayload(0, 0, 0, 0, 1);
-        payload.bools[0] = IRobotStateEmitter.NamedBool("active", isActive);
+        payload.bools[0] = IRobotStateEmitter.NamedBool(
+            "active",
+            isActive,
+            address(0)
+        );
 
         _getRobotStateEmitter().emitStateChange(payload);
     }
@@ -184,20 +190,24 @@ contract AmmPrimitive is
             memory payload = _initStateChangePayload(0, 0, 2, 2, 0);
         payload.strings[0] = IRobotStateEmitter.NamedString(
             "token1Name",
-            IERC20Metadata(_token1).symbol()
+            IERC20Metadata(_token1).symbol(),
+            address(0)
         );
         payload.strings[1] = IRobotStateEmitter.NamedString(
             "token2Name",
-            IERC20Metadata(_token2).symbol()
+            IERC20Metadata(_token2).symbol(),
+            address(0)
         );
 
         payload.addresses[0] = IRobotStateEmitter.NamedAddress(
             "token1Address",
-            _token1
+            _token1,
+            address(0)
         );
         payload.addresses[1] = IRobotStateEmitter.NamedAddress(
             "token2Address",
-            _token2
+            _token2,
+            address(0)
         );
         _getRobotStateEmitter().emitStateChange(payload);
     }
@@ -279,26 +289,42 @@ contract AmmPrimitive is
         emit LiquidityAdded(msgSender, _amount1, _amount2);
 
         IRobotStateEmitter.StateChangePayload
-            memory payload = _initStateChangePayload(0, 3, 0, 0, 0);
+            memory payload = _initStateChangePayload(0, 4, 0, 0, 0);
 
         if (holderChanged) {
             payload.uints = new IRobotStateEmitter.NamedUint[](1);
             payload.uints[0] = IRobotStateEmitter.NamedUint(
                 "totalLiquidityHolders",
-                _liquidityHolderCount
+                _liquidityHolderCount,
+                address(0),
+                Operation.Set
             );
         }
         payload.floats[0] = IRobotStateEmitter.NamedFloat(
             _TOT_LIQ,
-            _tokenOnePrimitive.contractFormatToUserFormat(totalLiquidityShares)
+            _tokenOnePrimitive.contractFormatToUserFormat(totalLiquidityShares),
+            address(0),
+            Operation.Set
         );
         payload.floats[1] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN1,
-            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
+            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1),
+            address(0),
+            Operation.Set
         );
         payload.floats[2] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN2,
-            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
+            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2),
+            address(0),
+            Operation.Set
+        );
+        payload.floats[3] = IRobotStateEmitter.NamedFloat(
+            "liquidityTokens",
+            _tokenOnePrimitive.contractFormatToUserFormat(
+                liquidityShare[msgSender]
+            ),
+            msgSender,
+            Operation.Set
         );
         _getRobotStateEmitter().emitStateChange(payload);
 
@@ -357,27 +383,43 @@ contract AmmPrimitive is
         IRobotStateEmitter.StateChangePayload
             memory payload = _initStateChangePayload(
                 holderChanged ? 1 : 0,
-                3,
+                4,
                 0,
                 0,
                 0
             );
         payload.floats[0] = IRobotStateEmitter.NamedFloat(
             _TOT_LIQ,
-            _tokenOnePrimitive.contractFormatToUserFormat(totalLiquidityShares)
+            _tokenOnePrimitive.contractFormatToUserFormat(totalLiquidityShares),
+            address(0),
+            Operation.Set
         );
         payload.floats[1] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN1,
-            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
+            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1),
+            address(0),
+            Operation.Set
         );
         payload.floats[2] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN2,
-            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
+            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2),
+            address(0),
+            Operation.Set
+        );
+        payload.floats[3] = IRobotStateEmitter.NamedFloat(
+            "liquidityTokens",
+            _tokenOnePrimitive.contractFormatToUserFormat(
+                liquidityShare[msgSender]
+            ),
+            msgSender,
+            Operation.Set
         );
         if (holderChanged) {
             payload.uints[0] = IRobotStateEmitter.NamedUint(
                 "totalLiquidityHolders",
-                _liquidityHolderCount
+                _liquidityHolderCount,
+                address(0),
+                Operation.Set
             );
         }
 
@@ -421,6 +463,7 @@ contract AmmPrimitive is
         uint256 inReserve = _reserves1;
         uint256 outReserve = _reserves2;
         bool isToken1 = true;
+        address msgSender = _msgSender();
 
         if (amountIn == 0) revert InvalidAmount();
         if (token == _token2) {
@@ -439,7 +482,7 @@ contract AmmPrimitive is
             ((inReserve * 10000) + product);
 
         IRobotStateEmitter.StateChangePayload
-            memory payload = _initStateChangePayload(1, 3, 0, 0, 0);
+            memory payload = _initStateChangePayload(2, 3, 0, 0, 0);
 
         if (isToken1) {
             _reserves1 += amountIn;
@@ -447,7 +490,11 @@ contract AmmPrimitive is
             _amountOneSwapped += amountIn;
             payload.floats[0] = IRobotStateEmitter.NamedFloat(
                 "amount1Swapped",
-                _tokenOnePrimitive.contractFormatToUserFormat(_amountOneSwapped)
+                _tokenOnePrimitive.contractFormatToUserFormat(
+                    _amountOneSwapped
+                ),
+                address(0),
+                Operation.Set
             );
         } else {
             _reserves2 += amountIn;
@@ -455,29 +502,48 @@ contract AmmPrimitive is
             _amountTwoSwapped += amountIn;
             payload.floats[0] = IRobotStateEmitter.NamedFloat(
                 "amount2Swapped",
-                _tokenTwoPrimitive.contractFormatToUserFormat(_amountTwoSwapped)
+                _tokenTwoPrimitive.contractFormatToUserFormat(
+                    _amountTwoSwapped
+                ),
+                address(0),
+                Operation.Set
             );
         }
 
         payload.floats[1] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN1,
-            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
+            _tokenOnePrimitive.contractFormatToUserFormat(_reserves1),
+            address(0),
+            Operation.Set
         );
         payload.floats[2] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN2,
-            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
+            _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2),
+            address(0),
+            Operation.Set
         );
 
         _numSwaps++;
-        payload.uints[0] = IRobotStateEmitter.NamedUint("numSwaps", _numSwaps);
+        payload.uints[0] = IRobotStateEmitter.NamedUint(
+            "numSwaps",
+            _numSwaps,
+            address(0),
+            Operation.Set
+        );
+        payload.uints[1] = IRobotStateEmitter.NamedUint(
+            "numSwapsPerAccount",
+            1,
+            msgSender,
+            Operation.Add
+        );
 
-        emit TokensSwapped(msg.sender, amountIn, amountOut);
+        emit TokensSwapped(msgSender, amountIn, amountOut);
 
         _getRobotStateEmitter().emitStateChange(payload);
         // Transfer input tokens in
-        _transferTokenIn(inTokenAddr, msg.sender, amountIn);
+        _transferTokenIn(inTokenAddr, msgSender, amountIn);
         // Transfer output tokens to user
-        _transferTokenOut(outTokenAddr, msg.sender, amountOut);
+        _transferTokenOut(outTokenAddr, msgSender, amountOut);
     }
 
     function priceUint(address token) external view returns (uint256) {
@@ -578,11 +644,18 @@ contract AmmPrimitive is
         IRobotStateEmitter.StateChangePayload
             memory payload = _initStateChangePayload(2, 6, 2, 2, 1);
 
-        payload.uints[0] = IRobotStateEmitter.NamedUint("numSwaps", _numSwaps);
+        payload.uints[0] = IRobotStateEmitter.NamedUint(
+            "numSwaps",
+            _numSwaps,
+            address(0),
+            Operation.Set
+        );
 
         payload.uints[1] = IRobotStateEmitter.NamedUint(
             "totalLiquidityHolders",
-            _liquidityHolderCount
+            _liquidityHolderCount,
+            address(0),
+            Operation.Set
         );
 
         payload.floats[0] = IRobotStateEmitter.NamedFloat(
@@ -591,7 +664,9 @@ contract AmmPrimitive is
                 ? _tokenOnePrimitive.contractFormatToUserFormat(
                     _amountOneSwapped
                 )
-                : "0"
+                : "0",
+            address(0),
+            Operation.Set
         );
         payload.floats[1] = IRobotStateEmitter.NamedFloat(
             "amount2Swapped",
@@ -599,7 +674,9 @@ contract AmmPrimitive is
                 ? _tokenTwoPrimitive.contractFormatToUserFormat(
                     _amountTwoSwapped
                 )
-                : "0"
+                : "0",
+            address(0),
+            Operation.Set
         );
         payload.floats[2] = IRobotStateEmitter.NamedFloat(
             _TOT_LIQ,
@@ -607,47 +684,63 @@ contract AmmPrimitive is
                 ? _tokenOnePrimitive.contractFormatToUserFormat(
                     totalLiquidityShares
                 )
-                : "0"
+                : "0",
+            address(0),
+            Operation.Set
         );
         payload.floats[3] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN1,
             tokenOneSet
                 ? _tokenOnePrimitive.contractFormatToUserFormat(_reserves1)
-                : "0"
+                : "0",
+            address(0),
+            Operation.Set
         );
         payload.floats[4] = IRobotStateEmitter.NamedFloat(
             _L_TOKEN2,
             tokenTwoSet
                 ? _tokenTwoPrimitive.contractFormatToUserFormat(_reserves2)
-                : "0"
+                : "0",
+            address(0),
+            Operation.Set
         );
         payload.floats[5] = IRobotStateEmitter.NamedFloat(
             "fee",
             UserDecimalFormatting.contractFormatToUserFormat(
                 _fee,
                 _FEE_DECIMALS
-            )
+            ),
+            address(0),
+            Operation.Set
         );
 
         payload.strings[0] = IRobotStateEmitter.NamedString(
             "token1Name",
-            tokenOneSet ? IERC20Metadata(_token1).symbol() : ""
+            tokenOneSet ? IERC20Metadata(_token1).symbol() : "",
+            address(0)
         );
         payload.strings[1] = IRobotStateEmitter.NamedString(
             "token2Name",
-            tokenTwoSet ? IERC20Metadata(_token2).symbol() : ""
+            tokenTwoSet ? IERC20Metadata(_token2).symbol() : "",
+            address(0)
         );
 
         payload.addresses[0] = IRobotStateEmitter.NamedAddress(
             "token1Address",
-            _token1
+            _token1,
+            address(0)
         );
         payload.addresses[1] = IRobotStateEmitter.NamedAddress(
             "token2Address",
-            _token2
+            _token2,
+            address(0)
         );
 
-        payload.bools[0] = IRobotStateEmitter.NamedBool("active", isActive);
+        payload.bools[0] = IRobotStateEmitter.NamedBool(
+            "active",
+            isActive,
+            address(0)
+        );
 
         return payload;
     }
