@@ -57,10 +57,9 @@ var (
 	LLMPrecompileABI = contract.ParseABI(LLMPrecompileRawABI)
 
 	// Prompt Counter for identification of evaluations
-	promptCounterKey       = common.BytesToHash([]byte("promptCounter"))
 	addressToPrimitiveName = common.BytesToHash([]byte("addressToPrimitiveName"))
 	lookupStorageKey       = crypto.Keccak256Hash([]byte("lookupStorage")) // Base slot key
-	promptIdKey            = common.BytesToHash([]byte("promtIdKey"))
+	systemPrimitiveKey     = []byte("systemPrimitiveKey")
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
@@ -369,6 +368,22 @@ func keysOfMap(m map[string]interface{}) []string {
 	return keys
 }
 
+// Helper to get the SystemPrimitive address from state
+func getSystemPrimitiveAddress(stateDB contract.StateDB, addr common.Address) (string, error) {
+	key := "SystemPrimitive"
+	fullKey := crypto.Keccak256Hash(append(systemPrimitiveKey, []byte(key)...))
+	stored, err := getLargeState(stateDB, addr, fullKey)
+	if err != nil {
+		log.Error("getSystemPrimitiveAddress: getLargeState failed", "error", err)
+		return "", fmt.Errorf("failed to get SystemPrimitive address: %w", err)
+	}
+	if len(stored) == 0 {
+		return common.Address{}.Hex(), nil
+	}
+	// stored is []byte, convert to string (should be hex address)
+	return string(stored), nil
+}
+
 // evaluatePlan expects a Python script and names, and runs evaluateSteps.
 func evaluatePlan(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	log.Info("evaluatePlan called", "caller", caller.Hex(), "addr", addr.Hex(), "inputLen", len(input), "suppliedGas", suppliedGas, "readOnly", readOnly)
@@ -385,6 +400,17 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, unpackErr
 	}
 	log.Info("evaluatePlan unpacked input", "plan", plan, "contracts", contracts, "wallets", wallets)
+
+	// Add SystemPrimitive to contracts
+	systemAddr, err := getSystemPrimitiveAddress(accessibleState.GetStateDB(), addr)
+	if err != nil {
+		log.Error("evaluatePlan: could not get SystemPrimitive address", "error", err)
+		return nil, remainingGas, err
+	}
+	contracts["systemPrimitive"] = map[string]interface{}{
+		"primitive": "SystemPrimitive",
+		"address":   systemAddr,
+	}
 
 	promptIdInt := getPromptIdFromInput(input)
 
@@ -433,6 +459,17 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, unpackErr
 	}
 	log.Info("evaluatePrompt unpacked input", "prompt", prompt, "contracts", contracts, "wallets", wallets)
+
+	// Add SystemPrimitive to contracts
+	systemAddr, err := getSystemPrimitiveAddress(accessibleState.GetStateDB(), addr)
+	if err != nil {
+		log.Error("evaluatePrompt: could not get SystemPrimitive address", "error", err)
+		return nil, remainingGas, err
+	}
+	contracts["SystemPrimitive"] = map[string]interface{}{
+		"primitive": "SystemPrimitive",
+		"address":   systemAddr,
+	}
 
 	promptIdInt := getPromptIdFromInput(input)
 

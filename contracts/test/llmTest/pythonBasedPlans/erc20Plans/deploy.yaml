@@ -1,0 +1,7 @@
+title: "deploy"
+description: |
+  Deploys erc20 token.
+expected:
+prompt: |
+  Deploy an erc20 token called JIRI. No custom rules. Then answer the question: What is the address of JIRI?
+python:
