@@ -72,10 +72,6 @@ describe("LLM Precompiled Contract - Prompt - erc20Plans", function () {
           primitive: "erc20",
           address: usdcContractAddress,
         },
-        SystemPrimitive: {
-          primitive: "SystemPrimitive",
-          address: ethers.ZeroAddress, // SystemPrimitive is not used in this test
-        },
       },
     });
 
