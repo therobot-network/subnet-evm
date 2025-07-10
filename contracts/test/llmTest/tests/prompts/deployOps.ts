@@ -5,6 +5,7 @@ import * as path from "path";
 import yaml from "js-yaml";
 import { setupTestEnvironment, TestEnv } from "../helpers/setupFixtures";
 import { ethers } from "hardhat";
+import { sign } from "crypto";
 
 // const originalSend = network.provider.send;
 
@@ -36,18 +37,21 @@ const erc20PlansDir = path.resolve(
 describe("LLM Precompiled Contract - Prompt - erc20Plans", function () {
   let env: TestEnv;
   let executor: Contract;
-  let usdcContract: Contract;
-  let usdcContractAddress: string;
   let owner: Signer;
   let llmContract: Contract;
 
   before(async function () {
-    env = await setupTestEnvironment(["llm", "executor", "usdcContract"]);
-    ({ executor, owner, llmContract, usdcContractAddress, usdcContract } = env);
+    env = await setupTestEnvironment([
+      "llm",
+      "executor",
+      "erc20Primitive",
+      "systemPrimitive",
+    ]);
+    ({ executor, owner, llmContract } = env);
   });
 
-  it("should pass balance.yaml", async function () {
-    const testFile = path.join(erc20PlansDir, "balance.yaml");
+  it("should pass deploy.yaml", async function () {
+    const testFile = path.join(erc20PlansDir, "deploy.yaml");
     const raw = fs.readFileSync(testFile, "utf8");
     const data = yaml.load(raw) as {
       title: string;
@@ -57,32 +61,57 @@ describe("LLM Precompiled Contract - Prompt - erc20Plans", function () {
       fails?: boolean;
     };
 
-    const ownerAddress = await owner.getAddress();
-
-    const balance = await usdcContract.balanceOf(ownerAddress);
-
     const payload = JSON.stringify({
       prompt: data.prompt,
       wallets: {
-        // signer: "0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC",
-        bob: ownerAddress,
+        signer: await owner.getAddress(),
       },
-      contracts: {
-        USDC: {
-          primitive: "erc20",
-          address: usdcContractAddress,
-        },
-      },
+      contracts: {},
     });
 
     const tx = await executor.evalPrompt(payload);
     await tx.wait();
 
+    // const receipt = await tx.wait();
+    // for (const log of receipt.logs) {
+    //   try {
+    //     const parsed = executor.interface.parseLog(log);
+    //     console.log("Event:", parsed.name, parsed.args);
+    //   } catch (e) {
+    //     // Not all logs are from this contract, so ignore parse errors
+    //   }
+    // }
+
+    let jiriContractAddress: string;
+
     await expect(tx)
       .to.emit(llmContract, "QuestionAnswer")
       .withArgs(
-        (question) => question === "What is bob's USDC balance?",
-        (answer) => ethers.parseUnits(answer, 18) === balance,
+        (question) => true,
+        (answer) => {
+          jiriContractAddress = answer;
+          return true;
+        },
       );
+
+    await expect(tx)
+      .to.emit(executor, "RobotContractDeployed")
+      .withArgs(
+        (contractName) => contractName === "JIRI",
+        (robotContractAddress) => {
+          jiriContractAddress = robotContractAddress;
+          return true;
+        },
+        (primitiveName) => primitiveName === "erc20",
+      );
+
+    const jiriContract = await ethers.getContractAt(
+      "ERC20Primitive",
+      jiriContractAddress,
+      owner,
+    );
+    const balance = await jiriContract.balanceOfFloat(await owner.getAddress());
+    expect(balance).to.equal("500");
+    expect(await jiriContract.name()).to.equal("ROBOT_DEPLOYED_JIRI");
   });
 });

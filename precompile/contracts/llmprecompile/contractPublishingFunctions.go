@@ -148,19 +148,10 @@ if readOnly {
 	contractAddress := inputStruct.ContractAddress
 	metadata := inputStruct.Name
 
-	if err := updatePlanLocalState(stateDB, addr, metadata, contractAddress); err != nil {
-		log.Info("Failed to store permanent lookup entry", "Key", metadata, "Error", err)
-		return nil, remainingGas, fmt.Errorf("failed to permanent store lookup entry for key %s: %w", metadata, err)
-	}
-
-	log.Info("Stored permanent lookup entry", "Key", metadata, "Address", contractAddress.Hex())
-
-	metadataHash := common.BytesToHash([]byte(metadata))
-	fullKey := crypto.Keccak256Hash(append(lookupStorageKey.Bytes(), metadataHash.Bytes()...))
-
+	fullKey := crypto.Keccak256Hash(append(systemPrimitiveKey, []byte(metadata)...))
 	existingValue, err := getLargeState(stateDB, addr, fullKey)
 	if err != nil {
-		log.Info("Failed to retrieve metadata key from state", "Error", err)
+		log.Info("Failed to retrieve systemPrimitive data key from state", "Error", err)
 		return nil, remainingGas, err
 	}
 	if len(existingValue) > 0 {
@@ -168,24 +159,11 @@ if readOnly {
 		return nil, remainingGas, fmt.Errorf("util name already registered")
 	}
 
-	setLargeState(stateDB, addr, fullKey, contractAddress.Bytes())
-	log.Info("Stored mapping metadata -> address", "Metadata", metadata, "ContractAddress", contractAddress.Hex())
-
-	addressHash := common.BytesToHash([]byte(contractAddress.Hex()))
-	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), addressHash.Bytes()...))
-	metadataBytes := []byte(metadata)
-	setLargeState(stateDB, addr, fullKey, metadataBytes)
-
-	log.Info("Stored mapping address -> metadata", "Metadata", metadata, "ContractAddress", contractAddress.Hex())
-
-	contractAddressHash := common.BytesToHash(contractAddress.Bytes())
-	fullKey = crypto.Keccak256Hash(append(addressToPrimitiveName.Bytes(), contractAddressHash.Bytes()...))
-	setLargeState(stateDB, addr, fullKey, metadataBytes)
+	setLargeState(stateDB, addr, fullKey, []byte(contractAddress.Hex()))
 
 	log.Info("Stored primitive mapping",
-		"Name", string(metadataBytes),
+		"Name", metadata,
 		"ContractAddress", contractAddress.Hex(),
-		"ContractAddressHash", contractAddressHash.Hex(),
 		"FullKey", fullKey.Hex(),
 		"StorageAddr", addr.Hex(),
 	)

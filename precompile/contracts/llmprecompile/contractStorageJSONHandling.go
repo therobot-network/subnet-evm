@@ -240,28 +240,6 @@ func removeItemLocalState(stateDB contract.StateDB, addr common.Address, key str
 	return nil
 }
 
-func GetPromptCounter(stateDB contract.StateDB) *big.Int {
-	value := stateDB.GetState(ContractAddress, promptCounterKey)
-	if value == (common.Hash{}) {
-		log.Info("Prompt counter not found in state, initializing to 0")
-		return big.NewInt(0)
-	}
-	counter := new(big.Int).SetBytes(value.Bytes())
-	log.Info("Retrieved prompt counter", "counter", counter.String())
-	return counter
-}
-
-// IncrementPromptCounter increments the value of promptCounter in the StateDB by 1.
-func IncrementPromptCounter(stateDB contract.StateDB) *big.Int {
-	currentCounter := GetPromptCounter(stateDB)
-	nextCounter := new(big.Int).Add(currentCounter, big.NewInt(1))
-
-	// Store the new value in the StateDB
-	stateDB.SetState(ContractAddress, promptCounterKey, common.BigToHash(nextCounter))
-
-	return nextCounter // Return the current value before incrementing
-}
-
 // setLargeState stores [data] and includes its total length as an 8-byte prefix. It also removes any leftover chunks from previous larger values.
 func setLargeState(stateDB contract.StateDB, addr common.Address, key common.Hash, data []byte) {
 	// 1) Write length + data
