@@ -63,8 +63,8 @@ var (
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
-	backendUrl = "http://192.168.1.62:80"
-	// backendUrl = "https://brain-sprint.therobot.network"
+	// backendUrl = "http://192.168.1.62:80"
+	backendUrl = "https://brain-sprint.therobot.network"
 
 	llmApiPromptURL   = backendUrl + "/eval_prompt"
 	llmApiPlanURL     = backendUrl + "/eval_plan"
