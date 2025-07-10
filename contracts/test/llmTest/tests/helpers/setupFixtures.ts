@@ -82,7 +82,8 @@ export async function setupTestEnvironment(
   const needMath = contractsToDeploy.includes("mathContract");
   const needERC20 =
     contractsToDeploy.includes("usdcContract") ||
-    contractsToDeploy.includes("jiriContract");
+    contractsToDeploy.includes("jiriContract") ||
+    contractsToDeploy.includes("erc20Primitive");
   const needAMM =
     contractsToDeploy.includes("ammContract1") ||
     contractsToDeploy.includes("ammContract2") ||
@@ -105,7 +106,7 @@ export async function setupTestEnvironment(
   }
   if (needERC20) {
     const ERC20Factory = await ethers.getContractFactory("ERC20Primitive", {
-      libraries: { UserDecimalFormatting: udfAddress },
+      // libraries: { UserDecimalFormatting: udfAddress },
     });
     try {
       const ERC20Primitive = await ERC20Factory.deploy(
@@ -120,7 +121,7 @@ export async function setupTestEnvironment(
   }
   if (needAMM) {
     const AmmFactory = await ethers.getContractFactory("AmmPrimitive", {
-      libraries: { UserDecimalFormatting: udfAddress },
+      // libraries: { UserDecimalFormatting: udfAddress },
     });
     await AmmFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
       console.warn("Skipping AmmPrimitive"),
@@ -128,7 +129,7 @@ export async function setupTestEnvironment(
   }
   if (needSystem) {
     const SystemFactory = await ethers.getContractFactory("SystemPrimitive", {
-      libraries: { UserDecimalFormatting: udfAddress },
+      // libraries: { UserDecimalFormatting: udfAddress },
     });
     await SystemFactory.deploy(LLM_ADDRESS, "", executorAddress).catch(() =>
       console.warn("Skipping SystemPrimitive"),
@@ -136,7 +137,7 @@ export async function setupTestEnvironment(
   }
   if (needPython) {
     const PythonFactory = await ethers.getContractFactory("PythonPrimitive", {
-      libraries: { UserDecimalFormatting: udfAddress },
+      // libraries: { UserDecimalFormatting: udfAddress },
     });
     await PythonFactory.deploy(LLM_ADDRESS, "").catch(() =>
       console.warn("Skipping PythonPrimitive"),

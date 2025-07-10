@@ -1,0 +1,7 @@
+title: "deploy"
+description: |
+  Deploys erc20 token.
+expected:
+prompt: |
+  Deploy an erc20 token called JIRI. No custom rules. The address returned should instantiate an erc20 object. Mint 500 tokens on the JIRI contract use mint function, arg should only be the amount. Then answer the question: What is the address of JIRI?
+python:
