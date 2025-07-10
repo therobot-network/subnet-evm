@@ -2,7 +2,6 @@ package llmprecompile
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,11 +59,12 @@ var (
 	addressToPrimitiveName = common.BytesToHash([]byte("addressToPrimitiveName"))
 	lookupStorageKey       = crypto.Keccak256Hash([]byte("lookupStorage")) // Base slot key
 	systemPrimitiveKey     = []byte("systemPrimitiveKey")
+	promptIdKey            = common.BytesToHash([]byte("promptIdKey"))
 
 	LLMPrecompilePrecompile = createLLMPrecompilePrecompile()
 
-	// backendUrl = "http://192.168.1.62:80"
-	backendUrl = "https://brain-sprint.therobot.network"
+	backendUrl = "http://192.168.1.62:80"
+	// backendUrl = "https://brain-sprint.therobot.network"
 
 	llmApiPromptURL   = backendUrl + "/eval_prompt"
 	llmApiPlanURL     = backendUrl + "/eval_plan"
@@ -401,18 +401,19 @@ func evaluatePlan(accessibleState contract.AccessibleState, caller common.Addres
 	}
 	log.Info("evaluatePlan unpacked input", "plan", plan, "contracts", contracts, "wallets", wallets)
 
+	stateDB := accessibleState.GetStateDB()
 	// Add SystemPrimitive to contracts
-	systemAddr, err := getSystemPrimitiveAddress(accessibleState.GetStateDB(), addr)
+	systemAddr, err := getSystemPrimitiveAddress(stateDB, addr)
 	if err != nil {
 		log.Error("evaluatePlan: could not get SystemPrimitive address", "error", err)
 		return nil, remainingGas, err
 	}
-	contracts["systemPrimitive"] = map[string]interface{}{
+	contracts["system_primitive"] = map[string]interface{}{
 		"primitive": "SystemPrimitive",
 		"address":   systemAddr,
 	}
 
-	promptIdInt := getPromptIdFromInput(input)
+	promptIdInt := getAndIncrementPromptId(accessibleState, addr)
 
 	// Use promptIdInt for run_id and output
 	payload := map[string]interface{}{"plan": plan, "contracts": contracts, "wallet_addresses": wallets, "run_id": promptIdInt, "localModel": false}
@@ -471,8 +472,8 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 		"address":   systemAddr,
 	}
 
-	promptIdInt := getPromptIdFromInput(input)
-
+	promptIdInt := getAndIncrementPromptId(accessibleState, addr)
+	
 	payload := map[string]interface{}{
 		"user_prompt":      prompt,
 		"contracts":        contracts,
@@ -506,8 +507,26 @@ func evaluatePrompt(accessibleState contract.AccessibleState, caller common.Addr
 	return packed, remainingGas, nil
 }
 
-// getPromptIdFromInput computes a uint256 promptId as the sha256 hash of the input bytes
-func getPromptIdFromInput(input []byte) *big.Int {
-	hash := sha256.Sum256(input)
-	return new(big.Int).SetBytes(hash[:])
+// // getPromptIdFromInput computes a uint256 promptId as the sha256 hash of the input bytes
+// func getPromptIdFromInput(input []byte, caller common.Address) *big.Int {
+// 	hash := sha256.Sum256(input)
+// 	return new(big.Int).SetBytes(hash[:])
+// }
+
+
+// getAndIncrementPromptId retrieves the current promptId for the given contract address from state, increments it, stores it, and returns the new value.
+func getAndIncrementPromptId(accessibleState contract.AccessibleState, addr common.Address) *big.Int {
+	promptIdRaw := accessibleState.GetStateDB().GetState(addr, promptIdKey).Bytes()
+	var promptIdInt *big.Int
+	if len(promptIdRaw) == 0 {
+		promptIdInt = big.NewInt(1)
+	} else {
+		promptIdInt = new(big.Int)
+		promptIdInt.SetBytes(promptIdRaw)
+		promptIdInt.Add(promptIdInt, big.NewInt(1))
+	}
+	stateDB := accessibleState.GetStateDB()
+	stateDB.SetState(addr, promptIdKey, common.BigToHash(promptIdInt))
+
+	return promptIdInt
 }

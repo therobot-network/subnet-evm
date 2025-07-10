@@ -66,26 +66,21 @@ describe("LLM Precompiled Contract - Prompt - erc20Plans", function () {
       wallets: {
         signer: await owner.getAddress(),
       },
-      contracts: {
-        AMM1: {
-          primitive: "amm",
-          address: ethers.ZeroAddress,
-        },
-      },
+      contracts: {},
     });
 
     const tx = await executor.evalPrompt(payload);
     await tx.wait();
 
-    const receipt = await tx.wait();
-    for (const log of receipt.logs) {
-      try {
-        const parsed = executor.interface.parseLog(log);
-        console.log("Event:", parsed.name, parsed.args);
-      } catch (e) {
-        // Not all logs are from this contract, so ignore parse errors
-      }
-    }
+    // const receipt = await tx.wait();
+    // for (const log of receipt.logs) {
+    //   try {
+    //     const parsed = executor.interface.parseLog(log);
+    //     console.log("Event:", parsed.name, parsed.args);
+    //   } catch (e) {
+    //     // Not all logs are from this contract, so ignore parse errors
+    //   }
+    // }
 
     let jiriContractAddress: string;
 
@@ -115,8 +110,8 @@ describe("LLM Precompiled Contract - Prompt - erc20Plans", function () {
       jiriContractAddress,
       owner,
     );
-    // const balance = await jiriContract.balanceOf(await owner.getAddress());
-    // expect(balance).to.equal(500n);
+    const balance = await jiriContract.balanceOfFloat(await owner.getAddress());
+    expect(balance).to.equal("500");
     expect(await jiriContract.name()).to.equal("ROBOT_DEPLOYED_JIRI");
   });
 });
